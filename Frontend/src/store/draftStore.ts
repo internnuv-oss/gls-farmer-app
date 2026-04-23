@@ -4,7 +4,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export interface DraftState {
   drafts: any[];
-  addDraft: (draft: any) => void;
+  addDraft: (draft: any ,customId?: string) => void;
   removeDraft: (id: string) => void;
   updateDraft: (id: string, data: any) => void;
 }
@@ -13,8 +13,8 @@ export const useDraftStore = create<DraftState>()(
   persist(
     (set) => ({
       drafts: [],
-      addDraft: (data) => set((state) => ({ 
-        drafts: [...state.drafts, { id: Date.now().toString(), type: 'Dealer', data }] 
+      addDraft: (data, customId) => set((state) => ({ 
+        drafts: [...state.drafts, { id: customId || Date.now().toString(), type: 'Dealer', data }] 
       })),
       removeDraft: (id) => set((state) => ({ 
         drafts: state.drafts.filter((d) => d.id !== id) 

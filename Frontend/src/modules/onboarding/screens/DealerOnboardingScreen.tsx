@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { View, Text, Pressable, ActivityIndicator, ScrollView } from 'react-native';
+import { View, Text, Pressable, ActivityIndicator, ScrollView ,BackHandler} from 'react-native';
 import { Controller } from 'react-hook-form';
 import { MaterialIcons } from '@expo/vector-icons';
 import { WizardFlowTemplate, FeedbackScreenTemplate } from '../../../design-system/templates';
@@ -38,6 +38,7 @@ const INDIAN_BANKS = [
 export const DealerOnboardingScreen = ({ navigation, route }: any) => {
   const { form, step, setStep, saveDraft, submit, scoreData, handleUpload, handleAudioUpload, uploading, isSubmitting, isNextEnabled, showSuccess, setShowSuccess, generatePDF, isEditing } = useDealerOnboarding(navigation, route);
   const { control, watch, setValue } = form;
+  const [jumpBackTo, setJumpBackTo] = React.useState<number | null>(null);
 
   const dynamicChecklistDocs = useMemo(() => {
     const checked = watch('complianceChecklist') || [];
@@ -156,6 +157,28 @@ export const DealerOnboardingScreen = ({ navigation, route }: any) => {
       setVillages([]);
     }
   }, [selectedTaluka, selectedCity, stateData]);
+
+  // 5 back handler
+  React.useEffect(() => {
+    const handleBackPress = () => {
+      if (jumpBackTo) {
+        setStep(jumpBackTo);
+        setJumpBackTo(null);
+        return true; 
+      }
+      if (step > 1) {
+        setStep(step - 1);
+        return true; 
+      }
+      return false; 
+    };
+
+    // ✅ 1. Store the subscription returned by addEventListener
+    const backSubscription = BackHandler.addEventListener('hardwareBackPress', handleBackPress);
+    
+    // ✅ 2. Call .remove() directly on the subscription for cleanup
+    return () => backSubscription.remove();
+  }, [step, jumpBackTo]);
   // --- END GITHUB REPO LOGIC ---
 
   if (showSuccess) {
@@ -274,13 +297,35 @@ export const DealerOnboardingScreen = ({ navigation, route }: any) => {
   return (
     <WizardFlowTemplate
       headerTitle={isEditing ? "Edit Dealer Profile" : "Dealer Onboarding"} stepLabel={`STEP ${step} OF 9`} progress01={step / 9}
-      onBack={() => step > 1 ? setStep(step - 1) : navigation.goBack()}
+      onBack={() => {
+        if (jumpBackTo) {
+          setStep(jumpBackTo);
+          setJumpBackTo(null);
+        } else {
+          step > 1 ? setStep(step - 1) : navigation.goBack();
+        }
+      }}
       footer={
         <View style={{ flexDirection: 'row', gap: spacing.sm }}>
           {!isEditing && <View style={{ flex: 1 }}><Button label="Save Draft" variant="secondary" onPress={saveDraft} disabled={isSubmitting} /></View>}
           <View style={{ flex: 1 }}>
-            {step < 9 ? <Button label="Next" onPress={() => setStep(step + 1)} disabled={!isNextEnabled} /> 
-                      : <Button label={isEditing ? "Save Changes" : "Submit Profile"} onPress={submit} loading={isSubmitting} disabled={!isNextEnabled} />}
+            {step < 9 ? (
+              // ✅ UPDATE 2: Handle the Next button
+              <Button 
+                label={jumpBackTo ? "Return to Review" : "Next"} 
+                onPress={() => {
+                  if (jumpBackTo) {
+                    setStep(jumpBackTo);
+                    setJumpBackTo(null); // Clear memory after jumping
+                  } else {
+                    setStep(step + 1);
+                  }
+                }} 
+                disabled={!isNextEnabled} 
+              /> 
+            ) : (
+              <Button label={isEditing ? "Save Changes" : "Submit Profile"} onPress={submit} loading={isSubmitting} disabled={!isNextEnabled} />
+            )}
           </View>
         </View>
       }
@@ -975,10 +1020,10 @@ export const DealerOnboardingScreen = ({ navigation, route }: any) => {
           <View style={{ backgroundColor: colors.surface, padding: spacing.lg, borderRadius: radius.md, borderWidth: 1, borderColor: colors.border, marginBottom: spacing.md }}>
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.sm }}>
                <Text style={{ fontSize: 16, fontWeight: '800', color: colors.primary }}>1. Basic Info</Text>
-               <Pressable onPress={() => setStep(1)} style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                 <MaterialIcons name="edit" size={16} color={colors.primary} />
-                 <Text style={{ color: colors.primary, fontWeight: '700' }}>Edit</Text>
-               </Pressable>
+               <Pressable onPress={() => { setJumpBackTo(9); setStep(1); }} style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+  <MaterialIcons name="edit" size={16} color={colors.primary} />
+  <Text style={{ color: colors.primary, fontWeight: '700' }}>Edit</Text>
+</Pressable>
             </View>
             <Text style={{ color: colors.textMuted, marginBottom: 4 }}>Shop Name: <Text style={{ color: colors.text }}>{watch('shopName')}</Text></Text>
             <Text style={{ color: colors.textMuted, marginBottom: 4 }}>Owner Name: <Text style={{ color: colors.text }}>{watch('ownerName')}</Text></Text>
@@ -1003,7 +1048,7 @@ export const DealerOnboardingScreen = ({ navigation, route }: any) => {
           <View style={{ backgroundColor: colors.surface, padding: spacing.lg, borderRadius: radius.md, borderWidth: 1, borderColor: colors.border, marginBottom: spacing.md }}>
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.sm }}>
                <Text style={{ fontSize: 16, fontWeight: '800', color: colors.primary }}>2. Profiling & Scoring</Text>
-               <Pressable onPress={() => setStep(2)} style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+               <Pressable onPress={() => { setJumpBackTo(9); setStep(2); }} style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
                  <MaterialIcons name="edit" size={16} color={colors.primary} />
                  <Text style={{ color: colors.primary, fontWeight: '700' }}>Edit</Text>
                </Pressable>
@@ -1031,7 +1076,7 @@ export const DealerOnboardingScreen = ({ navigation, route }: any) => {
           <View style={{ backgroundColor: colors.surface, padding: spacing.lg, borderRadius: radius.md, borderWidth: 1, borderColor: colors.border, marginBottom: spacing.md }}>
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.sm }}>
                <Text style={{ fontSize: 16, fontWeight: '800', color: colors.primary }}>3. Business Details</Text>
-               <Pressable onPress={() => setStep(3)} style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+               <Pressable onPress={() => { setJumpBackTo(9); setStep(3); }} style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
                  <MaterialIcons name="edit" size={16} color={colors.primary} />
                  <Text style={{ color: colors.primary, fontWeight: '700' }}>Edit</Text>
                </Pressable>
@@ -1050,7 +1095,7 @@ export const DealerOnboardingScreen = ({ navigation, route }: any) => {
           <View style={{ backgroundColor: colors.surface, padding: spacing.lg, borderRadius: radius.md, borderWidth: 1, borderColor: colors.border, marginBottom: spacing.md }}>
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.sm }}>
                <Text style={{ fontSize: 16, fontWeight: '800', color: colors.primary }}>4 & 5. Commitments & Checklists</Text>
-               <Pressable onPress={() => setStep(4)} style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+               <Pressable onPress={() => { setJumpBackTo(9); setStep(4); }} style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
                  <MaterialIcons name="edit" size={16} color={colors.primary} />
                  <Text style={{ color: colors.primary, fontWeight: '700' }}>Edit</Text>
                </Pressable>
@@ -1066,7 +1111,7 @@ export const DealerOnboardingScreen = ({ navigation, route }: any) => {
           <View style={{ backgroundColor: colors.surface, padding: spacing.lg, borderRadius: radius.md, borderWidth: 1, borderColor: colors.border, marginBottom: spacing.md }}>
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.sm }}>
                <Text style={{ fontSize: 16, fontWeight: '800', color: colors.primary }}>6. Documents & Photos</Text>
-               <Pressable onPress={() => setStep(6)} style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+               <Pressable onPress={() => { setJumpBackTo(9); setStep(6); }} style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
                  <MaterialIcons name="edit" size={16} color={colors.primary} />
                  <Text style={{ color: colors.primary, fontWeight: '700' }}>Edit</Text>
                </Pressable>
@@ -1084,7 +1129,7 @@ export const DealerOnboardingScreen = ({ navigation, route }: any) => {
           <View style={{ backgroundColor: colors.surface, padding: spacing.lg, borderRadius: radius.md, borderWidth: 1, borderColor: colors.border, marginBottom: spacing.md }}>
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.sm }}>
                <Text style={{ fontSize: 16, fontWeight: '800', color: colors.primary }}>7. Annexures</Text>
-               <Pressable onPress={() => setStep(7)} style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+               <Pressable onPress={() => { setJumpBackTo(9); setStep(7); }} style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
                  <MaterialIcons name="edit" size={16} color={colors.primary} />
                  <Text style={{ color: colors.primary, fontWeight: '700' }}>Edit</Text>
                </Pressable>
@@ -1115,7 +1160,7 @@ export const DealerOnboardingScreen = ({ navigation, route }: any) => {
           <View style={{ backgroundColor: colors.surface, padding: spacing.lg, borderRadius: radius.md, borderWidth: 1, borderColor: colors.border, marginBottom: spacing.md }}>
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.sm }}>
                <Text style={{ fontSize: 16, fontWeight: '800', color: colors.primary }}>8. Agreement & Signatures</Text>
-               <Pressable onPress={() => setStep(8)} style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+               <Pressable onPress={() => { setJumpBackTo(9); setStep(8); }} style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
                  <MaterialIcons name="edit" size={16} color={colors.primary} />
                  <Text style={{ color: colors.primary, fontWeight: '700' }}>Edit</Text>
                </Pressable>

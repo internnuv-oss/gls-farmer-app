@@ -153,7 +153,7 @@ export const DashboardScreen = ({ navigation }: any) => {
     },
   ];
 
-  const handleDelete = (id: string, name: string) => {
+  const handleDelete = useCallback((id: string, name: string) => {
     Alert.alert("Delete Profile", `Are you sure you want to delete ${name}?`, [
       { text: "Cancel", style: "cancel" },
       {
@@ -169,7 +169,16 @@ export const DashboardScreen = ({ navigation }: any) => {
         },
       },
     ]);
-  };
+  }, []);
+
+  const renderDealerItem = useCallback(({ item }: any) => (
+    <EntityCard 
+      item={item} 
+      navigation={navigation} 
+      t={t} 
+      onDelete={handleDelete} 
+    />
+  ), [navigation, t, handleDelete]);
 
   const getScoreColor = (score: number) => {
     if (score > 60) return '#3730A3'; // Elite (Premium Deep Indigo)
@@ -178,8 +187,14 @@ export const DashboardScreen = ({ navigation }: any) => {
     return '#991B1B';                  // C-Category (Crimson Red)
   };
 
+  interface EntityCardProps {
+    item: any;
+    navigation: any;
+    t: any;
+    onDelete: (id: string, name: string) => void;
+  }
   // Dedicated Card Component to manage individual modal and measurement states
-  const EntityCard = ({ item }: { item: any }) => {
+  const EntityCard = React.memo(({ item, navigation, t, onDelete }: EntityCardProps) => {
     const [menuVisible, setMenuVisible] = useState(false);
     const iconRef = useRef<View>(null);
     const [menuCoords, setMenuCoords] = useState({ top: 0, right: 0 });
@@ -369,7 +384,7 @@ export const DashboardScreen = ({ navigation }: any) => {
         </View>
       </View>
     );
-  };
+  });
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.screen, paddingTop: 50 }}>
@@ -570,15 +585,20 @@ export const DashboardScreen = ({ navigation }: any) => {
             <View style={{ width }}>
               <FlatList
                 data={item.data}
-                renderItem={({ item: dealerItem }) => (
-                  <EntityCard item={dealerItem} />
-                )}
+                renderItem={renderDealerItem}
                 keyExtractor={(i) => i.id}
                 contentContainerStyle={{
                   padding: spacing.lg,
                   paddingBottom: 100,
                 }}
                 showsVerticalScrollIndicator={false}
+
+
+                initialNumToRender={5}       // How many items to render in the first batch
+                maxToRenderPerBatch={5}      // How many items to render in subsequent batches
+                windowSize={5}               // How many screens worth of content to keep in memory
+                removeClippedSubviews={true} // Unmount components that are off-screen
+                updateCellsBatchingPeriod={50} // How often to update cells (in ms)
                 refreshControl={
                   <RefreshControl
                     refreshing={refreshing}

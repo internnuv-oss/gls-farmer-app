@@ -29,7 +29,7 @@ export const SimpleScreenTemplate: React.FC<SimpleProps> = ({ title, onBack, rig
     <View style={{ flex: 1, backgroundColor: colors.screen }}>
       <View style={{ paddingTop: paddingTop + spacing.md, paddingHorizontal: spacing.lg, paddingBottom: spacing.md, flexDirection: 'row', alignItems: 'center' }}>
         {onBack ? (
-          <Pressable onPress={onBack} style={{ paddingVertical: spacing.sm, paddingRight: spacing.md }}>
+          <Pressable onPress={onBack} hitSlop={20} style={{ paddingVertical: spacing.sm, paddingRight: spacing.md }}>
             <MaterialIcons name="chevron-left" size={28} color={colors.text} />
           </Pressable>
         ) : <View style={{ width: 28 }} />}
@@ -114,7 +114,7 @@ export const WizardFlowTemplate: React.FC<WizardProps> = ({ headerTitle, stepLab
       <View style={{ paddingTop, paddingHorizontal: spacing.lg, backgroundColor: colors.surface, paddingBottom: spacing.md, borderBottomWidth: 1, borderBottomColor: colors.border }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: spacing.sm }}>
           {onBack ? (
-            <Pressable onPress={onBack} style={{ paddingRight: spacing.md }}><MaterialIcons name="chevron-left" size={28} color={colors.text} /></Pressable>
+            <Pressable onPress={onBack} hitSlop={20} style={{ paddingRight: spacing.md }}><MaterialIcons name="chevron-left" size={28} color={colors.text} /></Pressable>
           ) : <View style={{ width: 28 }} />}
           <Text style={[typography.headingMd, { flex: 1, textAlign: 'center', marginLeft: -28 }]}>{headerTitle}</Text>
           <View style={{ width: 28 }} />

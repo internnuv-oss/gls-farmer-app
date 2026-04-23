@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo , useRef , useEffect} from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Alert } from "react-native";
@@ -7,6 +7,8 @@ import * as ImagePicker from "expo-image-picker";
 import * as Location from 'expo-location';
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
+import { AppState } from "react-native";
+
 
 import { requestMediaPermission, requestCameraPermission } from "../../core/permissions";
 import { useDraftStore } from "../../store/draftStore";
@@ -20,7 +22,7 @@ export function useDealerOnboarding(navigation: any, route: any) {
   const addDraft = useDraftStore((s) => s.addDraft);
   const updateDraft = useDraftStore((s) => s.updateDraft);
   const removeDraft = useDraftStore((s) => s.removeDraft);
-  
+
   const editData = route?.params?.editData; 
   const draftData = route?.params?.draftData;
   const draftId = route?.params?.draftId;
@@ -29,6 +31,45 @@ export function useDealerOnboarding(navigation: any, route: any) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [uploading, setUploading] = useState<Record<string, boolean>>({});
   const [showSuccess, setShowSuccess] = useState(false);
+  const draftIdRef = useRef(draftId);
+
+
+  const autoSave = () => {
+    const currentValues = form.getValues();
+    if (!currentValues.shopName) return; // Don't save if form is basically empty
+    if (editData) return; // Don't auto-save if we are editing a SUBMITTED profile
+
+    if (draftIdRef.current) {
+      updateDraft(draftIdRef.current, currentValues);
+    } else {
+      const newId = Date.now().toString();
+      draftIdRef.current = newId;
+      addDraft(currentValues, newId);
+    }
+  };
+
+  useEffect(() => {
+    // Save when app is pushed to the background
+    const subscription = AppState.addEventListener("change", nextAppState => {
+      if (nextAppState === "inactive" || nextAppState === "background") {
+        autoSave();
+      }
+    });
+
+    // Save when user abruptly navigates away
+    return () => {
+      subscription.remove();
+      if (!showSuccess) autoSave(); // Don't save a draft if they just successfully submitted it
+    };
+  }, [showSuccess, editData]);
+
+  const saveDraft = () => {
+    autoSave();
+    Alert.alert("Saved", "Dealer onboarding saved as draft.");
+    navigation.goBack();
+  };
+  
+
 
   const defaultFormValues = editData 
     ? mapDealerDbToForm(editData)
@@ -117,13 +158,6 @@ export function useDealerOnboarding(navigation: any, route: any) {
     } finally {
       setUploading(prev => ({ ...prev, [key]: false }));
     }
-  };
-
-  const saveDraft = () => {
-    if (draftId) updateDraft(draftId, form.getValues());
-    else addDraft(form.getValues());
-    Alert.alert("Saved", "Dealer onboarding saved as draft.");
-    navigation.goBack();
   };
 
   const generateHTML = () => {
@@ -360,21 +394,27 @@ export function useDealerOnboarding(navigation: any, route: any) {
     const perm = useCamera ? await requestCameraPermission() : await requestMediaPermission();
     if (!perm.granted) return Alert.alert("Permission Denied", perm.fallbackMessage);
 
+    // 🔥 Launch Camera BEFORE asking for GPS so it feels instant
+    let result = useCamera ? await ImagePicker.launchCameraAsync({ quality: 0.7 }) : await DocumentPicker.getDocumentAsync({ type: "*/*" });
+    if (result.canceled) return;
+    
+    const uri = result.assets[0].uri;
+    setUploading(prev => ({ ...prev, [key]: true }));
+    
     let location: any = null;
     const requiresGPS = ['shop_interior', 'shop_exterior', 'shop_godown'].includes(key);
     
     if (requiresGPS) {
       const { status } = await Location.requestForegroundPermissionsAsync();
-      if (status !== 'granted') { Alert.alert("GPS Required", "GPS location is required when capturing shop photos."); return; }
-      location = await Location.getCurrentPositionAsync({});
+      if (status !== 'granted') { 
+        Alert.alert("GPS Required", "GPS location is required when capturing shop photos."); 
+        setUploading(prev => ({ ...prev, [key]: false }));
+        return; 
+      }
+      // Fetch GPS while the image is processing
+      location = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
     }
 
-    let result = useCamera ? await ImagePicker.launchCameraAsync({ quality: 0.7 }) : await DocumentPicker.getDocumentAsync({ type: "*/*" });
-    if (result.canceled) return;
-    
-    const uri = result.assets[0].uri;
-    
-    setUploading(prev => ({ ...prev, [key]: true }));
     try {
       const url = await uploadFileToCloudinary(uri, useCamera ? 'image' : 'raw');
       const currentDocs = form.getValues('documents') || {};
