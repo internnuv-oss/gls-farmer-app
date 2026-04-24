@@ -40,12 +40,15 @@ export const DashboardScreen = ({ navigation }: any) => {
   const drafts = useDraftStore((state) => state.drafts);
   const user = useAuthStore((state) => state.user);
 
-  const [activeTab, setActiveTab] = useState(0);
+  const [activeTab, setActiveTab] = useState(1);
   const [dealers, setDealers] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const pagerRef = useRef<FlatList>(null);
 
+  const [page, setPage] = useState(0);
+  const [hasMore, setHasMore] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
   // Search, Filter & Sort State
   const [searchQuery, setSearchQuery] = useState("");
   const [isFilterModalOpen, setIsFilterModalOpen] = useState(false);
@@ -53,13 +56,15 @@ export const DashboardScreen = ({ navigation }: any) => {
   const [filterMinScore, setFilterMinScore] = useState("All");
   const [filterFirmType, setFilterFirmType] = useState("All");
 
-  const loadData = async (isRefresh = false) => {
+  const loadData = async (pageNumber: number = 0, isRefresh = false) => {
     if (!user?.id) return;
+    
     if (isRefresh) setRefreshing(true);
-    else setLoading(true);
+    else if (pageNumber === 0) setLoading(true);
+    else setLoadingMore(true);
 
     try {
-      const data = await fetchMyDealers(user.id);
+      const data = await fetchMyDealers(user.id, pageNumber, 10);
       const mapped = data.map((d: any) => ({
         id: d.id,
         name: d.shop_name,
@@ -69,21 +74,33 @@ export const DashboardScreen = ({ navigation }: any) => {
         score: d.total_score,
         raw: d,
       }));
-      setDealers(mapped);
+
+      // If page 0, replace data. If page > 0, append to the bottom.
+      if (pageNumber === 0) {
+        setDealers(mapped);
+      } else {
+        setDealers(prev => [...prev, ...mapped]);
+      }
+
+      // If we got exactly 10, there might be more. If less, we've hit the end.
+      setHasMore(data.length === 10);
+      setPage(pageNumber);
     } catch (e) {
       console.error(e);
     } finally {
       setLoading(false);
       setRefreshing(false);
+      setLoadingMore(false);
     }
   };
 
   useFocusEffect(
     useCallback(() => {
-      loadData();
+      loadData(0); // Always load page 0 on focus
     }, [user?.id]),
   );
-  const onRefresh = () => loadData(true);
+  
+  const onRefresh = () => loadData(0, true);
 
   // Apply Search, Filter, and Sort
   const processedDealers = useMemo(() => {
@@ -577,6 +594,12 @@ export const DashboardScreen = ({ navigation }: any) => {
           horizontal
           pagingEnabled
           showsHorizontalScrollIndicator={false}
+          initialScrollIndex={1}
+          getItemLayout={(data, index) => ({
+            length: width,
+            offset: width * index,
+            index,
+          })}
           onMomentumScrollEnd={(event) => {
             const index = Math.round(event.nativeEvent.contentOffset.x / width);
             if (activeTab !== index) setActiveTab(index);

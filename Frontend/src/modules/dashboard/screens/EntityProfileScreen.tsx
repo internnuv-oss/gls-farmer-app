@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
-import { View, Text, Alert, Pressable, ActivityIndicator, Modal, Linking } from 'react-native';
+import { View, Text, Alert, Pressable, ActivityIndicator, Modal, Image, Platform } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { MaterialIcons } from '@expo/vector-icons';
-import { documentDirectory, downloadAsync, cacheDirectory } from 'expo-file-system/legacy';
+import { documentDirectory, cacheDirectory, downloadAsync, StorageAccessFramework, EncodingType, readAsStringAsync, writeAsStringAsync } from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -11,15 +11,20 @@ import { Button } from '../../../design-system/components/Button';
 import { deleteDealer } from '../services/dashboardService';
 import { colors, radius, spacing, shadows } from '../../../design-system/tokens';
 
-const DetailRow = ({ label, value }: { label: string, value: any }) => (
-  <View>
-    <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: spacing.md }}>
-      <Text style={{ color: colors.textMuted, fontWeight: '700', flex: 1 }}>{label}</Text>
-      <Text style={{ color: colors.text, fontWeight: '800', flex: 1.5, textAlign: 'right' }}>{value || '-'}</Text>
+// ✅ FIX: DetailRow now explicitly returns "N/A" for any empty, null, or empty-array values
+const DetailRow = ({ label, value }: { label: string, value: any }) => {
+  const displayValue = (!value || value === '' || (Array.isArray(value) && value.length === 0)) ? 'N/A' : value;
+  
+  return (
+    <View>
+      <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: spacing.md }}>
+        <Text style={{ color: colors.textMuted, fontWeight: '700', flex: 1 }}>{label}</Text>
+        <Text style={{ color: colors.text, fontWeight: '800', flex: 1.5, textAlign: 'right' }}>{displayValue}</Text>
+      </View>
+      <View style={{ height: 1, backgroundColor: colors.border, marginBottom: spacing.md }} />
     </View>
-    <View style={{ height: 1, backgroundColor: colors.border, marginBottom: spacing.md }} />
-  </View>
-);
+  );
+};
 
 export const EntityProfileScreen = ({ navigation, route }: any) => {
   const { t } = useTranslation();
@@ -30,13 +35,14 @@ export const EntityProfileScreen = ({ navigation, route }: any) => {
   const [refreshing, setRefreshing] = useState(false);
   const [downloading, setDownloading] = useState(false);
   const [sharing, setSharing] = useState(false);
-  const [menuVisible, setMenuVisible] = useState(false); // State for the 3-dot dropdown menu
+  const [menuVisible, setMenuVisible] = useState(false);
+  const [viewerDoc, setViewerDoc] = useState<string | null>(null);
 
   const getScoreColor = (score: number) => {
-    if (score > 60) return '#3730A3'; // Elite (Premium Deep Indigo)
-    if (score >= 46) return '#166534'; // A-Category (Solid Forest Green)
-    if (score >= 26) return '#B45309'; // B-Category (Rich Amber / Bronze)
-    return '#991B1B';                  // C-Category (Crimson Red)
+    if (score > 60) return '#3730A3';
+    if (score >= 46) return '#166534';
+    if (score >= 26) return '#B45309';
+    return '#991B1B';
   };
 
   const onRefresh = () => {
@@ -62,28 +68,68 @@ export const EntityProfileScreen = ({ navigation, route }: any) => {
     ]);
   };
 
-  const getLocalFileUri = (fileName: string) => {
-    const dir = documentDirectory || cacheDirectory;
-    return `${dir}${fileName}`;
-  };
-
-  const handleDownloadPDF = async () => {
-    if (!raw.pdf_url) return Alert.alert("Not Found", "PDF document is not available.");
+  // ✅ FIX: Reusable function to handle both Dossier downloads and Document downloads securely
+  // ✅ FIX: Improved Download Function with clear UI feedback
+  const downloadFile = async (url: string, defaultFileName: string) => {
     setDownloading(true);
     try {
-      const fileName = `${raw.shop_name.replace(/[^a-zA-Z0-9]/g, '_')}_Dossier.pdf`;
-      // Use documentDirectory directly
-      const fileUri = `${documentDirectory}${fileName}`; 
+      const tempUri = `${documentDirectory}${defaultFileName}`; 
       
-      const { uri } = await downloadAsync(raw.pdf_url, fileUri);
-      
-      await Sharing.shareAsync(uri, { UTI: 'com.adobe.pdf', mimeType: 'application/pdf', dialogTitle: 'Save PDF' });
+      if (Platform.OS === 'android') {
+        // 1. Ask Android user where they want to save it
+        const permissions = await StorageAccessFramework.requestDirectoryPermissionsAsync();
+        
+        if (permissions.granted) {
+          // 2. Download from Cloudinary to hidden app cache first
+          const result = await downloadAsync(url, tempUri);
+          if (result.status !== 200) {
+            Alert.alert("Download Error", "Could not access the file from the server.");
+            return;
+          }
+          
+          // 3. Move it from hidden cache to their chosen public folder
+          const base64 = await readAsStringAsync(result.uri, { encoding: EncodingType.Base64 });
+          const mimeType = url.toLowerCase().endsWith('.pdf') ? 'application/pdf' : '*/*';
+          const savedUri = await StorageAccessFramework.createFileAsync(permissions.directoryUri, defaultFileName, mimeType);
+          await writeAsStringAsync(savedUri, base64, { encoding: EncodingType.Base64 });
+          
+          console.log("File saved successfully to:", savedUri);
+          
+          // 4. Force a highly visible success alert
+          Alert.alert(
+            "✅ Download Complete", 
+            `File saved as:\n${defaultFileName}\n\nCheck your device's Files or Downloads folder.`
+          );
+        } else {
+          console.log("User cancelled the Android folder picker.");
+        }
+      } else {
+        // iOS Behavior: Must use Share Sheet to "Save to Files"
+        const result = await downloadAsync(url, tempUri);
+        if (result.status !== 200) {
+          Alert.alert("Download Error", "Could not access the file.");
+          return;
+        }
+        const mimeType = url.toLowerCase().endsWith('.pdf') ? 'application/pdf' : 'application/octet-stream';
+        
+        // This opens the iOS Share Sheet where they must click "Save to Files"
+        await Sharing.shareAsync(result.uri, { 
+          UTI: 'public.data', 
+          mimeType, 
+          dialogTitle: 'Save File' // iOS instruction
+        });
+      }
     } catch (error) {
-      console.log("Download Error:", error);
-      Alert.alert("Error", "Failed to download the PDF document.");
+      console.error("Download Error Crash:", error);
+      Alert.alert("Error", "Failed to download the file. Check your connection.");
     } finally {
       setDownloading(false);
     }
+  };
+  const handleDownloadPDF = () => {
+    if (!raw.pdf_url) return Alert.alert("Not Found", "PDF document is not available.");
+    const fileName = `${raw.shop_name.replace(/[^a-zA-Z0-9]/g, '_')}_Dossier.pdf`;
+    downloadFile(raw.pdf_url, fileName);
   };
 
   const handleSharePDF = async () => {
@@ -91,14 +137,18 @@ export const EntityProfileScreen = ({ navigation, route }: any) => {
     setSharing(true);
     try {
       const fileName = `${raw.shop_name.replace(/[^a-zA-Z0-9]/g, '_')}_Dossier.pdf`;
-      // Use documentDirectory directly
       const fileUri = `${documentDirectory}${fileName}`; 
       
-      const { uri } = await downloadAsync(raw.pdf_url, fileUri);
+      const result = await downloadAsync(raw.pdf_url, fileUri);
+      
+      if (result.status !== 200) {
+        Alert.alert("Share Error", "Could not access the PDF.");
+        return;
+      }
       
       const canShare = await Sharing.isAvailableAsync();
       if (canShare) {
-        await Sharing.shareAsync(uri, { UTI: 'com.adobe.pdf', mimeType: 'application/pdf', dialogTitle: 'Share PDF' });
+        await Sharing.shareAsync(result.uri, { UTI: 'com.adobe.pdf', mimeType: 'application/pdf', dialogTitle: 'Share PDF' });
       } else {
         Alert.alert("Error", "Sharing is not available on this device.");
       }
@@ -107,6 +157,30 @@ export const EntityProfileScreen = ({ navigation, route }: any) => {
       Alert.alert("Error", "Failed to share the PDF document.");
     } finally {
       setSharing(false);
+    }
+  };
+
+  // ✅ FIX: Triggers a Download Alert instead of a viewer for non-image files
+  const handleViewDocument = async (key: string, url: string) => {
+    const isPdfOrRaw = url.toLowerCase().endsWith('.pdf') || url.includes('/raw/upload');
+
+    if (isPdfOrRaw) {
+      Alert.alert(
+        "Download Document",
+        "This file format cannot be viewed directly in the app. Would you like to download it?",
+        [
+          { text: "Cancel", style: "cancel" },
+          { 
+            text: "Download", 
+            onPress: () => {
+              const ext = url.toLowerCase().endsWith('.pdf') ? 'pdf' : 'doc';
+              downloadFile(url, `${key}_document_${Date.now()}.${ext}`);
+            }
+          }
+        ]
+      );
+    } else {
+      setViewerDoc(url); // Standard images still use the viewer
     }
   };
 
@@ -122,12 +196,11 @@ export const EntityProfileScreen = ({ navigation, route }: any) => {
             <MaterialIcons name="more-vert" size={28} color={colors.text} />
           </Pressable>
 
-          {/* Transparent Overlay Modal for the Dropdown Menu */}
           <Modal visible={menuVisible} transparent animationType="fade" onRequestClose={() => setMenuVisible(false)}>
             <Pressable style={{ flex: 1 }} onPress={() => setMenuVisible(false)}>
               <View style={{
                 position: 'absolute',
-                top: Math.max(insets.top, 24) + 45, // Aligns perfectly below the header
+                top: Math.max(insets.top, 24) + 45,
                 right: spacing.lg,
                 backgroundColor: colors.surface,
                 borderRadius: radius.md,
@@ -135,20 +208,14 @@ export const EntityProfileScreen = ({ navigation, route }: any) => {
                 borderColor: colors.border,
                 width: 170,
                 ...shadows.medium,
-                elevation: 5 // Android shadow
+                elevation: 5
               }}>
-                <Pressable 
-                  onPress={() => { setMenuVisible(false); handleEdit(); }} 
-                  style={{ flexDirection: 'row', alignItems: 'center', padding: spacing.md, borderBottomWidth: 1, borderBottomColor: colors.border }}
-                >
+                <Pressable onPress={() => { setMenuVisible(false); handleEdit(); }} style={{ flexDirection: 'row', alignItems: 'center', padding: spacing.md, borderBottomWidth: 1, borderBottomColor: colors.border }}>
                   <MaterialIcons name="edit" size={18} color={colors.primary} style={{ marginRight: spacing.sm }} />
                   <Text style={{ fontSize: 14, fontWeight: '700', color: colors.text }}>{t('Edit Profile')}</Text>
                 </Pressable>
 
-                <Pressable 
-                  onPress={() => { setMenuVisible(false); handleDelete(); }} 
-                  style={{ flexDirection: 'row', alignItems: 'center', padding: spacing.md }}
-                >
+                <Pressable onPress={() => { setMenuVisible(false); handleDelete(); }} style={{ flexDirection: 'row', alignItems: 'center', padding: spacing.md }}>
                   <MaterialIcons name="delete" size={18} color={colors.danger} style={{ marginRight: spacing.sm }} />
                   <Text style={{ fontSize: 14, fontWeight: '700', color: colors.danger }}>{t('Delete Profile')}</Text>
                 </Pressable>
@@ -177,23 +244,23 @@ export const EntityProfileScreen = ({ navigation, route }: any) => {
         <View style={{ flex: 1, backgroundColor: colors.surface, padding: spacing.lg, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.border, ...shadows.soft, alignItems: 'center' }}>
           <MaterialIcons name="location-city" size={28} color={colors.primary} style={{ marginBottom: 8 }} />
           <Text style={{ fontSize: 15, fontWeight: '800', color: colors.text, textAlign: 'center' }} numberOfLines={2}>
-            {raw.city && raw.state ? `${raw.city}, ${raw.state}` : (entity.location || '-')}
+            {raw.city && raw.state ? `${raw.city}, ${raw.state}` : (entity.location || 'N/A')}
           </Text>
           <Text style={{ fontSize: 11, fontWeight: '800', color: colors.textMuted, marginTop: 4 }}>{t('LOCATION')}</Text>
         </View>
       </View>
 
+      {/* ✅ N/A fallbacks added throughout all data displays */}
       <View style={{ backgroundColor: colors.surface, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.border, ...shadows.soft, padding: spacing.lg, marginBottom: spacing.lg }}>
         <Text style={{ fontSize: 16, fontWeight: '900', color: colors.text, marginBottom: spacing.lg }}>{t('Basic Information')}</Text>
         <DetailRow label="Contact Person" value={raw.owner_name} />
-        <DetailRow label="Mobile Number" value={`+91 ${raw.contact_mobile}`} />
+        <DetailRow label="Mobile Number" value={raw.contact_mobile ? `+91 ${raw.contact_mobile}` : ''} />
         <DetailRow label="Address" value={raw.address} />
         <DetailRow label="Landmark" value={raw.landmark} />
         <DetailRow label="GST Number" value={raw.gst_number} />
         <DetailRow label="PAN Number" value={raw.pan_number} />
         <DetailRow label="Est. Year" value={raw.est_year} />
         <DetailRow label="Firm Type" value={raw.firm_type} />
-        
         <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
           <Text style={{ color: colors.textMuted, fontWeight: '700' }}>{t('Onboarding Status')}</Text>
           <View style={{ backgroundColor: '#DCFCE7', paddingHorizontal: 10, paddingVertical: 4, borderRadius: radius.sm }}>
@@ -214,16 +281,18 @@ export const EntityProfileScreen = ({ navigation, route }: any) => {
       <View style={{ backgroundColor: colors.surface, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.border, ...shadows.soft, padding: spacing.lg, marginBottom: spacing.lg }}>
         <Text style={{ fontSize: 16, fontWeight: '900', color: colors.text, marginBottom: spacing.lg }}>{t('Business Area & Status')}</Text>
         <DetailRow label="Major Crops" value={raw.commitments?.majorCrops?.join(', ')} />
-        <DetailRow label="Acres Served" value={raw.commitments?.acresServed ? `${raw.commitments.acresServed} Acres` : '-'} />
+        <DetailRow label="Acres Served" value={raw.commitments?.acresServed ? `${raw.commitments.acresServed} Acres` : ''} />
         <DetailRow label="Proposed Status" value={raw.commitments?.proposedStatus} />
         <DetailRow label="Willing Demo Farmers" value={raw.commitments?.willingDemoFarmers} />
         
         <Text style={{ color: colors.textMuted, fontWeight: '700', marginBottom: spacing.sm, marginTop: spacing.sm }}>Linked Distributors:</Text>
-        {raw.commitments?.linkedDistributors?.map((dist: any, i: number) => (
-          <Text key={i} style={{ color: colors.text, fontWeight: '700', marginBottom: 4 }}>
-            • {dist.name} ({dist.contact})
-          </Text>
-        ))}
+        {raw.commitments?.linkedDistributors?.length > 0 ? (
+          raw.commitments.linkedDistributors.map((dist: any, i: number) => (
+            <Text key={i} style={{ color: colors.text, fontWeight: '700', marginBottom: 4 }}>• {dist.name} ({dist.contact})</Text>
+          ))
+        ) : (
+          <Text style={{ color: colors.text, fontWeight: '800', marginBottom: 4 }}>N/A</Text>
+        )}
       </View>
 
       <View style={{ backgroundColor: colors.surface, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.border, ...shadows.soft, padding: spacing.lg, marginBottom: spacing.lg }}>
@@ -237,11 +306,13 @@ export const EntityProfileScreen = ({ navigation, route }: any) => {
         <DetailRow label="Experience" value={`${raw.scoring?.experience || 0} / 10`} />
         <DetailRow label="Growth Orientation" value={`${raw.scoring?.growth || 0} / 10`} />
         
-        {raw.scoring?.redFlags && (
+        {raw.scoring?.redFlags ? (
           <View style={{ backgroundColor: '#FEE2E2', padding: spacing.md, borderRadius: radius.sm, marginTop: spacing.sm }}>
             <Text style={{ color: '#991B1B', fontWeight: '800', marginBottom: 4 }}>Red Flags Noted:</Text>
             <Text style={{ color: '#991B1B', fontWeight: '500' }}>{raw.scoring.redFlags}</Text>
           </View>
+        ) : (
+          <DetailRow label="Red Flags Noted" value="N/A" />
         )}
       </View>
 
@@ -249,79 +320,81 @@ export const EntityProfileScreen = ({ navigation, route }: any) => {
         <Text style={{ fontSize: 16, fontWeight: '900', color: colors.text, marginBottom: spacing.lg }}>{t('Commitments & Compliance')}</Text>
         
         <Text style={{ color: colors.textMuted, fontWeight: '700', marginBottom: spacing.sm }}>GLS Commitments Accepted:</Text>
-        {raw.commitments?.glsCommitments?.map((item: string, i: number) => (
+        {raw.commitments?.glsCommitments?.length > 0 ? raw.commitments.glsCommitments.map((item: string, i: number) => (
           <Text key={i} style={{ color: colors.text, fontWeight: '600', marginBottom: 6 }}>✓ {item}</Text>
-        ))}
+        )) : <Text style={{ color: colors.text, fontWeight: '800', marginBottom: 6 }}>N/A</Text>}
 
         <View style={{ height: 1, backgroundColor: colors.border, marginVertical: spacing.md }} />
 
         <Text style={{ color: colors.textMuted, fontWeight: '700', marginBottom: spacing.sm }}>Regulatory Documents Verified:</Text>
-        {raw.commitments?.complianceChecklist?.map((item: string, i: number) => (
+        {raw.commitments?.complianceChecklist?.length > 0 ? raw.commitments.complianceChecklist.map((item: string, i: number) => (
           <Text key={i} style={{ color: colors.text, fontWeight: '600', marginBottom: 6 }}>✓ {item}</Text>
-        ))}
+        )) : <Text style={{ color: colors.text, fontWeight: '800', marginBottom: 6 }}>N/A</Text>}
       </View>
 
       <View style={{ backgroundColor: colors.surface, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.border, ...shadows.soft, padding: spacing.lg, marginBottom: spacing.xl }}>
         <Text style={{ fontSize: 16, fontWeight: '900', color: colors.text, marginBottom: spacing.lg }}>{t('Uploaded Documents')}</Text>
         
         {raw.documents && Object.keys(raw.documents).length > 0 ? (
-          Object.entries(raw.documents).map(([key, url]) => (
-            <Pressable 
-              key={key} 
-              onPress={() => Linking.openURL(url as string)}
-              style={{ flexDirection: 'row', alignItems: 'center', marginBottom: spacing.md }}
-            >
-              <MaterialIcons name="insert-drive-file" size={20} color={colors.primary} style={{ marginRight: 8 }} />
-              <Text style={{ color: colors.primary, fontWeight: '700', fontSize: 14, textDecorationLine: 'underline' }}>
-                {key.toUpperCase().replace(/_/g, ' ')}
-              </Text>
-            </Pressable>
-          ))
+          Object.entries(raw.documents).flatMap(([key, val]) => {
+            const urls = Array.isArray(val) ? val : [val];
+            return urls.map((url, index) => {
+              const isPdf = typeof url === 'string' && (url.toLowerCase().endsWith('.pdf') || url.includes('/raw/upload'));
+              return (
+                <Pressable 
+                  key={`${key}-${index}`} 
+                  onPress={() => handleViewDocument(key, url as string)}
+                  style={{ flexDirection: 'row', alignItems: 'center', marginBottom: spacing.md }}
+                >
+                  <MaterialIcons name={isPdf ? "file-download" : "image"} size={20} color={colors.primary} style={{ marginRight: 8 }} />
+                  <Text style={{ color: colors.primary, fontWeight: '700', fontSize: 14, textDecorationLine: 'underline' }}>
+                    {key.toUpperCase().replace(/_/g, ' ')} {Array.isArray(val) ? `(${index + 1})` : ''}
+                  </Text>
+                </Pressable>
+              );
+            });
+          })
         ) : (
-          <Text style={{ color: colors.textMuted, fontWeight: '500' }}>No documents uploaded.</Text>
+          <Text style={{ color: colors.textMuted, fontWeight: '500' }}>N/A</Text>
         )}
       </View>
 
-      {/* Two minimal separate buttons for PDF actions */}
       <View style={{ marginBottom: spacing.lg }}>
         {raw.pdf_url ? (
           <View style={{ flexDirection: 'row', gap: spacing.md, marginBottom: spacing.md }}>
-            <Pressable 
-              onPress={handleDownloadPDF} 
-              disabled={downloading}
-              style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', height: 48, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.primary, borderRadius: radius.md }}
-            >
+            <Pressable onPress={handleDownloadPDF} disabled={downloading} style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', height: 48, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.primary, borderRadius: radius.md }}>
               {downloading ? <ActivityIndicator color={colors.primary} /> : (
-                <>
-                  <MaterialIcons name="file-download" size={20} color={colors.primary} style={{ marginRight: 8 }} />
-                  <Text style={{ color: colors.primary, fontWeight: '700' }}>Download</Text>
-                </>
+                <><MaterialIcons name="file-download" size={20} color={colors.primary} style={{ marginRight: 8 }} /><Text style={{ color: colors.primary, fontWeight: '700' }}>Download</Text></>
               )}
             </Pressable>
-
-            <Pressable 
-              onPress={handleSharePDF} 
-              disabled={sharing}
-              style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', height: 48, backgroundColor: colors.primary, borderRadius: radius.md }}
-            >
+            <Pressable onPress={handleSharePDF} disabled={sharing} style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', height: 48, backgroundColor: colors.primary, borderRadius: radius.md }}>
               {sharing ? <ActivityIndicator color="#FFF" /> : (
-                <>
-                  <MaterialIcons name="share" size={20} color="#FFF" style={{ marginRight: 8 }} />
-                  <Text style={{ color: "#FFF", fontWeight: '700' }}>Share</Text>
-                </>
+                <><MaterialIcons name="share" size={20} color="#FFF" style={{ marginRight: 8 }} /><Text style={{ color: "#FFF", fontWeight: '700' }}>Share</Text></>
               )}
             </Pressable>
           </View>
         ) : (
-          <View style={{ marginBottom: spacing.md }}>
-            <Button 
-              label="Generate PDF Dossier" 
-              variant="secondary"
-              onPress={handleEdit} 
-            />
-          </View>
+          <View style={{ marginBottom: spacing.md }}><Button label="Generate PDF Dossier" variant="secondary" onPress={handleEdit} /></View>
         )}
       </View>
+
+      <Modal visible={!!viewerDoc} transparent animationType="fade" onRequestClose={() => setViewerDoc(null)}>
+        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.95)', justifyContent: 'center', alignItems: 'center' }}>
+          <Pressable 
+            style={{ position: 'absolute', top: Math.max(insets.top, 20), right: 20, zIndex: 10, padding: 8, backgroundColor: 'rgba(255,255,255,0.2)', borderRadius: 20 }} 
+            onPress={() => setViewerDoc(null)}
+          >
+            <MaterialIcons name="close" size={28} color="#FFF" />
+          </Pressable>
+          {viewerDoc && (
+            <Image 
+              source={{ uri: viewerDoc }} 
+              style={{ width: '100%', height: '80%', resizeMode: 'contain' }} 
+            />
+          )}
+        </View>
+      </Modal>
+
     </SimpleScreenTemplate>
   );
 };

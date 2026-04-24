@@ -8,17 +8,45 @@ export async function fetchOnboardedCount() {
   return count ?? 0;
 }
 
-export async function fetchMyDealers(seId: string) {
+export const fetchMyDealers = async (userId: string, page: number = 0, limit: number = 10) => {
+  const from = page * limit;
+  const to = from + limit - 1;
+
+  // ✅ Updated table to 'dealers' and join column to 'se_id'
   const { data, error } = await supabase
-    .from("dealers")
-    .select("*")
-    .eq("se_id", seId)
-    .eq("status", "SUBMITTED")
-    .order("created_at", { ascending: false });
+    .from('dealers') 
+    .select('*')
+    .eq('se_id', userId) // Matches your se_id uuid foreign key
+    .order('created_at', { ascending: false })
+    .range(from, to); 
+
+  if (error) {
+    console.error("Supabase Fetch Error:", error.message);
+    throw error;
+  }
+  
+  return data || [];
+};
+
+// ✅ Add page and limit parameters
+export const getNetworkData = async (search: string = '', page: number = 0, limit: number = 10) => {
+  const from = page * limit;
+  const to = from + limit - 1;
+
+  let query = supabase.from('profiles').select('*', { count: 'exact' });
+  
+  if (search) {
+    query = query.ilike('name', `%${search}%`);
+  }
+
+  // ✅ Fetch only the chunk of data we need
+  const { data, error, count } = await query
+    .order('created_at', { ascending: false })
+    .range(from, to);
 
   if (error) throw error;
-  return data || [];
-}
+  return { data, count };
+};
 
 export async function deleteDealer(id: string) {
   const { error } = await supabase.from("dealers").delete().eq("id", id);

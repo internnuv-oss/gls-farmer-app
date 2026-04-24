@@ -103,21 +103,24 @@ type WizardProps = {
   onBack?: () => void;
   children: React.ReactNode;
   footer?: React.ReactNode;
+  headerRight?: React.ReactNode;
 };
 
-export const WizardFlowTemplate: React.FC<WizardProps> = ({ headerTitle, stepLabel, stepTextRight, progress01 = 0, onBack, children, footer }) => {
+export const WizardFlowTemplate: React.FC<WizardProps> = ({ headerTitle, stepLabel, stepTextRight, progress01 = 0, onBack, children, footer, headerRight }) => {
   const insets = useSafeAreaInsets();
   const paddingTop = Math.max(insets.top, TOP_PADDING);
 
   return (
     <KeyboardAvoidingView style={{ flex: 1, backgroundColor: colors.screen }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <View style={{ paddingTop, paddingHorizontal: spacing.lg, backgroundColor: colors.surface, paddingBottom: spacing.md, borderBottomWidth: 1, borderBottomColor: colors.border }}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: spacing.sm }}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: spacing.sm }}>
           {onBack ? (
             <Pressable onPress={onBack} hitSlop={20} style={{ paddingRight: spacing.md }}><MaterialIcons name="chevron-left" size={28} color={colors.text} /></Pressable>
           ) : <View style={{ width: 28 }} />}
-          <Text style={[typography.headingMd, { flex: 1, textAlign: 'center', marginLeft: -28 }]}>{headerTitle}</Text>
-          <View style={{ width: 28 }} />
+          
+          <Text style={[typography.headingMd, { flex: 1, textAlign: 'center', marginLeft: headerRight ? 0 : -28 }]}>{headerTitle}</Text>
+          
+          <View style={{ width: headerRight ? undefined : 28 }}>{headerRight}</View>
         </View>
         <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: spacing.sm }}>
           {stepLabel && <Text style={{ color: colors.textMuted, fontSize: 12, fontWeight: '700' }}>{stepLabel}</Text>}

@@ -74,7 +74,9 @@ export const ProfileScreen = () => {
       <View style={{ flexDirection: 'row', gap: spacing.sm, marginBottom: spacing['2xl'] }}>
         {['en', 'gu', 'hi'].map((lng) => (
           <Pressable key={lng} onPress={() => changeLanguage(lng)} style={{ flex: 1, padding: 12, borderRadius: radius.md, backgroundColor: i18n.language === lng ? colors.primary : colors.surface, borderWidth: 1, borderColor: i18n.language === lng ? colors.primary : colors.border, alignItems: 'center' }}>
-            <Text style={{ fontWeight: '800', color: i18n.language === lng ? '#FFF' : colors.text }}>{lng.toUpperCase()}</Text>
+            <Text style={{ fontWeight: '800', color: i18n.language === lng ? '#FFF' : colors.text }}>
+              {lng === 'en' ? 'ENG' : lng === 'gu' ? 'ગુજરાતી' : 'हिंदी'}
+            </Text>
           </Pressable>
         ))}
       </View>

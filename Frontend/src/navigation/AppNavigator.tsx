@@ -16,10 +16,14 @@ import { ComingSoonScreen } from '../modules/core/screens/ComingSoonScreen';
 import { useAuthStore } from '../store/authStore';
 import { colors } from '../design-system/tokens';
 import { FeedbackScreenTemplate } from '../design-system/templates'; // NEW
+import { supabase } from '../core/supabase';
+import { AlertModal } from '../design-system/components/AlertModal';
+import { useAlertStore } from '../store/alertStore';
 
 const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
 const DashboardStack = createNativeStackNavigator();
+
 
 const DashboardStackNavigator = () => (
   <DashboardStack.Navigator screenOptions={{ headerShown: false }}>
@@ -55,7 +59,10 @@ const MainTabs = () => (
 export const AppNavigator = () => {
   const user = useAuthStore((state) => state.user);
   const [isConnected, setIsConnected] = useState<boolean | null>(true);
+  const logout = useAuthStore((state) => state.logout); // ✅ 2. Bring in the logout function
 
+
+  const { visible, title, message, buttons, hideAlert } = useAlertStore();
   // Listen to network state changes
   useEffect(() => {
     const unsubscribe = NetInfo.addEventListener(state => {
@@ -63,6 +70,18 @@ export const AppNavigator = () => {
     });
     return () => unsubscribe();
   }, []);
+
+
+  useEffect(() => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      // ✅ FIX: Removed 'USER_DELETED' as SIGNED_OUT catches everything now
+      if (event === 'SIGNED_OUT' || !session) {
+        logout(); 
+      }
+    });
+
+    return () => subscription.unsubscribe();
+  }, [logout]);
 
   // Show Fallback Screen if offline
   if (isConnected === false) {
@@ -100,6 +119,20 @@ export const AppNavigator = () => {
           </>
         )}
       </Stack.Navigator>
+      <AlertModal 
+        visible={visible}
+        title={title}
+        message={message}
+        buttons={buttons.map(btn => ({
+          label: btn.text,
+          variant: btn.style === 'cancel' ? 'secondary' : btn.style === 'destructive' ? 'danger' : 'primary',
+          onPress: () => {
+            if (btn.onPress) btn.onPress();
+            hideAlert();
+          }
+        }))}
+        onClose={hideAlert}
+      />
     </NavigationContainer>
   );
 };

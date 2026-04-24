@@ -13,6 +13,8 @@ import { AudioRecorder } from '../../../design-system/components';
 import { colors, radius, spacing, shadows } from '../../../design-system/tokens';
 import { useDealerOnboarding } from '../hooks';
 import { GLS_COMMITMENTS } from '../schema';
+import { useTranslation } from 'react-i18next'; // ✅ ADD THIS
+import i18n from '../../../core/i18n';          // ✅ ADD THIS
 
 
 const COMPLIANCE_ITEMS = ["Valid FCO Authorization / Fertilizer Dealer Registration", "Valid Insecticide Selling License", "Educational Qualification Certificate", "Any state-specific approvals"];
@@ -39,6 +41,13 @@ export const DealerOnboardingScreen = ({ navigation, route }: any) => {
   const { form, step, setStep, saveDraft, submit, scoreData, handleUpload, handleAudioUpload, uploading, isSubmitting, isNextEnabled, showSuccess, setShowSuccess, generatePDF, isEditing } = useDealerOnboarding(navigation, route);
   const { control, watch, setValue } = form;
   const [jumpBackTo, setJumpBackTo] = React.useState<number | null>(null);
+
+
+  const { t } = useTranslation();
+  const cycleLanguage = () => {
+    const next = i18n.language === 'en' ? 'hi' : i18n.language === 'hi' ? 'gu' : 'en';
+    i18n.changeLanguage(next);
+  };
 
   const dynamicChecklistDocs = useMemo(() => {
     const checked = watch('complianceChecklist') || [];
@@ -296,7 +305,17 @@ export const DealerOnboardingScreen = ({ navigation, route }: any) => {
 
   return (
     <WizardFlowTemplate
-      headerTitle={isEditing ? "Edit Dealer Profile" : "Dealer Onboarding"} stepLabel={`STEP ${step} OF 9`} progress01={step / 9}
+    headerTitle={t(isEditing ? "Edit Dealer Profile" : "Dealer Onboarding")} 
+    stepLabel={`STEP ${step} OF 9`} 
+    progress01={step / 9}
+
+    headerRight={
+      <Pressable onPress={cycleLanguage} style={{ backgroundColor: colors.primarySoft, paddingHorizontal: 12, paddingVertical: 6, borderRadius: radius.pill }}>
+        <Text style={{ fontWeight: '900', color: colors.primary, fontSize: 12 }}>
+          {i18n.language.toUpperCase()}
+        </Text>
+      </Pressable>
+    }
       onBack={() => {
         if (jumpBackTo) {
           setStep(jumpBackTo);
@@ -307,24 +326,20 @@ export const DealerOnboardingScreen = ({ navigation, route }: any) => {
       }}
       footer={
         <View style={{ flexDirection: 'row', gap: spacing.sm }}>
-          {!isEditing && <View style={{ flex: 1 }}><Button label="Save Draft" variant="secondary" onPress={saveDraft} disabled={isSubmitting} /></View>}
+          {/* ✅ 3. Translate Buttons */}
+          {!isEditing && <View style={{ flex: 1 }}><Button label={t("Save Draft")} variant="secondary" onPress={saveDraft} disabled={isSubmitting} /></View>}
           <View style={{ flex: 1 }}>
             {step < 9 ? (
-              // ✅ UPDATE 2: Handle the Next button
               <Button 
-                label={jumpBackTo ? "Return to Review" : "Next"} 
+                label={t(jumpBackTo ? "Return to Review" : "Next")} 
                 onPress={() => {
-                  if (jumpBackTo) {
-                    setStep(jumpBackTo);
-                    setJumpBackTo(null); // Clear memory after jumping
-                  } else {
-                    setStep(step + 1);
-                  }
+                  if (jumpBackTo) { setStep(jumpBackTo); setJumpBackTo(null); } 
+                  else { setStep(step + 1); }
                 }} 
                 disabled={!isNextEnabled} 
               /> 
             ) : (
-              <Button label={isEditing ? "Save Changes" : "Submit Profile"} onPress={submit} loading={isSubmitting} disabled={!isNextEnabled} />
+              <Button label={t(isEditing ? "Save Changes" : "Submit Profile")} onPress={submit} loading={isSubmitting} disabled={!isNextEnabled} />
             )}
           </View>
         </View>
