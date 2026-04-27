@@ -3,7 +3,7 @@ import { persist, createJSONStorage } from "zustand/middleware";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
 type AuthState = {
-  user: { id: string; name?: string; mobile?: string } | null;
+  user: { id: string; name?: string; mobile?: string ;isProfileComplete?: boolean;} | null;
   setUser: (user: AuthState["user"]) => void;
   logout: () => void;
 };

@@ -10,11 +10,11 @@ import * as Sharing from 'expo-sharing';
 import { AppState } from "react-native";
 
 
-import { requestMediaPermission, requestCameraPermission } from "../../core/permissions";
-import { useDraftStore } from "../../store/draftStore";
-import { useAuthStore } from "../../store/authStore";
-import { uploadFileToCloudinary } from "./services/cloudinaryService";
-import { saveDealerOnboarding, mapDealerDbToForm, updateDealerPdfUrl } from "./services/onboardingService";
+import { requestMediaPermission, requestCameraPermission } from "../../../core/permissions";
+import { useDraftStore } from "../../../store/draftStore";
+import { useAuthStore } from "../../../store/authStore";
+import { uploadFileToCloudinary } from "../services/cloudinaryService";
+import { saveDealerOnboarding, mapDealerDbToForm, updateDealerPdfUrl } from "../services/onboardingService";
 import { dealerOnboardingSchema, DealerOnboardingValues, GLS_COMMITMENTS } from "./schema";
 
 export function useDealerOnboarding(navigation: any, route: any) {
@@ -222,7 +222,7 @@ export function useDealerOnboarding(navigation: any, route: any) {
           <div class="section-title">1. Basic Information</div>
           <table>
             <tr><th>Shop / Firm Name</th><td>${data.shopName || '-'}</td></tr>
-            <tr><th>Owner Name</th><td>${data.ownerName || '-'}</td></tr>
+            <tr><th>Contact Person</th><td>${data.ownerName || '-'}</td></tr>
             <tr><th>Contact Mobile</th><td>+91 ${data.contactMobile || '-'}</td></tr>
             <tr><th>Address</th><td>${data.address || '-'} ${data.landmark ? `(Near ${data.landmark})` : ''}</td></tr>
             <tr><th>GST Number</th><td>${data.gstNumber || '-'}</td></tr>
@@ -235,7 +235,7 @@ export function useDealerOnboarding(navigation: any, route: any) {
           <div class="section-title">2. Bank Details</div>
           <table>
             <tr><th>Bank Name & Branch</th><td>${data.bankName || '-'} - ${data.bankBranch || '-'}</td></tr>
-            <tr><th>Account Holder</th><td>${data.bankAccountName || '-'}</td></tr>
+            <tr><th>Account Name</th><td>${data.bankAccountName || '-'}</td></tr>
             <tr><th>Account Number</th><td>${data.bankAccountNumber || '-'}</td></tr>
             <tr><th>IFSC Code</th><td>${data.bankIfsc || '-'}</td></tr>
           </table>

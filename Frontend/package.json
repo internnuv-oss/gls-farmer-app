@@ -48,7 +48,9 @@
   },
   "devDependencies": {
     "@types/react": "~19.1.0",
+    "@vitalets/google-translate-api": "^9.2.1",
     "babel-preset-expo": "~54.0.10",
+    "i18next-parser": "^9.4.0",
     "typescript": "~5.9.2"
   },
   "private": true

@@ -2,19 +2,19 @@ import React, { useMemo } from 'react';
 import { View, Text, Pressable, ActivityIndicator, ScrollView ,BackHandler} from 'react-native';
 import { Controller } from 'react-hook-form';
 import { MaterialIcons } from '@expo/vector-icons';
-import { WizardFlowTemplate, FeedbackScreenTemplate } from '../../../design-system/templates';
-import { Button, Input, SelectField, SignaturePad, ScoreSlider, UploadTile, UploadedFileCard, YearPickerField } from '../../../design-system/components';
-import { TextArea } from '../../../design-system/components/TextArea';
-import { RadioGroup } from '../../../design-system/components/RadioGroup';
-import { TagsInput } from '../../../design-system/components/TagsInput';
-import { CheckboxItem } from '../../../design-system/components/CheckboxItem';
-import { MultiSelectField } from '../../../design-system/components/MultiSelectField';
-import { AudioRecorder } from '../../../design-system/components';
-import { colors, radius, spacing, shadows } from '../../../design-system/tokens';
+import { WizardFlowTemplate, FeedbackScreenTemplate } from '../../../../design-system/templates';
+import { Button, Input, SelectField, SignaturePad, ScoreSlider, UploadTile, UploadedFileCard, YearPickerField } from '../../../../design-system/components';
+import { TextArea } from '../../../../design-system/components/TextArea';
+import { RadioGroup } from '../../../../design-system/components/RadioGroup';
+import { TagsInput } from '../../../../design-system/components/TagsInput';
+import { CheckboxItem } from '../../../../design-system/components/CheckboxItem';
+import { MultiSelectField } from '../../../../design-system/components/MultiSelectField';
+import { AudioRecorder } from '../../../../design-system/components';
+import { colors, radius, spacing, shadows } from '../../../../design-system/tokens';
 import { useDealerOnboarding } from '../hooks';
 import { GLS_COMMITMENTS } from '../schema';
 import { useTranslation } from 'react-i18next'; // ✅ ADD THIS
-import i18n from '../../../core/i18n';          // ✅ ADD THIS
+import i18n from '../../../../core/i18n';          // ✅ ADD THIS
 
 
 const COMPLIANCE_ITEMS = ["Valid FCO Authorization / Fertilizer Dealer Registration", "Valid Insecticide Selling License", "Educational Qualification Certificate", "Any state-specific approvals"];
@@ -351,7 +351,7 @@ export const DealerOnboardingScreen = ({ navigation, route }: any) => {
           <Text style={{ fontSize: 20, fontWeight: '800', marginBottom: spacing.lg }}>Basic Information</Text>
           
           <Controller control={control} name="shopName" render={({field}) => <Input label="Shop / Firm Name *" value={field.value} onChangeText={field.onChange} placeholder="e.g. Kisan Seva Kendra" error={form.formState.errors.shopName?.message} />} />
-          <Controller control={control} name="ownerName" render={({field}) => <Input label="Owner Name *" value={field.value} onChangeText={field.onChange} placeholder="e.g. Ramesh Patel" error={form.formState.errors.ownerName?.message} />} />
+          <Controller control={control} name="ownerName" render={({field}) => <Input label="Contact Person *" value={field.value} onChangeText={field.onChange} placeholder="e.g. Ramesh Patel" error={form.formState.errors.ownerName?.message} />} />
           <Controller control={control} name="contactMobile" render={({field}) => <Input label="Mobile Number *" value={field.value} onChangeText={field.onChange} prefix="+91" keyboardType="phone-pad" maxLength={10} placeholder="9876543210" error={form.formState.errors.contactMobile?.message} />} />
           
           {/* Cascading Location Dropdowns */}
@@ -425,7 +425,7 @@ export const DealerOnboardingScreen = ({ navigation, route }: any) => {
           <Text style={{ fontSize: 16, fontWeight: '800', marginTop: spacing.md, marginBottom: spacing.md }}>Bank Details</Text>
           <Controller control={control} name="bankName" render={({field}) => <SelectField label="Bank Name *" value={field.value ?? ''} options={INDIAN_BANKS.sort()} searchable onChange={field.onChange} error={form.formState.errors.bankName?.message} />} />
           <Controller control={control} name="bankBranch" render={({field}) => <Input label="Branch Name *" value={field.value} onChangeText={field.onChange} placeholder="e.g. MG Road Branch" error={form.formState.errors.bankBranch?.message} />} />
-          <Controller control={control} name="bankAccountName" render={({field}) => <Input label="Account Holder Name *" value={field.value} onChangeText={field.onChange} error={form.formState.errors.bankAccountName?.message} />} />
+          <Controller control={control} name="bankAccountName" render={({field}) => <Input label="Account Name *" value={field.value} onChangeText={field.onChange} error={form.formState.errors.bankAccountName?.message} />} />
           
           {/* Validated Fields based on schema */}
           <Controller control={control} name="bankAccountNumber" render={({field}) => <Input label="Account Number *" value={field.value} onChangeText={field.onChange} keyboardType="numeric" maxLength={18} placeholder="Enter exact account no." error={form.formState.errors.bankAccountNumber?.message} />} />
@@ -1041,7 +1041,7 @@ export const DealerOnboardingScreen = ({ navigation, route }: any) => {
 </Pressable>
             </View>
             <Text style={{ color: colors.textMuted, marginBottom: 4 }}>Shop Name: <Text style={{ color: colors.text }}>{watch('shopName')}</Text></Text>
-            <Text style={{ color: colors.textMuted, marginBottom: 4 }}>Owner Name: <Text style={{ color: colors.text }}>{watch('ownerName')}</Text></Text>
+            <Text style={{ color: colors.textMuted, marginBottom: 4 }}>Contact Person: <Text style={{ color: colors.text }}>{watch('ownerName')}</Text></Text>
             <Text style={{ color: colors.textMuted, marginBottom: 4 }}>Mobile: <Text style={{ color: colors.text }}>+91 {watch('contactMobile')}</Text></Text>
             <Text style={{ color: colors.textMuted, marginBottom: 4 }}>Address: <Text style={{ color: colors.text }}>{watch('address')}</Text></Text>
             <Text style={{ color: colors.textMuted, marginBottom: 4 }}>Landmark: <Text style={{ color: colors.text }}>{watch('landmark') || 'N/A'}</Text></Text>

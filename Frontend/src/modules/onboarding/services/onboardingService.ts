@@ -1,5 +1,5 @@
 import { supabase } from "../../../core/supabase";
-import { DealerOnboardingValues } from "../schema";
+import { DealerOnboardingValues } from "../dealer/schema";
 
 export async function saveDealerOnboarding(
   payload: DealerOnboardingValues, 

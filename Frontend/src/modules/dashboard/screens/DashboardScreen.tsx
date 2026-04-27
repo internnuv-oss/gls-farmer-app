@@ -210,6 +210,7 @@ export const DashboardScreen = ({ navigation }: any) => {
     t: any;
     onDelete: (id: string, name: string) => void;
   }
+
   // Dedicated Card Component to manage individual modal and measurement states
   const EntityCard = React.memo(({ item, navigation, t, onDelete }: EntityCardProps) => {
     const [menuVisible, setMenuVisible] = useState(false);
@@ -477,196 +478,210 @@ export const DashboardScreen = ({ navigation }: any) => {
         </Pressable>
       </View>
 
-      {/* Search & Filter */}
-      <View
-        style={{
-          flexDirection: "row",
-          paddingHorizontal: spacing.lg,
-          marginBottom: spacing.md,
-          gap: spacing.sm,
-        }}
-      >
-        <View
-          style={{
-            flex: 1,
-            flexDirection: "row",
-            alignItems: "center",
-            backgroundColor: colors.surface,
-            borderRadius: radius.md,
-            borderWidth: 1,
-            borderColor: colors.border,
-            paddingHorizontal: spacing.md,
-            height: 48,
-          }}
-        >
-          <Search size={20} color={colors.textMuted} />
-          <TextInput
-            value={searchQuery}
-            onChangeText={setSearchQuery}
-            placeholder={t("Search by name or location...")}
-            placeholderTextColor={colors.textMuted}
-            style={{
-              flex: 1,
-              marginLeft: spacing.sm,
-              fontSize: 15,
-              fontWeight: "500",
-              color: colors.text,
-            }}
+      {/* --- THE BLOCKER LOGIC --- */}
+      {!user?.isProfileComplete ? (
+        <View style={{ flex: 1, justifyContent: 'center', paddingBottom: 100 }}>
+          <EmptyState
+            title={t("Complete Your Profile")}
+            description={t("You must complete your Sales Executive onboarding (Personal, Bank, and Statutory details) before you can add Dealers, Distributors, or Farmers to your network.")}
+            iconName="assignment-ind"
+            actionLabel={t("Complete Profile Now")}
+            actionIcon="arrow-forward"
+            onAction={() => navigation.navigate("SEOnboardingScreen")}
           />
-        </View>
-        <Pressable
-          onPress={() => setIsFilterModalOpen(true)}
-          style={{
-            width: 48,
-            height: 48,
-            backgroundColor:
-              sortBy !== "latest" || filterMinScore !== "All"
-                ? colors.primarySoft
-                : colors.surface,
-            borderRadius: radius.md,
-            borderWidth: 1,
-            borderColor:
-              sortBy !== "latest" || filterMinScore !== "All"
-                ? colors.primary
-                : colors.border,
-            justifyContent: "center",
-            alignItems: "center",
-          }}
-        >
-          <Filter
-            size={20}
-            color={
-              sortBy !== "latest" || filterMinScore !== "All"
-                ? colors.primary
-                : colors.text
-            }
-          />
-        </Pressable>
-      </View>
-
-      {/* Tabs */}
-      <View
-        style={{
-          flexDirection: "row",
-          paddingHorizontal: spacing.lg,
-          marginBottom: spacing.sm,
-        }}
-      >
-        {tabPages.map((tab, index) => (
-          <Pressable
-            key={tab.key}
-            onPress={() => {
-              setActiveTab(index);
-              pagerRef.current?.scrollToIndex({ index, animated: true });
-            }}
-            style={{
-              flex: 1,
-              paddingVertical: 12,
-              borderBottomWidth: 2,
-              borderBottomColor:
-                activeTab === index ? colors.primary : "transparent",
-              alignItems: "center",
-            }}
-          >
-            <Text
-              style={{
-                fontWeight: "800",
-                color: activeTab === index ? colors.primary : colors.textMuted,
-              }}
-            >
-              {t(tab.key)}
-            </Text>
-          </Pressable>
-        ))}
-      </View>
-
-      {loading && !refreshing ? (
-        <View
-          style={{ flex: 1, justifyContent: "center", alignItems: "center" }}
-        >
-          <ActivityIndicator size="large" color={colors.primary} />
         </View>
       ) : (
-        <FlatList
-          ref={pagerRef}
-          data={tabPages}
-          keyExtractor={(item) => item.key}
-          horizontal
-          pagingEnabled
-          showsHorizontalScrollIndicator={false}
-          initialScrollIndex={1}
-          getItemLayout={(data, index) => ({
-            length: width,
-            offset: width * index,
-            index,
-          })}
-          onMomentumScrollEnd={(event) => {
-            const index = Math.round(event.nativeEvent.contentOffset.x / width);
-            if (activeTab !== index) setActiveTab(index);
-          }}
-          renderItem={({ item }) => (
-            <View style={{ width }}>
-              <FlatList
-                data={item.data}
-                renderItem={renderDealerItem}
-                keyExtractor={(i) => i.id}
-                contentContainerStyle={{
-                  padding: spacing.lg,
-                  paddingBottom: 100,
+        <>
+          {/* Search & Filter */}
+          <View
+            style={{
+              flexDirection: "row",
+              paddingHorizontal: spacing.lg,
+              marginBottom: spacing.md,
+              gap: spacing.sm,
+            }}
+          >
+            <View
+              style={{
+                flex: 1,
+                flexDirection: "row",
+                alignItems: "center",
+                backgroundColor: colors.surface,
+                borderRadius: radius.md,
+                borderWidth: 1,
+                borderColor: colors.border,
+                paddingHorizontal: spacing.md,
+                height: 48,
+              }}
+            >
+              <Search size={20} color={colors.textMuted} />
+              <TextInput
+                value={searchQuery}
+                onChangeText={setSearchQuery}
+                placeholder={t("Search by name or location...")}
+                placeholderTextColor={colors.textMuted}
+                style={{
+                  flex: 1,
+                  marginLeft: spacing.sm,
+                  fontSize: 15,
+                  fontWeight: "500",
+                  color: colors.text,
                 }}
-                showsVerticalScrollIndicator={false}
-
-
-                initialNumToRender={5}       // How many items to render in the first batch
-                maxToRenderPerBatch={5}      // How many items to render in subsequent batches
-                windowSize={5}               // How many screens worth of content to keep in memory
-                removeClippedSubviews={true} // Unmount components that are off-screen
-                updateCellsBatchingPeriod={50} // How often to update cells (in ms)
-                refreshControl={
-                  <RefreshControl
-                    refreshing={refreshing}
-                    onRefresh={onRefresh}
-                    colors={[colors.primary]}
-                    tintColor={colors.primary}
-                  />
-                }
-                ListEmptyComponent={
-                  <EmptyState
-                    title={t(
-                      searchQuery ? "No Results Found" : `No ${item.key} Yet`,
-                    )}
-                    description={t(
-                      searchQuery
-                        ? "Try adjusting your search criteria."
-                        : item.emptyMsg,
-                    )}
-                    iconName={item.icon as any}
-                    actionLabel={t(item.actionLabel)}
-                    actionIcon={item.actionIcon}
-                    onAction={() => {
-                      if (item.actionId === "dealer")
-                        navigation.navigate("DealerOnboarding");
-                      else navigation.navigate("ComingSoonScreen");
-                    }}
-                  />
-                }
               />
             </View>
-          )}
-        />
-      )}
+            <Pressable
+              onPress={() => setIsFilterModalOpen(true)}
+              style={{
+                width: 48,
+                height: 48,
+                backgroundColor:
+                  sortBy !== "latest" || filterMinScore !== "All"
+                    ? colors.primarySoft
+                    : colors.surface,
+                borderRadius: radius.md,
+                borderWidth: 1,
+                borderColor:
+                  sortBy !== "latest" || filterMinScore !== "All"
+                    ? colors.primary
+                    : colors.border,
+                justifyContent: "center",
+                alignItems: "center",
+              }}
+            >
+              <Filter
+                size={20}
+                color={
+                  sortBy !== "latest" || filterMinScore !== "All"
+                    ? colors.primary
+                    : colors.text
+                }
+              />
+            </Pressable>
+          </View>
 
-      <FloatingActionMenu
-        actions={[
-          { id: "dealer", label: t("Add Dealer"), icon: "storefront" },
-          { id: "farmer", label: t("Add Farmer"), icon: "agriculture" },
-          { id: "distributor", label: t("Add Distributor"), icon: "domain" },
-        ]}
-        onActionPress={(id) => {
-          if (id === "dealer") navigation.navigate("DealerOnboarding");
-          else navigation.navigate("ComingSoonScreen");
-        }}
-      />
+          {/* Tabs */}
+          <View
+            style={{
+              flexDirection: "row",
+              paddingHorizontal: spacing.lg,
+              marginBottom: spacing.sm,
+            }}
+          >
+            {tabPages.map((tab, index) => (
+              <Pressable
+                key={tab.key}
+                onPress={() => {
+                  setActiveTab(index);
+                  pagerRef.current?.scrollToIndex({ index, animated: true });
+                }}
+                style={{
+                  flex: 1,
+                  paddingVertical: 12,
+                  borderBottomWidth: 2,
+                  borderBottomColor:
+                    activeTab === index ? colors.primary : "transparent",
+                  alignItems: "center",
+                }}
+              >
+                <Text
+                  style={{
+                    fontWeight: "800",
+                    color: activeTab === index ? colors.primary : colors.textMuted,
+                  }}
+                >
+                  {t(tab.key)}
+                </Text>
+              </Pressable>
+            ))}
+          </View>
+
+          {loading && !refreshing ? (
+            <View
+              style={{ flex: 1, justifyContent: "center", alignItems: "center" }}
+            >
+              <ActivityIndicator size="large" color={colors.primary} />
+            </View>
+          ) : (
+            <FlatList
+              ref={pagerRef}
+              data={tabPages}
+              keyExtractor={(item) => item.key}
+              horizontal
+              pagingEnabled
+              showsHorizontalScrollIndicator={false}
+              initialScrollIndex={1}
+              getItemLayout={(data, index) => ({
+                length: width,
+                offset: width * index,
+                index,
+              })}
+              onMomentumScrollEnd={(event) => {
+                const index = Math.round(event.nativeEvent.contentOffset.x / width);
+                if (activeTab !== index) setActiveTab(index);
+              }}
+              renderItem={({ item }) => (
+                <View style={{ width }}>
+                  <FlatList
+                    data={item.data}
+                    renderItem={renderDealerItem}
+                    keyExtractor={(i) => i.id}
+                    contentContainerStyle={{
+                      padding: spacing.lg,
+                      paddingBottom: 100,
+                    }}
+                    showsVerticalScrollIndicator={false}
+                    initialNumToRender={5}
+                    maxToRenderPerBatch={5}
+                    windowSize={5}
+                    removeClippedSubviews={true}
+                    updateCellsBatchingPeriod={50}
+                    refreshControl={
+                      <RefreshControl
+                        refreshing={refreshing}
+                        onRefresh={onRefresh}
+                        colors={[colors.primary]}
+                        tintColor={colors.primary}
+                      />
+                    }
+                    ListEmptyComponent={
+                      <EmptyState
+                        title={t(
+                          searchQuery ? "No Results Found" : `No ${item.key} Yet`,
+                        )}
+                        description={t(
+                          searchQuery
+                            ? "Try adjusting your search criteria."
+                            : item.emptyMsg,
+                        )}
+                        iconName={item.icon as any}
+                        actionLabel={t(item.actionLabel)}
+                        actionIcon={item.actionIcon}
+                        onAction={() => {
+                          if (item.actionId === "dealer")
+                            navigation.navigate("DealerOnboarding");
+                          else navigation.navigate("ComingSoonScreen");
+                        }}
+                      />
+                    }
+                  />
+                </View>
+              )}
+            />
+          )}
+
+          <FloatingActionMenu
+            actions={[
+              { id: "dealer", label: t("Add Dealer"), icon: "storefront" },
+              { id: "farmer", label: t("Add Farmer"), icon: "agriculture" },
+              { id: "distributor", label: t("Add Distributor"), icon: "domain" },
+            ]}
+            onActionPress={(id) => {
+              if (id === "dealer") navigation.navigate("DealerOnboarding");
+              else navigation.navigate("ComingSoonScreen");
+            }}
+          />
+        </>
+      )}
 
       {/* Filter & Sort Modal */}
       <Modal

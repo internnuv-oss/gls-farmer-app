@@ -10,7 +10,7 @@ export const GLS_COMMITMENTS = [
 
 export const dealerOnboardingSchema = z.object({
   shopName: z.string().min(2, "Shop Name is required"),
-  ownerName: z.string().min(2, "Owner Name is required"),
+  ownerName: z.string().min(2, "Contact Person is required"),
   contactMobile: z.string().regex(/^\d{10}$/, "Must be exactly 10 digits"),
   state: z.string().min(2, "State is required"), // NEW
   city: z.string().min(2, "City is required"),   // NEW
