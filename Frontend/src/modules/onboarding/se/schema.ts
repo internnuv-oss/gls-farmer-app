@@ -72,14 +72,14 @@ export const seOnboardingSchema = z.object({
   if (data.maritalStatus === "Married") {
     if (!data.spouseName || data.spouseName.length < 2) {
       ctx.addIssue({
-        code: z.ZodIssueCode.custom,
+        code: "custom",
         path: ["spouseName"],
         message: "Spouse Name is required if married",
       });
     }
     if (!data.spouseMobile || !/^\d{10,12}$/.test(data.spouseMobile)) {
       ctx.addIssue({
-        code: z.ZodIssueCode.custom,
+        code: "custom",
         path: ["spouseMobile"],
         message: "Valid Spouse Mobile (10-12 digits) is required",
       });

@@ -3,7 +3,7 @@ import { View, Text } from 'react-native';
 import { UseFormReturn } from 'react-hook-form';
 import { UploadTile } from '../../../../../design-system/components';
 import { colors, spacing } from '../../../../../design-system/tokens';
-import { SEOnboardingValues } from '../../../dealer/schema';
+import { SEOnboardingValues } from '../../../se/schema';
 
 interface Step5Props {
   form: UseFormReturn<SEOnboardingValues>;

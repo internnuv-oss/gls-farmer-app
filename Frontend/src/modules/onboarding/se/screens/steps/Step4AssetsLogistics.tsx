@@ -3,7 +3,7 @@ import { View, Text } from 'react-native';
 import { Controller, UseFormReturn } from 'react-hook-form';
 import { Input, RadioGroup, TagsInput } from '../../../../../design-system/components';
 import { spacing } from '../../../../../design-system/tokens';
-import { SEOnboardingValues } from '../../../dealer/schema';
+import { SEOnboardingValues } from '../../../se/schema';
 
 export const Step4AssetsLogistics = ({ form }: { form: UseFormReturn<SEOnboardingValues> }) => {
   const { control } = form;
