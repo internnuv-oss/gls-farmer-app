@@ -12,12 +12,14 @@ type Props = {
   keyboardType?: 'default' | 'numeric' | 'email-address' | 'phone-pad';
   isPassword?: boolean;
   prefix?: string;
+  suffix?: string; // 🚀 NEW PROP
+  autoCapitalize?: 'none' | 'sentences' | 'words' | 'characters'; // 🚀 NEW PROP
   icon?: React.ComponentProps<typeof MaterialIcons>['name'];
-  maxLength?: number; // <-- Added maxLength prop
+  maxLength?: number;
 };
 
 export const Input: React.FC<Props> = ({
-  label, placeholder, value, onChangeText, error, keyboardType, isPassword, prefix, icon, maxLength
+  label, placeholder, value, onChangeText, error, keyboardType, isPassword, prefix, suffix, autoCapitalize = 'sentences', icon, maxLength
 }) => {
   const [showPassword, setShowPassword] = useState(false);
   const [isFocused, setIsFocused] = useState(false);
@@ -37,17 +39,34 @@ export const Input: React.FC<Props> = ({
         }}
       >
         {icon && <MaterialIcons name={icon} size={20} color={isFocused ? colors.primary : colors.textMuted} style={{ marginRight: spacing.sm }} />}
+        
         {prefix && (
           <View style={{ borderRightWidth: 1, borderRightColor: colors.border, paddingRight: spacing.sm, marginRight: spacing.sm }}>
             <Text style={{ color: colors.text, fontWeight: '700', fontSize: 16 }}>{prefix}</Text>
           </View>
         )}
+        
         <TextInput
-          value={value} onChangeText={onChangeText} placeholder={placeholder} keyboardType={keyboardType}
-          placeholderTextColor="#94A3B8" secureTextEntry={isPassword && !showPassword} maxLength={maxLength}
-          onFocus={() => setIsFocused(true)} onBlur={() => setIsFocused(false)}
+          value={value} 
+          onChangeText={onChangeText} 
+          placeholder={placeholder} 
+          keyboardType={keyboardType}
+          placeholderTextColor="#94A3B8" 
+          secureTextEntry={isPassword && !showPassword} 
+          maxLength={maxLength}
+          autoCapitalize={autoCapitalize} // 🚀 APPLIED HERE
+          onFocus={() => setIsFocused(true)} 
+          onBlur={() => setIsFocused(false)}
           style={{ flex: 1, height: '100%', color: colors.text, fontSize: 16, fontWeight: '600' }}
         />
+        
+        {/* 🚀 NEW SUFFIX RENDERING */}
+        {suffix && (
+          <View style={{ borderLeftWidth: 1, borderLeftColor: colors.border, paddingLeft: spacing.sm, marginLeft: spacing.sm }}>
+            <Text style={{ color: colors.textMuted, fontWeight: '700', fontSize: 16 }}>{suffix}</Text>
+          </View>
+        )}
+
         {isPassword && (
           <Pressable onPress={() => setShowPassword(!showPassword)} style={{ padding: spacing.xs }}>
             <MaterialIcons name={showPassword ? 'visibility-off' : 'visibility'} size={22} color={colors.textMuted} />

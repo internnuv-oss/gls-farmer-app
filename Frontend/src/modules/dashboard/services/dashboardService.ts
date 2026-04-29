@@ -1,4 +1,5 @@
 import { supabase } from "../../../core/supabase";
+import { translateText } from "../../../core/translationService";
 
 export async function fetchOnboardedCount() {
   const { count } = await supabase
@@ -8,26 +9,49 @@ export async function fetchOnboardedCount() {
   return count ?? 0;
 }
 
-export const fetchMyDealers = async (userId: string, page: number = 0, limit: number = 10) => {
+export const fetchMyDealers = async (userId: string, page: number = 0, limit: number = 10, targetLang: string = 'en') => {
   const from = page * limit;
   const to = from + limit - 1;
 
-  // ✅ Updated table to 'dealers' and join column to 'se_id'
   const { data, error } = await supabase
     .from('dealers') 
     .select('*')
-    .eq('se_id', userId) // Matches your se_id uuid foreign key
+    .eq('se_id', userId)
     .order('created_at', { ascending: false })
     .range(from, to); 
 
-  if (error) {
-    console.error("Supabase Fetch Error:", error.message);
-    throw error;
-  }
-  
-  return data || [];
+  if (error) throw error;
+  if (!data) return [];
+
+  // If language is English, just return the data immediately
+  if (targetLang === 'en') return data;
+
+  // 🚀 Translate dynamic fields on the fly using Promise.all to do it in parallel
+  const translatedData = await Promise.all(data.map(async (dealer) => {
+    return {
+      ...dealer,
+      shop_name: await translateText(dealer.shop_name, targetLang),
+      city: await translateText(dealer.city, targetLang),
+      state: await translateText(dealer.state, targetLang),
+      firm_type: await translateText(dealer.firm_type, targetLang),
+      owner_name: await translateText(dealer.owner_name, targetLang),
+    };
+  }));
+
+  return translatedData;
 };
 
+export async function fetchSEProfile(seId: string) {
+  const { data, error } = await supabase
+    .from('sales_executive')
+    .select('*')
+    .eq('profile_id', seId)
+    // 🚀 CHANGED: from .single() to .maybeSingle()
+    .maybeSingle(); 
+
+  if (error) throw error;
+  return data;
+}
 // ✅ Add page and limit parameters
 export const getNetworkData = async (search: string = '', page: number = 0, limit: number = 10) => {
   const from = page * limit;

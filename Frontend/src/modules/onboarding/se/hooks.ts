@@ -4,6 +4,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { Alert } from "react-native";
 import * as DocumentPicker from "expo-document-picker";
 import * as ImagePicker from "expo-image-picker";
+import { useRoute } from "@react-navigation/native"; 
 
 import { requestMediaPermission, requestCameraPermission } from "../../../core/permissions";
 import { useAuthStore } from "../../../store/authStore";
@@ -12,6 +13,9 @@ import { supabase } from "../../../core/supabase";
 import { seOnboardingSchema, SEOnboardingValues } from "./schema";
 
 export function useSEOnboarding(navigation: any) {
+  const route = useRoute<any>(); 
+  const editData = route.params?.editData || {}; 
+
   const user = useAuthStore((s) => s.user);
   const setUser = useAuthStore((s) => s.setUser);
 
@@ -22,32 +26,70 @@ export function useSEOnboarding(navigation: any) {
   const [jumpBackTo, setJumpBackTo] = useState<number | null>(null);
 
   const form = useForm<SEOnboardingValues>({
-    resolver: zodResolver(seOnboardingSchema) as any, // <-- ADDED 'as any' HERE
+    resolver: zodResolver(seOnboardingSchema) as any,
     defaultValues: {
-      firstName: "", middleName: "", lastName: "", dob: "", bloodGroup: undefined, maritalStatus: undefined,
-      mobileNumber: user?.mobile || "", emailId: "", permanentAddress: "", sameAsPermanent: false, currentAddress: "",
-      employeeId: "", designation: "", reportingTo: "", joiningDate: "", headquarter: "", territory: "", area: "",
-      panNumber: "", bankName: "", bankAccountNumber: "", bankIfsc: "", pfPensionNumber: "",
-      vehicleType: undefined, drivingLicenseNo: "", dlExpiryDate: "", companyAssets: [], fuelAllowance: "",
-      documents: {}
-    } as any, // <-- ADDED 'as any' HERE
+      // 🚀 Step 6: Automatically injects data from Auth Store!
+      firstName: editData.firstName || user?.firstName || "", 
+      middleName: editData.middleName || "", 
+      lastName: editData.lastName || user?.lastName || "", 
+      dob: editData.dob || user?.dob || "", 
+      mobileNumber: editData.mobileNumber || user?.mobile || "", 
+      emailId: editData.emailId || user?.email || "",
+      
+      bloodGroup: editData.bloodGroup || undefined, 
+      maritalStatus: editData.maritalStatus || undefined,
+      spouseName: editData.spouseName || "",
+      spouseMobile: editData.spouseMobile || "",
+      emergencyContact: editData.emergencyContact || "", 
+      permanentAddress: editData.permanentAddress || "", 
+      permanentPincode: editData.permanentPincode || "", 
+      sameAsPermanent: editData.sameAsPermanent || false, 
+      currentAddress: editData.currentAddress || "", 
+      currentPincode: editData.currentPincode || "",
+      employeeId: editData.employeeId || "", 
+      designation: editData.designation || "", 
+      reportingTo: editData.reportingTo || "", 
+      joiningDate: editData.joiningDate || "", 
+      headquarter: editData.headquarter || "", 
+      territory: editData.territory || "", 
+      area: editData.area || "",
+      panNumber: editData.panNumber || "", 
+      bankName: editData.bankName || "", 
+      bankAccountNumber: editData.bankAccountNumber || "", 
+      bankIfsc: editData.bankIfsc || "", 
+      pfPensionNumber: editData.pfPensionNumber || "",
+      vehicleType: editData.vehicleType || undefined, 
+      vehicleNumber: editData.vehicleNumber || "", 
+      drivingLicenseNo: editData.drivingLicenseNo || "", 
+      dlExpiryDate: editData.dlExpiryDate || "", 
+      companyAssets: editData.companyAssets || [], 
+      fuelAllowance: editData.fuelAllowance || "",
+      documents: editData.documents || {}
+    } as any,
     mode: 'onChange'
   });
 
   const { watch, setValue } = form;
   const values = watch();
 
-  // Auto-fill current address if checkbox is ticked
   useEffect(() => {
     if (values.sameAsPermanent) {
       setValue("currentAddress", values.permanentAddress, { shouldValidate: true });
+      setValue("currentPincode", values.permanentPincode, { shouldValidate: true });
     }
-  }, [values.sameAsPermanent, values.permanentAddress]);
+  }, [values.sameAsPermanent, values.permanentAddress, values.permanentPincode]);
 
-  // Step validation logic
   const isNextEnabled = useMemo(() => {
     if (step === 1) {
-      const basicValid = !!(values.firstName && values.lastName && values.dob && values.bloodGroup && values.maritalStatus && values.mobileNumber?.length === 10 && values.emailId && values.permanentAddress && values.currentAddress);
+      const basicValid = !!(
+        values.firstName && values.lastName && values.dob && 
+        values.bloodGroup && values.maritalStatus && 
+        values.mobileNumber?.length === 10 && 
+        values.emergencyContact?.length === 10 && 
+        values.emailId && 
+        values.permanentAddress && values.permanentPincode?.length === 6 && 
+        values.currentAddress && values.currentPincode?.length === 6
+      );
       if (values.maritalStatus === "Married") {
         return basicValid && !!(values.spouseName && values.spouseMobile && values.spouseMobile.length >= 10);
       }
@@ -55,24 +97,36 @@ export function useSEOnboarding(navigation: any) {
     }
     if (step === 2) return !!(values.employeeId && values.designation && values.reportingTo && values.joiningDate && values.headquarter && values.territory && values.area);
     if (step === 3) return !!(values.panNumber && values.bankName && values.bankAccountNumber && values.bankIfsc);
-    if (step === 4) return !!(values.vehicleType && values.drivingLicenseNo && values.dlExpiryDate);
-    if (step === 5) return !!(values.documents?.profilePhoto && values.documents?.identityProof && values.documents?.addressProof);
-    return true; // Step 6 (Review)
+    if (step === 4) return !!(values.vehicleType && values.vehicleNumber && values.drivingLicenseNo && values.dlExpiryDate); 
+    if (step === 5) return !!(values.documents?.profilePhoto && values.documents?.aadharCard && values.documents?.panCard && values.documents?.addressProof);
+    return true; 
   }, [step, values]);
 
   const handleUpload = async (key: keyof NonNullable<SEOnboardingValues['documents']>, type: 'camera' | 'image' | 'doc' = 'doc') => {
-    const useCamera = type === 'camera' || type === 'image';
-    const perm = useCamera ? await requestCameraPermission() : await requestMediaPermission();
-    if (!perm.granted) return Alert.alert("Permission Denied", perm.fallbackMessage);
+    let result;
+    
+    if (type === 'camera') {
+      const perm = await requestCameraPermission();
+      if (!perm.granted) return Alert.alert("Permission Denied", perm.fallbackMessage);
+      result = await ImagePicker.launchCameraAsync({ quality: 0.7 });
+    } else if (type === 'image') {
+      const perm = await requestMediaPermission();
+      if (!perm.granted) return Alert.alert("Permission Denied", perm.fallbackMessage);
+      result = await ImagePicker.launchImageLibraryAsync({ quality: 0.7 }); 
+    } else {
+      const perm = await requestMediaPermission();
+      if (!perm.granted) return Alert.alert("Permission Denied", perm.fallbackMessage);
+      result = await DocumentPicker.getDocumentAsync({ type: "*/*" });
+    }
 
-    let result = useCamera ? await ImagePicker.launchCameraAsync({ quality: 0.7 }) : await DocumentPicker.getDocumentAsync({ type: "*/*" });
     if (result.canceled) return;
     
     const uri = result.assets[0].uri;
     setUploading(prev => ({ ...prev, [key]: true }));
 
     try {
-      const url = await uploadFileToCloudinary(uri, useCamera ? 'image' : 'raw');
+      const isCloudinaryImage = type === 'camera' || type === 'image';
+      const url = await uploadFileToCloudinary(uri, isCloudinaryImage ? 'image' : 'raw');
       const currentDocs = form.getValues('documents') || {};
       
       if (key === 'educationalCertificates') {
@@ -93,21 +147,18 @@ export function useSEOnboarding(navigation: any) {
       if (!user?.id) return Alert.alert("Error", "User session not found.");
       setIsSubmitting(true);
       try {
-        // Update the profiles table
-        const { error } = await supabase.from('profiles').update({
+        const { error } = await supabase.from('sales_executive').upsert({
+           profile_id: user.id, 
            first_name: data.firstName,
            last_name: data.lastName,
            dob: data.dob,
-           mobile: data.mobileNumber,
            is_profile_complete: true,
-           metadata: data // Store all other fields in a JSONB column
-        }).eq('id', user.id);
+           metadata: data 
+        });
 
         if (error) throw error;
         
-        // Update local auth store to unlock the dashboard
         setUser({ ...user, isProfileComplete: true });
-        
         setShowSuccess(true);
       } catch (error: any) {
         Alert.alert("Submission Failed", error.message);
@@ -117,7 +168,7 @@ export function useSEOnboarding(navigation: any) {
     },
     (errors) => {
       console.log("Validation Errors: ", errors);
-      Alert.alert("Validation Error", "Please check all required fields.");
+      Alert.alert("Validation Error", "Please check all required fields in the previous steps.");
     }
   );
 

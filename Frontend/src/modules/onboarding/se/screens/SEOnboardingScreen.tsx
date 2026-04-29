@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, Pressable, BackHandler } from 'react-native';
+import { View, Text, Pressable, BackHandler, Alert } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
 
@@ -8,7 +8,7 @@ import { Button } from '../../../../design-system/components';
 import { colors } from '../../../../design-system/tokens';
 import { useSEOnboarding } from '../hooks';
 
-// Import our newly created step components
+// Import our step components
 import { Step1PersonalDetails } from './steps/Step1PersonalDetails';
 import { Step2Organization } from './steps/Step2Organization';
 import { Step3Financial } from './steps/Step3Financial';
@@ -18,18 +18,27 @@ import { Step6Review } from './steps/Step6Review';
 
 export const SEOnboardingScreen = ({ navigation }: any) => {
   const { t } = useTranslation();
+  
   const { form, step, setStep, jumpBackTo, setJumpBackTo, submit, handleUpload, uploading, isSubmitting, isNextEnabled, showSuccess } = useSEOnboarding(navigation);
 
-  // Hardware back button handler
+  // Hardware back button logic
   React.useEffect(() => {
     const handleBackPress = () => {
-      if (jumpBackTo) { setStep(jumpBackTo); setJumpBackTo(null); return true; }
+      if (jumpBackTo) { 
+        if (!isNextEnabled) {
+          Alert.alert(t("Incomplete"), t("Please fill all required fields correctly before returning to the review screen."));
+          return true; 
+        }
+        setStep(jumpBackTo); 
+        setJumpBackTo(null); 
+        return true; 
+      }
       if (step > 1) { setStep(step - 1); return true; }
       return false; 
     };
     const backSubscription = BackHandler.addEventListener('hardwareBackPress', handleBackPress);
     return () => backSubscription.remove();
-  }, [step, jumpBackTo]);
+  }, [step, jumpBackTo, isNextEnabled]);
 
   if (showSuccess) {
     return (
@@ -54,10 +63,18 @@ export const SEOnboardingScreen = ({ navigation }: any) => {
   return (
     <WizardFlowTemplate
       headerTitle={t("Complete Your Profile")} 
-      stepLabel={`STEP ${step} OF 6`} 
+      stepLabel={t("STEP {{current}} OF {{total}}", { current: step, total: 6 })} 
+      // 🚀 The prop below triggers the scroll reset in Templates.tsx
       progress01={step / 6}
       onBack={() => {
-        if (jumpBackTo) { setStep(jumpBackTo); setJumpBackTo(null); } 
+        if (jumpBackTo) { 
+          if (!isNextEnabled) {
+            Alert.alert(t("Incomplete"), t("Please fill all required fields correctly before returning to the review screen."));
+            return; 
+          }
+          setStep(jumpBackTo); 
+          setJumpBackTo(null); 
+        } 
         else { step > 1 ? setStep(step - 1) : navigation.goBack(); }
       }}
       footer={
@@ -74,14 +91,12 @@ export const SEOnboardingScreen = ({ navigation }: any) => {
         </View>
       }
     >
-      {/* Conditionally Render the correct step component and pass the form/props down */}
       {step === 1 && <Step1PersonalDetails form={form} />}
       {step === 2 && <Step2Organization form={form} />}
       {step === 3 && <Step3Financial form={form} />}
       {step === 4 && <Step4AssetsLogistics form={form} />}
       {step === 5 && <Step5Documents form={form} uploading={uploading} handleUpload={handleUpload} />}
       {step === 6 && <Step6Review form={form} renderEditBtn={renderEditBtn} />}
-
     </WizardFlowTemplate>
   );
 };

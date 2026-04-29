@@ -1,200 +1,91 @@
-import React, { useState } from "react";
-import {
-  View,
-  Text,
-  KeyboardAvoidingView,
-  Platform,
-  ScrollView,
-  Pressable,
-} from "react-native";
+import React, { useState, useMemo } from "react";
+import { View, Text, KeyboardAvoidingView, Platform, ScrollView, Pressable } from "react-native";
 import { useTranslation } from "react-i18next";
-import { UserPlus } from "lucide-react-native";
+import { Leaf } from "lucide-react-native";
 import { Controller } from "react-hook-form";
+
 import { useRegisterForm } from "../hooks";
-import { Input } from "../../../design-system/components/Input";
-import { Button } from "../../../design-system/components/Button";
-import { AlertModal } from "../../../design-system/components/AlertModal";
+import { registerUser } from "../services/authService";
+import { Input, Button, DatePickerField, AlertModal } from "../../../design-system/components";
 import { colors, spacing } from "../../../design-system/tokens";
 
 export const RegisterScreen = ({ navigation }: any) => {
   const { t } = useTranslation();
+  
+  const [modal, setModal] = useState({ visible: false, title: "", message: "", tone: "danger" as any });
 
-  const [modal, setModal] = useState({
-    visible: false,
-    title: "",
-    message: "",
-    tone: "danger" as any,
-    isSuccess: false,
-  });
+  const maxDobDate = useMemo(() => {
+    const d = new Date();
+    d.setFullYear(d.getFullYear() - 18); // 🚀 18+ validation enforcer on the picker
+    return d; 
+  }, []);
 
   const { form, submit, loading } = useRegisterForm(
-    (msg) =>
-      setModal({
-        visible: true,
-        title: t("Success"),
-        message: msg,
-        tone: "success",
-        isSuccess: true,
-      }),
-    (err) =>
-      setModal({
-        visible: true,
-        title: t("Registration Failed"),
-        message: err,
-        tone: "danger",
-        isSuccess: false,
-      }),
+    (msg) => {
+      setModal({ visible: true, title: t("Success"), tone: "success", message: t(msg) });
+      setTimeout(() => { setModal({ ...modal, visible: false }); }, 2000);
+    },
+    (err) => setModal({ visible: true, title: t("Registration Failed"), message: err, tone: "danger" })
   );
 
-  const handleModalClose = () => {
-    setModal({ ...modal, visible: false });
-    if (modal.isSuccess) {
-      navigation.navigate("Login");
-    }
-  };
-
   return (
-    <KeyboardAvoidingView
-      behavior={Platform.OS === "ios" ? "padding" : "height"}
-      style={{ flex: 1, backgroundColor: colors.surface }}
-    >
-      <ScrollView
-        contentContainerStyle={{
-          flexGrow: 1,
-          justifyContent: "center",
-          padding: spacing["2xl"],
-        }}
-        showsVerticalScrollIndicator={false}
-      >
-        <View style={{ alignItems: "center", marginBottom: 32 }}>
-          <View
-            style={{
-              width: 64,
-              height: 64,
-              borderRadius: 20,
-              backgroundColor: "#E8F5E9",
-              alignItems: "center",
-              justifyContent: "center",
-              marginBottom: spacing.md,
-            }}
-          >
-            <UserPlus size={32} color={colors.primary} />
+    <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : "height"} style={{ flex: 1, backgroundColor: colors.surface }}>
+      <ScrollView contentContainerStyle={{ flexGrow: 1, padding: spacing["2xl"], paddingTop: 60 }} showsVerticalScrollIndicator={false}>
+        <View style={{ alignItems: "center", marginBottom: spacing.xl }}>
+          <View style={{ width: 64, height: 64, borderRadius: 20, backgroundColor: colors.primarySoft, alignItems: "center", justifyContent: "center", marginBottom: spacing.md }}>
+            <Leaf size={32} color={colors.primary} />
           </View>
-          <Text style={{ fontSize: 28, fontWeight: "900", color: colors.text }}>
-            {t("Create Account")}
-          </Text>
-          <Text
-            style={{
-              color: colors.textMuted,
-              marginTop: 8,
-              fontSize: 15,
-              textAlign: "center",
-            }}
-          >
-            {t("Join as a Sales Executive")}
-          </Text>
+          <Text style={{ fontSize: 28, fontWeight: "900", color: colors.text }}>{t("Create Account")}</Text>
+          <Text style={{ color: colors.textMuted, marginTop: 8, fontSize: 15 }}>{t("Join as a Sales Executive")}</Text>
         </View>
 
-        <Controller
-          control={form.control}
-          name="name"
-          render={({ field: { onChange, value }, fieldState: { error } }) => (
-            <Input
-              label={t("Full Name")}
-              value={value}
-              onChangeText={onChange}
-              icon="person"
-              placeholder="e.g. Ramesh Patel"
-              error={error?.message}
-            />
-          )}
-        />
+        <View style={{ flexDirection: 'row', gap: spacing.md }}>
+          <View style={{ flex: 1 }}>
+            <Controller control={form.control} name="firstName" render={({ field }) => (
+              <Input label={t("First Name *")} value={field.value} onChangeText={field.onChange} placeholder={t("e.g. Ramesh")} error={form.formState.errors.firstName?.message} />
+            )} />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Controller control={form.control} name="lastName" render={({ field }) => (
+              <Input label={t("Last Name *")} value={field.value} onChangeText={field.onChange} placeholder={t("e.g. Patel")} error={form.formState.errors.lastName?.message} />
+            )} />
+          </View>
+        </View>
 
-        <Controller
-          control={form.control}
-          name="mobile"
-          render={({ field: { onChange, value }, fieldState: { error } }) => (
-            <Input
-              label={t("Mobile Number")}
-              value={value}
-              onChangeText={onChange}
-              keyboardType="phone-pad"
-              prefix="+91"
-              icon="phone"
-              placeholder="98765 43210"
-              maxLength={10}
-              error={error?.message}
-            />
-          )}
-        />
+        {/* 🚀 Outputs strictly in DD-MM-YYYY format */}
+        <Controller control={form.control} name="dob" render={({ field }) => (
+          <DatePickerField label={t("Date of Birth (18+ only) *")} value={field.value} onChange={field.onChange} maximumDate={maxDobDate} error={form.formState.errors.dob?.message} />
+        )} />
 
-        <Controller
-          control={form.control}
-          name="password"
-          render={({ field: { onChange, value }, fieldState: { error } }) => (
-            <Input
-              label={t("Password")}
-              value={value}
-              onChangeText={onChange}
-              isPassword
-              icon="lock"
-              placeholder="••••••••"
-              error={error?.message}
-            />
-          )}
-        />
+        <Controller control={form.control} name="email" render={({ field }) => (
+          <Input label={t("Email ID *")} value={field.value} onChangeText={(val) => field.onChange(val.toLowerCase())} keyboardType="email-address" autoCapitalize="none" placeholder={t("e.g. ramesh@gls.com")} icon="email" error={form.formState.errors.email?.message} />
+        )} />
 
-        <Controller
-          control={form.control}
-          name="confirmPassword"
-          render={({ field: { onChange, value }, fieldState: { error } }) => (
-            <Input
-              label={t("Confirm Password")}
-              value={value}
-              onChangeText={onChange}
-              isPassword
-              icon="lock-outline"
-              placeholder="••••••••"
-              error={error?.message}
-            />
-          )}
-        />
+        <Controller control={form.control} name="mobile" render={({ field }) => (
+          <Input label={t("Mobile Number *")} value={field.value} onChangeText={field.onChange} keyboardType="phone-pad" prefix="+91" maxLength={10} icon="phone" placeholder="98765 43210" error={form.formState.errors.mobile?.message} />
+        )} />
+
+        <Controller control={form.control} name="password" render={({ field }) => (
+          <Input label={t("Password *")} value={field.value} onChangeText={field.onChange} isPassword icon="lock" placeholder="••••••••" error={form.formState.errors.password?.message} />
+        )} />
+
+        <Controller control={form.control} name="confirmPassword" render={({ field }) => (
+          <Input label={t("Confirm Password *")} value={field.value} onChangeText={field.onChange} isPassword icon="lock-outline" placeholder="••••••••" error={form.formState.errors.confirmPassword?.message} />
+        )} />
 
         <View style={{ marginTop: spacing.md }}>
           <Button label={t("Register")} onPress={submit} loading={loading} />
         </View>
 
-        <View
-          style={{
-            flexDirection: "row",
-            justifyContent: "center",
-            marginTop: spacing.xl,
-          }}
-        >
-          <Text style={{ color: colors.textMuted, fontSize: 14 }}>
-            {t("Already have an account?")}{" "}
-          </Text>
-          <Pressable
-            onPress={() => navigation.navigate("Login")}
-            style={{ marginLeft: 4 }}
-          >
-            <Text
-              style={{ color: colors.primary, fontWeight: "800", fontSize: 14 }}
-            >
-              {t("Login")}
-            </Text>
+        <View style={{ flexDirection: "row", justifyContent: "center", marginTop: spacing.xl, marginBottom: 40 }}>
+          <Text style={{ color: colors.textMuted }}>{t("Already have an account?")} </Text>
+          <Pressable onPress={() => navigation.navigate("Login")}>
+            <Text style={{ color: colors.primary, fontWeight: "800" }}>{t("Login")}</Text>
           </Pressable>
         </View>
       </ScrollView>
 
-      <AlertModal
-        visible={modal.visible}
-        title={modal.title}
-        message={modal.message}
-        tone={modal.tone}
-        actionLabel={modal.isSuccess ? t("Go to Login") : t("Try Again")}
-        onClose={handleModalClose}
-      />
+      <AlertModal visible={modal.visible} title={modal.title} message={modal.message} onClose={() => setModal({ ...modal, visible: false })} />
     </KeyboardAvoidingView>
   );
 };

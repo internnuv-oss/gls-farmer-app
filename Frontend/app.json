@@ -34,7 +34,8 @@
         {
           "microphonePermission": "Allow $(PRODUCT_NAME) to access your microphone to record dealer onboarding voice notes."
         }
-      ]
+      ],
+      "@react-native-community/datetimepicker"
     ]
   }
 }

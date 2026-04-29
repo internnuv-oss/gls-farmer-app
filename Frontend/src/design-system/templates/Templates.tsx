@@ -1,5 +1,5 @@
-import React from 'react';
-import { ScrollView, View, Text, Pressable, KeyboardAvoidingView, Platform, RefreshControl } from 'react-native';
+import React, { useEffect, useRef } from 'react';
+import { ScrollView, View, Text, Pressable, KeyboardAvoidingView, Platform, RefreshControl, Keyboard } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
 import { colors, spacing, typography, shadows, radius } from '../tokens';
@@ -18,12 +18,18 @@ type SimpleProps = {
   refreshing?: boolean;
   onRefresh?: () => void;
   scrollViewRef?: React.RefObject<ScrollView>;
-  noScroll?: boolean; // NEW PROP
+  noScroll?: boolean;
 };
 
-export const SimpleScreenTemplate: React.FC<SimpleProps> = ({ title, onBack, rightAction, children, footer, refreshing = false, onRefresh, scrollViewRef, noScroll }) => {
+export const SimpleScreenTemplate: React.FC<SimpleProps> = ({ 
+  title, onBack, rightAction, children, footer, refreshing = false, onRefresh, scrollViewRef, noScroll 
+}) => {
   const insets = useSafeAreaInsets();
   const paddingTop = Math.max(insets.top, TOP_PADDING);
+  
+  // 🚀 Internal fallback ref if none provided
+  const internalRef = useRef<ScrollView>(null);
+  const activeRef = scrollViewRef || internalRef;
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.screen }}>
@@ -43,7 +49,7 @@ export const SimpleScreenTemplate: React.FC<SimpleProps> = ({ title, onBack, rig
         </View>
       ) : (
         <ScrollView
-          ref={scrollViewRef as any}
+          ref={activeRef as any}
           contentContainerStyle={{ paddingHorizontal: spacing.lg, paddingTop: spacing.lg, paddingBottom: footer ? 140 : spacing['2xl'] }}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
@@ -109,13 +115,31 @@ type WizardProps = {
 export const WizardFlowTemplate: React.FC<WizardProps> = ({ headerTitle, stepLabel, stepTextRight, progress01 = 0, onBack, children, footer, headerRight }) => {
   const insets = useSafeAreaInsets();
   const paddingTop = Math.max(insets.top, TOP_PADDING);
+  
+  // 🚀 Ref for the ScrollView
+  const scrollRef = useRef<ScrollView>(null);
+
+  // 🚀 Automatically scroll to top whenever the step (progress01) changes
+  useEffect(() => {
+    // A. Instantly kill the keyboard so it doesn't animate the KeyboardAvoidingView
+    Keyboard.dismiss(); 
+
+    // B. Wait exactly 10ms for the new step's UI to draw, THEN jump instantly
+    const timeout = setTimeout(() => {
+      scrollRef.current?.scrollTo({ y: 0, animated: false });
+    }, 10);
+
+    return () => clearTimeout(timeout);
+  }, [progress01]);
 
   return (
     <KeyboardAvoidingView style={{ flex: 1, backgroundColor: colors.screen }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <View style={{ paddingTop, paddingHorizontal: spacing.lg, backgroundColor: colors.surface, paddingBottom: spacing.md, borderBottomWidth: 1, borderBottomColor: colors.border }}>
-      <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: spacing.sm }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: spacing.sm }}>
           {onBack ? (
-            <Pressable onPress={onBack} hitSlop={20} style={{ paddingRight: spacing.md }}><MaterialIcons name="chevron-left" size={28} color={colors.text} /></Pressable>
+            <Pressable onPress={onBack} hitSlop={20} style={{ paddingRight: spacing.md }}>
+              <MaterialIcons name="chevron-left" size={28} color={colors.text} />
+            </Pressable>
           ) : <View style={{ width: 28 }} />}
           
           <Text style={[typography.headingMd, { flex: 1, textAlign: 'center', marginLeft: headerRight ? 0 : -28 }]}>{headerTitle}</Text>
@@ -132,7 +156,8 @@ export const WizardFlowTemplate: React.FC<WizardProps> = ({ headerTitle, stepLab
       </View>
 
       <ScrollView 
-        contentContainerStyle={{ padding: spacing.lg, paddingBottom: 350 }} // Increased from 140 to 350
+        ref={scrollRef} // 🚀 Attached ref here
+        contentContainerStyle={{ padding: spacing.lg, paddingBottom: 350 }}
         keyboardShouldPersistTaps="handled" 
         showsVerticalScrollIndicator={false}
       >
