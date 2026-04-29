@@ -28,13 +28,12 @@ export function useSEOnboarding(navigation: any) {
   const form = useForm<SEOnboardingValues>({
     resolver: zodResolver(seOnboardingSchema) as any,
     defaultValues: {
-      // 🚀 Step 6: Automatically injects data from Auth Store!
       firstName: editData.firstName || user?.firstName || "", 
       middleName: editData.middleName || "", 
       lastName: editData.lastName || user?.lastName || "", 
       dob: editData.dob || user?.dob || "", 
       mobileNumber: editData.mobileNumber || user?.mobile || "", 
-      emailId: editData.emailId || user?.email || "",
+      emailId: editData.emailId || user?.email || "", 
       
       bloodGroup: editData.bloodGroup || undefined, 
       maritalStatus: editData.maritalStatus || undefined,
@@ -147,14 +146,56 @@ export function useSEOnboarding(navigation: any) {
       if (!user?.id) return Alert.alert("Error", "User session not found.");
       setIsSubmitting(true);
       try {
-        const { error } = await supabase.from('sales_executive').upsert({
-           profile_id: user.id, 
-           first_name: data.firstName,
-           last_name: data.lastName,
-           dob: data.dob,
-           is_profile_complete: true,
-           metadata: data 
-        });
+        // 🚀 UPDATED SUBMISSION PAYLOAD
+const { error } = await supabase.from('sales_executive').upsert({
+    profile_id: user.id, 
+    is_profile_complete: true,
+    
+    // All personal and contact details are now strictly unified here
+    personal_details: {
+      firstName: data.firstName,
+      middleName: data.middleName,
+      lastName: data.lastName,
+      dob: data.dob,
+      bloodGroup: data.bloodGroup,
+      maritalStatus: data.maritalStatus,
+      spouseName: data.spouseName,
+      spouseMobile: data.spouseMobile,
+      mobileNumber: data.mobileNumber,
+      emergencyContact: data.emergencyContact,
+      emailId: data.emailId,
+      permanentAddress: data.permanentAddress,
+      permanentPincode: data.permanentPincode,
+      sameAsPermanent: data.sameAsPermanent,
+      currentAddress: data.currentAddress,
+      currentPincode: data.currentPincode
+    },
+    organization_details: {
+      employeeId: data.employeeId,
+      designation: data.designation,
+      reportingTo: data.reportingTo,
+      joiningDate: data.joiningDate,
+      headquarter: data.headquarter,
+      territory: data.territory,
+      area: data.area
+    },
+    financial_details: {
+      panNumber: data.panNumber,
+      bankName: data.bankName,
+      bankAccountNumber: data.bankAccountNumber,
+      bankIfsc: data.bankIfsc,
+      pfPensionNumber: data.pfPensionNumber
+    },
+    assets_details: {
+      vehicleType: data.vehicleType,
+      vehicleNumber: data.vehicleNumber,
+      drivingLicenseNo: data.drivingLicenseNo,
+      dlExpiryDate: data.dlExpiryDate,
+      companyAssets: data.companyAssets,
+      fuelAllowance: data.fuelAllowance
+    },
+    documents: data.documents || {}
+ });
 
         if (error) throw error;
         

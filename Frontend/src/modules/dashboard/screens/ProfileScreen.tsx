@@ -65,9 +65,20 @@ export const ProfileScreen = () => {
   }
 
   const isProfileComplete = user?.isProfileComplete || seData?.is_profile_complete;
-  const values = seData?.metadata || {};
+
+  // 🚀 RECOMBINE THE SPLIT COLUMNS SO THE UI KEEPS WORKING FLAWLESSLY
+  const values = seData ? {
+    ...seData.personal_details, //firstName, lastName, dob, and contact info are all here now
+    ...seData.organization_details,
+    ...seData.financial_details,
+    ...seData.assets_details,
+    documents: seData.documents || {}
+  } : {};
+
   const profilePhotoUrl = values?.documents?.profilePhoto;
 
+
+// ... rest of the file remains exactly the same
   const DataRow = ({ label, value, prefix }: { label: string, value?: any, prefix?: string }) => {
     const hasValue = value && (Array.isArray(value) ? value.length > 0 : true);
     let displayValue = hasValue ? (Array.isArray(value) ? value.join(', ') : value) : "N/A";

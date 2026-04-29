@@ -1,0 +1,40 @@
+name: EAS Auto Update
+
+# This tells GitHub to run this script whenever you push to the 'main' branch
+on:
+  push:
+    branches:
+      - main 
+
+jobs:
+  update:
+    name: Publish Update
+    runs-on: ubuntu-latest
+    
+    # This is crucial: it tells GitHub Actions to run commands inside your Frontend folder
+    defaults:
+      run:
+        working-directory: ./Frontend 
+
+    steps:
+      - name: 🏗 Setup repo
+        uses: actions/checkout@v4
+
+      - name: 🏗 Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 18.x
+          cache: 'npm'
+          cache-dependency-path: ./Frontend/package-lock.json
+
+      - name: 🏗 Setup Expo and EAS
+        uses: expo/expo-github-action@v8
+        with:
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }} # This uses the secret you added to GitHub
+
+      - name: 📦 Install dependencies
+        run: npm install
+
+      - name: 🚀 Publish EAS Update
+        run: eas update --branch main --message "Auto-update: ${{ github.event.head_commit.message }}"
