@@ -1,0 +1,23 @@
+---
+alwaysApply: true
+---
+
+
+---
+description: Rules for handling Supabase, Cloudinary, and Device Permissions.
+globs: ["src/modules/**/services/*.ts", "src/core/**/*.ts"]
+---
+# INTEGRATIONS & DEVICE APIs
+
+## MEDIA UPLOADS (CLOUDINARY)
+- Never store base64 strings in Supabase.
+- Upload images to Cloudinary first -> get secure URL -> store URL in Supabase `jsonb` or `text` columns.
+
+## DEVICE PERMISSIONS
+- Centralize all permission requests in `src/core/permissions.ts`.
+- If Camera/Media permission is denied, show a graceful fallback UI explaining why the feature is locked. Do not crash.
+
+## SUPABASE RLS
+- All data fetching must assume Row Level Security is active.
+- Ensure the user's JWT is passed correctly.
+- Filter locally only for search functionality; rely on Supabase for primary data isolation.

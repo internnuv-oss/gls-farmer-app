@@ -45,7 +45,7 @@ export const SEOnboardingScreen = ({ navigation }: any) => {
       <FeedbackScreenTemplate
         iconName="check-circle" tone="success" animationType="pulse"
         title={t("Profile Complete!")}
-        description={t("Your Sales Executive profile has been successfully saved. You can now start onboarding your network.")}
+        description={t("Your Sales Executive profile has been successfully saved.")}
         primaryActionLabel={t("Go to Dashboard")}
         onPrimaryAction={() => navigation.navigate("MainTabs")}
         primaryActionIcon="dashboard"

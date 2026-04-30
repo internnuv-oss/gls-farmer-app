@@ -33,14 +33,32 @@ export const SimpleScreenTemplate: React.FC<SimpleProps> = ({
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.screen }}>
-      <View style={{ paddingTop: paddingTop + spacing.md, paddingHorizontal: spacing.lg, paddingBottom: spacing.md, flexDirection: 'row', alignItems: 'center' }}>
-        {onBack ? (
-          <Pressable onPress={onBack} hitSlop={20} style={{ paddingVertical: spacing.sm, paddingRight: spacing.md }}>
-            <MaterialIcons name="chevron-left" size={28} color={colors.text} />
-          </Pressable>
-        ) : <View style={{ width: 28 }} />}
-        <Text style={[typography.headingMd, { flex: 1, textAlign: 'center', marginLeft: -28 }]}>{title}</Text>
-        <View style={{ width: 28, alignItems: 'flex-end' }}>{rightAction}</View>
+      
+      {/* --- FOOLPROOF 3-COLUMN HEADER --- */}
+      <View style={{ paddingTop: paddingTop + spacing.sm, paddingHorizontal: spacing.lg, paddingBottom: spacing.md, flexDirection: 'row', alignItems: 'center' }}>
+        
+        {/* LEFT COLUMN (Fixed width, elevated) */}
+        <View style={{ width: 50, alignItems: 'flex-start', zIndex: 20, elevation: 10 }}>
+          {onBack && (
+            <Pressable 
+              onPress={onBack} 
+              hitSlop={{ top: 20, bottom: 20, left: 20, right: 20 }}
+            >
+              <MaterialIcons name="chevron-left" size={32} color={colors.text} />
+            </Pressable>
+          )}
+        </View>
+
+        {/* CENTER COLUMN (Flex space) */}
+        <View style={{ flex: 1, alignItems: 'center' }}>
+          <Text style={[typography.headingMd, { textAlign: 'center' }]} numberOfLines={1}>{title}</Text>
+        </View>
+
+        {/* RIGHT COLUMN (Fixed width, elevated) */}
+        <View style={{ width: 50, alignItems: 'flex-end', zIndex: 20, elevation: 10 }}>
+          {rightAction}
+        </View>
+
       </View>
 
       {noScroll ? (
@@ -135,17 +153,31 @@ export const WizardFlowTemplate: React.FC<WizardProps> = ({ headerTitle, stepLab
   return (
     <KeyboardAvoidingView style={{ flex: 1, backgroundColor: colors.screen }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <View style={{ paddingTop, paddingHorizontal: spacing.lg, backgroundColor: colors.surface, paddingBottom: spacing.md, borderBottomWidth: 1, borderBottomColor: colors.border }}>
+        
+        {/* --- FOOLPROOF 3-COLUMN HEADER --- */}
         <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: spacing.sm }}>
-          {onBack ? (
-            <Pressable onPress={onBack} hitSlop={20} style={{ paddingRight: spacing.md }}>
-              <MaterialIcons name="chevron-left" size={28} color={colors.text} />
-            </Pressable>
-          ) : <View style={{ width: 28 }} />}
           
-          <Text style={[typography.headingMd, { flex: 1, textAlign: 'center', marginLeft: headerRight ? 0 : -28 }]}>{headerTitle}</Text>
-          
-          <View style={{ width: headerRight ? undefined : 28 }}>{headerRight}</View>
+          {/* LEFT COLUMN */}
+          <View style={{ width: 50, alignItems: 'flex-start', zIndex: 20, elevation: 10 }}>
+            {onBack && (
+              <Pressable onPress={onBack} hitSlop={{ top: 20, bottom: 20, left: 20, right: 20 }}>
+                <MaterialIcons name="chevron-left" size={32} color={colors.text} />
+              </Pressable>
+            )}
+          </View>
+
+          {/* CENTER COLUMN */}
+          <View style={{ flex: 1, alignItems: 'center' }}>
+            <Text style={[typography.headingMd, { textAlign: 'center' }]} numberOfLines={1}>{headerTitle}</Text>
+          </View>
+
+          {/* RIGHT COLUMN */}
+          <View style={{ width: 50, alignItems: 'flex-end', zIndex: 20, elevation: 10 }}>
+            {headerRight}
+          </View>
+
         </View>
+
         <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: spacing.sm }}>
           {stepLabel && <Text style={{ color: colors.textMuted, fontSize: 12, fontWeight: '700' }}>{stepLabel}</Text>}
           {stepTextRight && <Text style={{ color: colors.primary, fontSize: 12, fontWeight: '800' }}>{stepTextRight}</Text>}
@@ -193,13 +225,14 @@ export const DashboardScreenTemplate: React.FC<DashboardProps> = ({ headerLeft, 
     <View style={{ flex: 1, backgroundColor: colors.screen }}>
       <View style={{ paddingTop: paddingTop + spacing.md, paddingHorizontal: spacing.lg, paddingBottom: spacing.md, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
         <View style={{ flex: 1 }}>{headerLeft}</View>
-        <View>{headerRight}</View>
+        <View style={{ zIndex: 10, elevation: 10 }}>{headerRight}</View>
       </View>
       {periodSelector && <View style={{ paddingHorizontal: spacing.lg, marginBottom: spacing.md }}>{periodSelector}</View>}
       
       <ScrollView
         contentContainerStyle={{ paddingHorizontal: spacing.lg, paddingBottom: 100 }}
         showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
         refreshControl={onRefresh ? <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[colors.primary]} tintColor={colors.primary} /> : undefined}
       >
         {children}

@@ -1,0 +1,33 @@
+---
+alwaysApply: true
+---
+
+
+---
+description: React Native frontend architecture, folder structure, state management, and offline-first rules.
+globs: ["src/**/*.ts", "src/**/*.tsx"]
+---
+# FRONTEND ARCHITECTURE & LOGIC
+
+## TECH STACK
+- React Native with TypeScript (Expo SDK)
+- NativeWind (Tailwind CSS)
+- Supabase (Backend/Auth)
+- Cloudinary (Media)
+
+## PROJECT STRUCTURE (STRICT)
+`src/`
+ ├─ `core/`          -> config, permissions, i18n, utils, supabase client
+ ├─ `design-system/` -> tokens, components, templates
+ ├─ `modules/`       -> domain modules (`auth`, `dashboard`, `onboarding`)
+ │   ├─ `screens/`   -> UI only
+ │   ├─ `hooks.ts`   -> business logic & RHF setup
+ │   ├─ `schema.ts`  -> Zod validation
+ │   └─ `services/`  -> Supabase API calls
+ ├─ `navigation/`    -> React Navigation setup
+ └─ `store/`         -> Zustand global stores
+
+## STATE MANAGEMENT
+- Use Zustand for global state (`authStore`, `draftStore`).
+- Use React Hook Form + Zod for ALL forms.
+- Support "Save as Draft" logic by storing partial RHF data in Zustand before pushing to Supabase.

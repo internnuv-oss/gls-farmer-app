@@ -1,12 +1,13 @@
 import { useState, useMemo , useRef , useEffect} from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Alert } from "react-native";
+import { Alert, Platform } from "react-native";
 import * as DocumentPicker from "expo-document-picker";
 import * as ImagePicker from "expo-image-picker";
 import * as Location from 'expo-location';
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
+import * as FileSystem from 'expo-file-system';
 import { AppState } from "react-native";
 
 
@@ -36,7 +37,7 @@ export function useDealerOnboarding(navigation: any, route: any) {
 
   const autoSave = () => {
     const currentValues = form.getValues();
-    if (!currentValues.shopName) return; // Don't save if form is basically empty
+    if (!currentValues.shopName) return;
     if (editData) return; // Don't auto-save if we are editing a SUBMITTED profile
 
     if (draftIdRef.current) {
@@ -74,13 +75,50 @@ export function useDealerOnboarding(navigation: any, route: any) {
   const defaultFormValues = editData 
     ? mapDealerDbToForm(editData)
     : (draftData ? draftData : {
+        // Step 1: Basic Info
+        shopName: '', firmType: '', estYear: '', state: '', city: '', taluka: '', village: [], address: '', landmark: '',
+        contactMobile: '', landlineNumber: '', gstNumber: '', panNumber: '',
+        owners: [{ name: '' }], 
+        bankAccounts: [{ accountType: '', bankName: '', bankBranch: '', accountName: '', accountNumber: '', bankIfsc: '' }],
+        
+        // Step 2: Scoring
         scoreFinancial: 5, scoreReputation: 5, scoreOperations: 5, scoreFarmerNetwork: 5,
         scoreTeam: 5, scorePortfolio: 5, scoreExperience: 5, scoreGrowth: 5,
-        glsCommitments: [], complianceChecklist: [], agreementAccepted: false,
-        documents: {}, linkedDistributors: [{ name: '', contact: '' }], majorCrops: [],
-        seTalukasCovered: [], seVillagesCovered: [], seMajorCrops: [], sePrincipalSuppliers: [], 
-        seChemicalProducts: [], seBioProducts: [], seOtherProducts: [], seWillShareSales: false,
-        seTotalCultivableAreaUnit: 'Acres', seGodownCapacityUnit: 'Sq.ft',
+        
+        // Step 3: Business Details & Additional Locations
+        hasAdditionalLocations: undefined, 
+        additionalShops: [], 
+        godowns: [], 
+        isLinkedToDistributor: undefined, 
+        linkedDistributors: [{ name: '', contact: '' }],
+        proposedStatus: '', 
+        willingDemoFarmers: undefined,
+        demoFarmers: Array(5).fill({ name: '', contact: '', address: '' }),
+        
+        // Steps 4, 5, 6: Checklists & Media
+        glsCommitments: [], 
+        complianceChecklist: [], 
+        documents: {}, 
+        shopLocations: {}, // UPDATED: Changed from shopLocation: undefined
+        
+        // Step 7: Annexures
+        seTerritories: [{ taluka: '', village: [], cultivableArea: '', majorCrops: [] }], 
+        sePrincipalSuppliers: [], 
+        seChemicalProducts: [], 
+        seBioProducts: [], 
+        seOtherProducts: [], 
+        seHasCreditReferences: undefined,
+        seCreditReferences: [{ name: '', contact: '', behavior: '', behaviorAudio: '' }],
+        seWillShareSales: false, 
+        seGrowthVision: '', 
+        seGrowthVisionAudio: '', 
+        seSecurityDeposit: '', 
+        sePaymentProofText: '',
+        
+        // Step 8: Agreement
+        agreementAccepted: false,
+        dealerSignature: '', 
+        seSignature: ''
       });
 
   const form = useForm<DealerOnboardingValues>({
@@ -93,11 +131,95 @@ export function useDealerOnboarding(navigation: any, route: any) {
   const values = watch();
 
   const isNextEnabled = useMemo(() => {
-    if (step === 1) return !!(values.shopName && values.ownerName && values.contactMobile?.length === 10 && values.address && values.state && values.city && values.taluka && values.village && values.gstNumber && values.panNumber && values.estYear && values.firmType && values.bankAccountName && values.bankAccountNumber && values.bankIfsc && values.bankName && values.bankBranch);
+    if (step === 1) {
+      // 1. Basic Regex Patterns (Matches schema.ts)
+      const mobileRegex = /^\d{10}$/;
+      const landlineRegex = /^[0-9]{3,5}[- ]?[0-9]{6,8}$/;
+      const gstRegex = /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/;
+      const panRegex = /^[A-Z]{5}[0-9]{4}[A-Z]{1}$/;
+      const ifscRegex = /^[A-Z]{4}0[A-Z0-9]{6}$/;
+      const bankAccRegex = /^\d{9,18}$/;
+
+      // 2. Validate Arrays (Owners and Bank Accounts)
+      const areOwnersValid = values.owners?.every(o => o.name && o.name.length >= 2);
+      
+      const areBanksValid = values.bankAccounts?.every(b => 
+        b.accountType && 
+        b.bankName && 
+        b.bankBranch && 
+        b.accountName && 
+        bankAccRegex.test(b.accountNumber || '') && 
+        ifscRegex.test(b.bankIfsc || '')
+      );
+
+      // 3. Optional Landline Check
+      const isLandlineValid = !values.landlineNumber || landlineRegex.test(values.landlineNumber);
+
+      // 4. Combined Validation
+      return !!(
+        values.shopName && values.shopName.length >= 2 &&
+        values.firmType &&
+        values.estYear && values.estYear.length === 4 &&
+        areOwnersValid &&
+        mobileRegex.test(values.contactMobile || '') &&
+        isLandlineValid &&
+        values.state && values.city && values.taluka && values.village &&
+        values.address && values.address.length >= 5 &&
+        gstRegex.test(values.gstNumber || '') &&
+        panRegex.test(values.panNumber || '') &&
+        areBanksValid
+      );
+    }
     if (step === 2) return true; 
     if (step === 3) {
-      const distValid = values.isLinkedToDistributor === 'No' || (values.isLinkedToDistributor === 'Yes' && values.linkedDistributors?.[0]?.name && values.linkedDistributors?.[0]?.contact?.length === 10);
-      return !!(values.isLinkedToDistributor && distValid && values.majorCrops?.length > 0 && values.proposedStatus && values.willingDemoFarmers);
+      // 1. Distributor Validation
+      const distValid = values.isLinkedToDistributor === 'No' || (
+        values.isLinkedToDistributor === 'Yes' && 
+        values.linkedDistributors?.[0]?.name && 
+        /^\d{10}$/.test(values.linkedDistributors?.[0]?.contact || '')
+      );
+
+      // 2. Additional Locations Validation
+      // If "Yes", at least one shop OR one godown must exist, and all provided must be valid.
+      const hasAtLeastOneLocation = (values.additionalShops?.length || 0) > 0 || (values.godowns?.length || 0) > 0;
+      
+      const additionalShopsValid = (values.additionalShops || []).every(s => 
+        s.shopName && s.estYear && s.state && s.city && s.taluka && s.village && s.address
+      );
+      
+      const godownsValid = (values.godowns || []).every(g => 
+        g.address && g.capacity && g.capacityUnit
+      );
+
+      const addLocValid = values.hasAdditionalLocations === 'No' || (
+        values.hasAdditionalLocations === 'Yes' && 
+        hasAtLeastOneLocation && 
+        additionalShopsValid && 
+        godownsValid
+      );
+
+      // 3. Demo Farmers Validation
+      // If "Yes", must either have an uploaded list OR at least one manual entry filled correctly.
+      const hasFarmerFile = !!values.documents?.['demo_farmers_list'];
+      const manualFarmersValid = (values.demoFarmers || []).some(f => 
+        f.name && f.contact && f.address
+      );
+
+      const demoFarmersValid = values.willingDemoFarmers === 'No' || (
+        values.willingDemoFarmers === 'Yes' && 
+        (hasFarmerFile || manualFarmersValid)
+      );
+
+      // 4. Combined Step 3 Check
+      return !!(
+        values.isLinkedToDistributor && 
+        distValid && 
+        values.hasAdditionalLocations &&
+        addLocValid && 
+        values.proposedStatus && 
+        values.willingDemoFarmers && 
+        demoFarmersValid
+      );
     }
     if (step === 4) return Array.isArray(values.glsCommitments) && values.glsCommitments.length === GLS_COMMITMENTS.length; 
     if (step === 5) return true; 
@@ -105,7 +227,12 @@ export function useDealerOnboarding(navigation: any, route: any) {
       const requiredKeys = ['gst certificate / shop establishment license', 'pan card', 'cancelled cheque', 'shop_exterior', 'selfie_with_owner'];
       const dynamicKeys = (values.complianceChecklist || []).map((item: string) => item.replace(/[^a-zA-Z0-9]/g, '_').toLowerCase());
       const allRequired = [...requiredKeys, ...dynamicKeys];
-      return allRequired.every(key => { const doc = values.documents?.[key]; return Array.isArray(doc) ? doc.length > 0 : !!doc; }) && !!values.shopLocation;
+      
+      // UPDATED: Check for specific exterior GPS coordinates instead of a single object
+      return allRequired.every(key => { 
+        const doc = values.documents?.[key]; 
+        return Array.isArray(doc) ? doc.length > 0 : !!doc; 
+      }) && !!values.shopLocations?.['shop_exterior']; 
     }
     
     // ---> NEW STEP 7 (SE ANNEXURE) VALIDATION <---
@@ -114,24 +241,27 @@ export function useDealerOnboarding(navigation: any, route: any) {
         values.seHasCreditReferences === 'Yes' && 
         values.seCreditReferences && values.seCreditReferences.length > 0 && 
         values.seCreditReferences.every(ref => 
-          (ref.name?.length ?? 0) >= 2 && 
-          (ref.contact?.length ?? 0) === 10 && 
-          ((ref.behavior?.length ?? 0) > 2 || !!ref.behaviorAudio)
+          (ref.name?.length ?? 0) >= 2 && (ref.contact?.length ?? 0) === 10
         )
       );
       
-      // Removed validVision from the required list since it's now optional
+      const validTerritories = values.seTerritories?.length > 0 && values.seTerritories.every(t => t.taluka && t.village?.length > 0 && t.cultivableArea && t.majorCrops?.length > 0);
+
+      // ---> NEW: Check if payment proof is valid <---
+      const securityDepositVal = parseInt(values.seSecurityDeposit || '0');
+      const hasPaymentProof = securityDepositVal === 0 || (
+        securityDepositVal > 0 && 
+        (!!values.sePaymentProofText || !!values.documents?.['se_payment_proof'])
+      );
+
       return !!(
-        values.seTalukasCovered?.length > 0 && 
-        values.seVillagesCovered?.length > 0 && 
-        values.seTotalCultivableArea && 
-        values.seMajorCrops?.length > 0 && 
+        validTerritories && 
         values.sePrincipalSuppliers?.length > 0 && 
         values.seChemicalProducts?.length > 0 && 
         values.seBioProducts?.length > 0 && 
         values.seOtherProducts?.length > 0 && 
-        validCreditRefs && 
-        values.seWillShareSales
+        validCreditRefs &&
+        hasPaymentProof // <-- Block 'Next' button if false
       );
     }
     if (step === 8) return !!(values.agreementAccepted && values.dealerSignature && values.seSignature);
@@ -162,7 +292,20 @@ export function useDealerOnboarding(navigation: any, route: any) {
 
   const generateHTML = () => {
     const data = form.getValues();
-    const dateStr = new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' });
+    const dateValue = editData?.created_at || new Date().toISOString();
+    const dateObj = new Date(dateValue);
+    const dateStr = dateObj.toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' });
+
+    // Helper to open documents in a native-like viewer instead of raw Cloudinary downloads
+    const getNativeViewerUrl = (url?: string) => {
+      if (!url) return '#';
+      // Route documents (PDF, Excel, Word) through Google Docs Viewer for an in-built reading experience
+      if (url.match(/\.(pdf|doc|docx|xls|xlsx|csv)$/i)) {
+        return `https://docs.google.com/viewer?url=${encodeURIComponent(url)}&embedded=true`;
+      }
+      // Return raw URL for images/audio as mobile browsers already use native media viewers for these
+      return url;
+    };
 
     const renderSignature = (sigData?: string) => {
       if (!sigData) return '<span style="color:red">No Signature</span>';
@@ -173,7 +316,7 @@ export function useDealerOnboarding(navigation: any, route: any) {
           return `M ${points[0].x} ${points[0].y} ` + points.slice(1).map(p => `L ${p.x} ${p.y}`).join(' ');
         };
         const paths = strokes.map((pts: any[]) => `<path d="${toPath(pts)}" stroke="#16A34A" stroke-width="4" fill="none" stroke-linecap="round" stroke-linejoin="round" />`).join('');
-        return `<svg viewBox="0 0 400 250" style="width: 100%; max-width: 250px; height: 100px; margin-top: 10px;">${paths}</svg>`;
+        return `<svg viewBox="0 0 400 250" style="width: 100%; max-width: 250px; height: 80px;">${paths}</svg>`;
       } catch (e) {
         return '<span style="color:red">Invalid Signature Format</span>';
       }
@@ -186,159 +329,333 @@ export function useDealerOnboarding(navigation: any, route: any) {
       <!DOCTYPE html>
       <html>
       <head>
+        <meta charset="utf-8">
         <style>
-          body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; color: #333; margin: 0; padding: 40px; line-height: 1.5; }
+          @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap');
+          
+          /* Set consistent margins for print layout */
+          @page {
+            margin: 20mm; 
+            size: A4;
+          }
+
+          body { font-family: 'Inter', Helvetica, Arial, sans-serif; color: #1E293B; margin: 0; padding: 0; line-height: 1.6; background-color: #FFFFFF; }
+          .container { background-color: #FFFFFF; width: 100%; padding: 0; }
+          
           .header { border-bottom: 3px solid #16A34A; padding-bottom: 20px; margin-bottom: 30px; text-align: center; }
-          .header h1 { margin: 0; color: #16A34A; font-size: 28px; text-transform: uppercase; letter-spacing: 1px; }
-          .header p { margin: 5px 0 0; color: #64748B; font-size: 14px; }
-          .section { margin-bottom: 30px; }
-          .section-title { font-size: 16px; color: #16A34A; border-bottom: 2px solid #E2E8F0; padding-bottom: 8px; margin-bottom: 15px; text-transform: uppercase; font-weight: bold; }
-          table { width: 100%; border-collapse: collapse; margin-bottom: 15px; font-size: 13px; }
-          th, td { padding: 10px 12px; text-align: left; border: 1px solid #E2E8F0; }
-          th { width: 30%; background-color: #F8FAFC; color: #475569; font-weight: bold; }
-          .badge { display: inline-block; padding: 4px 12px; border-radius: 20px; font-weight: bold; font-size: 14px; background: ${bandBg}; color: ${bandColor}; }
-          .list { margin: 0; padding-left: 20px; font-size: 13px; }
-          .list li { margin-bottom: 5px; }
-          .signatures { display: table; width: 100%; margin-top: 40px; }
+          .header h1 { margin: 0; color: #16A34A; font-size: 32px; text-transform: uppercase; letter-spacing: 1.5px; font-weight: 800; }
+          .header p { margin: 8px 0 0; color: #64748B; font-size: 15px; }
+          
+          .score-card { background: ${bandBg}; color: ${bandColor}; padding: 20px; border-radius: 8px; text-align: center; margin-bottom: 30px; border: 1px solid ${bandColor}; }
+          .score-card h2 { margin: 0 0 5px 0; font-size: 24px; font-weight: 800; }
+          .score-card p { margin: 0; font-size: 14px; opacity: 0.9; }
+
+          .section { margin-bottom: 35px; }
+          .page-break { page-break-before: always; }
+          
+          .section-title { font-size: 18px; color: #16A34A; border-bottom: 2px solid #E2E8F0; padding-bottom: 8px; margin-bottom: 20px; text-transform: uppercase; font-weight: 800; }
+          
+          table { width: 100%; border-collapse: collapse; font-size: 14px; background-color: #FFFFFF; }
+          table, tr, td, th { page-break-inside: avoid; } 
+          th, td { padding: 12px 16px; text-align: left; border-bottom: 1px solid #E2E8F0; vertical-align: top; }
+          th { width: 35%; color: #475569; font-weight: 600; background-color: #F1F5F9; border-right: 1px solid #E2E8F0; }
+          td { color: #0F172A; font-weight: 500; }
+          tr:last-child th, tr:last-child td { border-bottom: none; }
+          
+          .table-wrapper { border: 1px solid #E2E8F0; border-radius: 8px; overflow: hidden; margin-bottom: 15px; }
+          .sub-heading { font-size: 15px; font-weight: 700; color: #334155; margin: 20px 0 10px 0; border-left: 4px solid #16A34A; padding-left: 10px; }
+          
+          .grid-2 { display: table; width: 100%; table-layout: fixed; margin-bottom: 15px; }
+          .grid-col { display: table-cell; width: 50%; padding-right: 10px; vertical-align: top; }
+          .grid-col:last-child { padding-right: 0; padding-left: 10px; }
+
+          .list { margin: 0; padding-left: 20px; font-size: 14px; }
+          .list li { margin-bottom: 6px; color: #334155; }
+          .pill { display: inline-block; background-color: #E2E8F0; color: #334155; padding: 4px 10px; border-radius: 15px; font-size: 12px; font-weight: 600; margin: 2px 4px 2px 0; }
+          
+          .signatures { display: table; width: 100%; margin-top: 50px; page-break-inside: avoid; }
           .sig-box { display: table-cell; width: 50%; text-align: center; }
-          .sig-line { border-top: 1px solid #94A3B8; margin: 10px 40px 0; padding-top: 5px; font-weight: bold; color: #333; }
-          a { color: #2563EB; text-decoration: none; font-weight: bold; }
+          .sig-line { border-top: 2px solid #94A3B8; margin: 10px 60px 0; padding-top: 8px; font-weight: 800; color: #1E293B; font-size: 14px; text-transform: uppercase; }
+          .sig-img { max-height: 80px; max-width: 200px; margin-bottom: 10px; }
+          
+          a { color: #2563EB; text-decoration: none; font-weight: 600; }
+          .empty-text { color: #94A3B8; font-style: italic; font-weight: 400; }
         </style>
       </head>
       <body>
-        <div class="header">
-          <h1>Dealer Onboarding Dossier</h1>
-          <p>Generated on ${dateStr} • Recommended by ${user?.name || 'Sales Executive'}</p>
-        </div>
-
-        <div class="section">
-          <div class="section-title">Profile Score</div>
-          <div style="text-align: center; margin-bottom: 15px;">
-            <span class="badge">${scoreData.percentage} (${scoreData.band})</span>
+        <div class="container">
+          
+          <div class="header">
+            <h1>Dealer Onboarding Dossier</h1>
+            <p>Onboarded on ${dateStr} • Added by ${user?.name || 'Sales Executive'}</p>
           </div>
-        </div>
 
-        <div class="section">
-          <div class="section-title">1. Basic Information</div>
-          <table>
-            <tr><th>Shop / Firm Name</th><td>${data.shopName || '-'}</td></tr>
-            <tr><th>Contact Person</th><td>${data.ownerName || '-'}</td></tr>
-            <tr><th>Contact Mobile</th><td>+91 ${data.contactMobile || '-'}</td></tr>
-            <tr><th>Address</th><td>${data.address || '-'} ${data.landmark ? `(Near ${data.landmark})` : ''}</td></tr>
-            <tr><th>GST Number</th><td>${data.gstNumber || '-'}</td></tr>
-            <tr><th>PAN Number</th><td>${data.panNumber || '-'}</td></tr>
-            <tr><th>Firm Type & Est. Year</th><td>${data.firmType || '-'} / ${data.estYear || '-'}</td></tr>
-          </table>
-        </div>
+          <div class="score-card">
+            <h2>Overall Score: ${scoreData.percentage} / 100</h2>
+            <p>Risk Band: <strong>${scoreData.band}</strong></p>
+          </div>
 
-        <div class="section">
-          <div class="section-title">2. Bank Details</div>
-          <table>
-            <tr><th>Bank Name & Branch</th><td>${data.bankName || '-'} - ${data.bankBranch || '-'}</td></tr>
-            <tr><th>Account Name</th><td>${data.bankAccountName || '-'}</td></tr>
-            <tr><th>Account Number</th><td>${data.bankAccountNumber || '-'}</td></tr>
-            <tr><th>IFSC Code</th><td>${data.bankIfsc || '-'}</td></tr>
-          </table>
-        </div>
+          <div class="section">
+            <div class="section-title">1. Business Profile</div>
+            <div class="table-wrapper">
+              <table>
+                <tr><th>Primary Shop Name</th><td>${data.shopName || '<span class="empty-text">N/A</span>'}</td></tr>
+                <tr><th>Firm Type & Est. Year</th><td>${data.firmType || '-'} / ${data.estYear || '-'}</td></tr>
+                <tr><th>Primary Address</th><td>${data.address || '-'}<br><span style="color:#64748B; font-size:12px;">${data.village || '-'}, ${data.taluka || '-'}, ${data.city || '-'}, ${data.state || '-'}</span></td></tr>
+                <tr><th>Landmark</th><td>${data.landmark || '<span class="empty-text">N/A</span>'}</td></tr>
+                <tr><th>Owner(s) / Partner(s)</th><td>${data.owners?.map(o => `<span class="pill">${o.name}</span>`).join('') || '-'}</td></tr>
+                <tr><th>Contact Numbers</th><td>+91 ${data.contactMobile || '-'} ${data.landlineNumber ? `<br><span style="color:#64748B; font-size:12px;">Landline: ${data.landlineNumber}</span>` : ''}</td></tr>
+                <tr><th>Tax IDs</th><td><strong>GST:</strong> ${data.gstNumber || '-'}<br><strong>PAN:</strong> ${data.panNumber || '-'}</td></tr>
+              </table>
+            </div>
 
-        <div class="section">
-          <div class="section-title">3. Business Area & Status</div>
-          <table>
-            <tr><th>Major Crops</th><td>${data.majorCrops?.join(', ') || '-'}</td></tr>
-            <tr><th>Average Acres/Farmer</th><td>${data.acresServed || '-'} Acres</td></tr>
-            <tr><th>Proposed Status</th><td>${data.proposedStatus || '-'}</td></tr>
-            <tr><th>Willing for Demo Farmers?</th><td>${data.willingDemoFarmers || '-'}</td></tr>
-            <tr><th>Linked Distributors</th>
-              <td>
-                <ul class="list" style="padding-left:15px; margin:0;">
-                  ${data.linkedDistributors?.map(d => `<li>${d.name} (${d.contact})</li>`).join('') || '-'}
+            <div class="sub-heading">Bank Details</div>
+            ${data.bankAccounts?.map((b, i) => `
+              <div class="table-wrapper" style="margin-bottom:10px;">
+                <table>
+                  <tr><th>Account ${i + 1} (${b.accountType})</th><td><strong>${b.bankName || '-'}</strong> - ${b.bankBranch || '-'}</td></tr>
+                  <tr><th>Account Details</th><td>A/C Name: ${b.accountName || '-'}<br>A/C No: <strong>${b.accountNumber || '-'}</strong><br>IFSC: <strong>${b.bankIfsc || '-'}</strong></td></tr>
+                </table>
+              </div>
+            `).join('')}
+          </div>
+
+          <div class="section page-break">
+            <div class="section-title">2. Profiling & Evaluation</div>
+            <div class="table-wrapper">
+              <table>
+                <tr style="background-color: #E2E8F0; color: #334155; font-weight: 800; font-size: 12px; text-transform: uppercase;">
+                  <td style="padding: 10px 16px;">Assessment Aspect</td>
+                  <td style="text-align: center; width: 15%;">Score</td>
+                  <td>Remarks & Audio Evidence</td>
+                </tr>
+                <tr><th>Financial Health</th><td style="text-align: center; font-weight: 800;">${data.scoreFinancial}/10</td><td>${data.remFinancial || '<span class="empty-text">No text remarks</span>'} ${data.audioFinancial ? `<br><a href="${data.audioFinancial}">▶ Play Audio</a>` : ''}</td></tr>
+                <tr><th>Market Reputation</th><td style="text-align: center; font-weight: 800;">${data.scoreReputation}/10</td><td>${data.remReputation || '<span class="empty-text">No text remarks</span>'} ${data.audioReputation ? `<br><a href="${data.audioReputation}">▶ Play Audio</a>` : ''}</td></tr>
+                <tr><th>Operations & Infra</th><td style="text-align: center; font-weight: 800;">${data.scoreOperations}/10</td><td>${data.remOperations || '<span class="empty-text">No text remarks</span>'} ${data.audioOperations ? `<br><a href="${data.audioOperations}">▶ Play Audio</a>` : ''}</td></tr>
+                <tr><th>Farmer Network</th><td style="text-align: center; font-weight: 800;">${data.scoreFarmerNetwork}/10</td><td>${data.remFarmerNetwork || '<span class="empty-text">No text remarks</span>'} ${data.audioFarmerNetwork ? `<br><a href="${data.audioFarmerNetwork}">▶ Play Audio</a>` : ''}</td></tr>
+                <tr><th>Team & Professionalism</th><td style="text-align: center; font-weight: 800;">${data.scoreTeam}/10</td><td>${data.remTeam || '<span class="empty-text">No text remarks</span>'} ${data.audioTeam ? `<br><a href="${data.audioTeam}">▶ Play Audio</a>` : ''}</td></tr>
+                <tr><th>Portfolio Alignment</th><td style="text-align: center; font-weight: 800;">${data.scorePortfolio}/10</td><td>${data.remPortfolio || '<span class="empty-text">No text remarks</span>'} ${data.audioPortfolio ? `<br><a href="${data.audioPortfolio}">▶ Play Audio</a>` : ''}</td></tr>
+                <tr><th>Experience</th><td style="text-align: center; font-weight: 800;">${data.scoreExperience}/10</td><td>${data.remExperience || '<span class="empty-text">No text remarks</span>'} ${data.audioExperience ? `<br><a href="${data.audioExperience}">▶ Play Audio</a>` : ''}</td></tr>
+                <tr><th>Growth Orientation</th><td style="text-align: center; font-weight: 800;">${data.scoreGrowth}/10</td><td>${data.remGrowth || '<span class="empty-text">No text remarks</span>'} ${data.audioGrowth ? `<br><a href="${data.audioGrowth}">▶ Play Audio</a>` : ''}</td></tr>
+                <tr>
+                  <th style="color:#DC2626;">Red Flags Noted</th>
+                  <td colspan="2" style="color:#DC2626; font-weight:bold;">${data.redFlags || 'None Reported'} ${data.audioRedFlags ? `<br><a style="color:#DC2626;" href="${data.audioRedFlags}">▶ Play Audio Alert</a>` : ''}</td>
+                </tr>
+              </table>
+            </div>
+          </div>
+
+          <div class="section page-break">
+            <div class="section-title">3. Business Infrastructure & Status</div>
+            
+            <div class="grid-2">
+              <div class="grid-col">
+                <div class="table-wrapper">
+                  <table>
+                    <tr><th>Proposed Status</th><td><strong>${data.proposedStatus || '-'}</strong></td></tr>
+                    <tr><th>Demo Farmers</th><td>${data.willingDemoFarmers || '-'}</td></tr>
+                    <tr><th>Linked Distributor</th><td>${data.isLinkedToDistributor === 'Yes' ? data.linkedDistributors?.map(d => `${d.name} (${d.contact})`).join('<br>') : 'No'}</td></tr>
+                  </table>
+                </div>
+              </div>
+              <div class="grid-col">
+                <div class="table-wrapper">
+                  <table>
+                    <tr><th>Additional Shops</th><td>${data.additionalShops?.length || '0'} Recorded</td></tr>
+                    <tr><th>Godowns</th><td>${data.godowns?.length || '0'} Recorded</td></tr>
+                    <tr>
+                      <th>GPS Coordinates</th>
+                      <td>
+                        ${data.shopLocations?.['shop_exterior'] 
+                          ? `${data.shopLocations['shop_exterior'].lat.toFixed(5)}, ${data.shopLocations['shop_exterior'].lng.toFixed(5)}` 
+                          : '<span class="empty-text">Missing</span>'}
+                      </td>
+                    </tr>
+                  </table>
+                </div>
+              </div>
+            </div>
+
+            ${data.additionalShops?.length ? `
+              <div class="sub-heading">Additional Shops</div>
+              ${data.additionalShops.map((s, i) => `
+                <div class="table-wrapper" style="margin-bottom:10px;">
+                  <table>
+                    <tr><th>Shop ${i + 1} (${s.estYear})</th><td><strong>${s.shopName || '-'}</strong></td></tr>
+                    <tr><th>Address</th><td>${s.address || '-'}<br><span style="color:#64748B; font-size:12px;">${s.village || '-'}, ${s.taluka || '-'}, ${s.city || '-'}, ${s.state || '-'}</span></td></tr>
+                  </table>
+                </div>
+              `).join('')}
+            ` : ''}
+
+            ${data.godowns?.length ? `
+              <div class="sub-heading">Storage / Godowns</div>
+              ${data.godowns.map((g, i) => `
+                <div class="table-wrapper" style="margin-bottom:10px;">
+                  <table>
+                    <tr><th>Godown ${i + 1}</th><td>Capacity: <strong>${g.capacity || '-'} ${g.capacityUnit || ''}</strong></td></tr>
+                    <tr><th>Address</th><td>${g.address || '-'}</td></tr>
+                  </table>
+                </div>
+              `).join('')}
+            ` : ''}
+
+            ${data.willingDemoFarmers === 'Yes' ? `
+              <div class="sub-heading">Demo Farmers List</div>
+              ${data.documents?.demo_farmers_list ? `
+                <p style="margin:0 0 10px 0;"><a href="${getNativeViewerUrl(data.documents.demo_farmers_list)}" target="_blank">📄 View Uploaded Farmer List</a></p>
+              ` : `
+                <div class="table-wrapper">
+                  <table>
+                    <tr style="background-color: #F1F5F9; font-weight: 600;"><td>Name</td><td>Contact</td><td>Address</td></tr>
+                    ${data.demoFarmers?.filter(f => f.name).map(f => `<tr><td>${f.name}</td><td>${f.contact}</td><td>${f.address}</td></tr>`).join('') || '<tr><td colspan="3" class="empty-text">No manual entries</td></tr>'}
+                  </table>
+                </div>
+              `}
+            ` : ''}
+          </div>
+
+          <div class="section page-break">
+            <div class="section-title">4. Compliance & Media Attachments</div>
+            
+            <div class="grid-2">
+              <div class="grid-col">
+                <div class="sub-heading" style="margin-top:0;">GLS Commitments Accepted</div>
+                <ul class="list">
+                  ${data.glsCommitments?.map(c => `<li>${c}</li>`).join('') || '<li class="empty-text">None selected</li>'}
                 </ul>
-              </td>
-            </tr>
-          </table>
-        </div>
+              </div>
+              <div class="grid-col">
+                <div class="sub-heading" style="margin-top:0;">Regulatory Documents Checked</div>
+                <ul class="list">
+                  ${data.complianceChecklist?.map(c => `<li>${c}</li>`).join('') || '<li class="empty-text">None selected</li>'}
+                </ul>
+              </div>
+            </div>
 
-        <div class="section">
-          <div class="section-title">4. Profiling & Scoring Breakdown</div>
-          <table>
-            <tr style="background-color: #E2E8F0; color: #334155; font-weight: bold; text-transform: uppercase; font-size: 11px;">
-              <td style="padding: 10px 12px; border: 1px solid #CBD5E1;">Aspect</td>
-              <td style="padding: 10px 12px; border: 1px solid #CBD5E1; text-align: center; width: 12%;">Score</td>
-              <td style="padding: 10px 12px; border: 1px solid #CBD5E1;">Remarks / Evidence</td>
-            </tr>
-            <tr><th>Financial Health</th><td style="text-align: center; font-weight: bold;">${data.scoreFinancial} / 10</td><td>${data.remFinancial || '-'}</td></tr>
-            <tr><th>Market Reputation</th><td style="text-align: center; font-weight: bold;">${data.scoreReputation} / 10</td><td>${data.remReputation || '-'}</td></tr>
-            <tr><th>Operations & Infra</th><td style="text-align: center; font-weight: bold;">${data.scoreOperations} / 10</td><td>${data.remOperations || '-'}</td></tr>
-            <tr><th>Farmer Network</th><td style="text-align: center; font-weight: bold;">${data.scoreFarmerNetwork} / 10</td><td>${data.remFarmerNetwork || '-'}</td></tr>
-            <tr><th>Team & Prof.</th><td style="text-align: center; font-weight: bold;">${data.scoreTeam} / 10</td><td>${data.remTeam || '-'}</td></tr>
-            <tr><th>Portfolio</th><td style="text-align: center; font-weight: bold;">${data.scorePortfolio} / 10</td><td>${data.remPortfolio || '-'}</td></tr>
-            <tr><th>Experience</th><td style="text-align: center; font-weight: bold;">${data.scoreExperience} / 10</td><td>${data.remExperience || '-'}</td></tr>
-            <tr><th>Growth Orientation</th><td style="text-align: center; font-weight: bold;">${data.scoreGrowth} / 10</td><td>${data.remGrowth || '-'}</td></tr>
-            <tr>
-              <th colspan="2" style="color:#991B1B; text-align: right; padding-right: 15px;">Red Flags Noted</th>
-              <td style="color:#991B1B; font-weight:bold;">${data.redFlags || 'None'}</td>
-            </tr>
-          </table>
-        </div>
-
-        <div class="section">
-          <div class="section-title">5. Commitments & Checklists</div>
-          <p><strong>GLS Commitments Accepted:</strong></p>
-          <ul class="list">
-            ${data.glsCommitments?.map(c => `<li>&#10003; ${c}</li>`).join('') || '<li>None selected</li>'}
-          </ul>
-          <p style="margin-top:15px;"><strong>Regulatory Documents Verified:</strong></p>
-          <ul class="list">
-            ${data.complianceChecklist?.map(c => `<li>&#10003; ${c}</li>`).join('') || '<li>None selected</li>'}
-          </ul>
-        </div>
-
-        <div class="section">
-          <div class="section-title">6. Uploaded Documents</div>
-          <ul class="list">
-            ${Object.entries(data.documents || {}).map(([k, v]) => {
-              if (Array.isArray(v)) {
-                return v.map((url, i) => `<li><a href="${url}" target="_blank">View ${k.toUpperCase().replace(/_/g, ' ')} (${i + 1})</a></li>`).join('');
-              }
-              return `<li><a href="${v}" target="_blank">View ${k.toUpperCase().replace(/_/g, ' ')}</a></li>`;
-            }).join('') || '<li>No documents uploaded.</li>'}
-          </ul>
-          ${data.shopLocation ? `<p style="margin-top:10px; font-size:13px;"><strong>Captured GPS Location:</strong> Lat ${data.shopLocation.lat.toFixed(6)}, Lng ${data.shopLocation.lng.toFixed(6)}</p>` : ''}
-        </div>
-
-        <div class="section" style="page-break-before: always;">
-          <div class="section-title">7. Annexure Details (SE Evaluation)</div>
-          <table>
-            <tr><th>Territory (Talukas)</th><td>${data.seTalukasCovered?.join(', ') || '-'}</td></tr>
-            <tr><th>Villages Covered</th><td>${data.seVillagesCovered?.join(', ') || '-'}</td></tr>
-            <tr><th>Cultivable Area</th><td>${data.seTotalCultivableArea || '-'} ${data.seTotalCultivableAreaUnit}</td></tr>
-            <tr><th>Major Crops</th><td>${data.seMajorCrops?.join(', ') || '-'}</td></tr>
-            <tr><th>Principal Suppliers</th><td>${data.sePrincipalSuppliers?.join(', ') || '-'}</td></tr>
-            <tr><th>Chemical Products</th><td>${data.seChemicalProducts?.join(', ') || '-'}</td></tr>
-            <tr><th>Bio Products</th><td>${data.seBioProducts?.join(', ') || '-'}</td></tr>
-            <tr><th>Other Products</th><td>${data.seOtherProducts?.join(', ') || '-'}</td></tr>
-            <tr><th>Godown Capacity</th><td>${data.seGodownCapacity ? `${data.seGodownCapacity} ${data.seGodownCapacityUnit}` : '-'}</td></tr>
-            <tr><th>Growth Vision</th><td>
-              ${data.seGrowthVision || '-'} 
-              ${data.seGrowthVisionAudio ? `<br><a href="${data.seGrowthVisionAudio}" target="_blank">Listen to Audio Recording</a>` : ''}
-            </td></tr>
-            <tr><th>Supplier References</th><td>
-              ${data.seHasCreditReferences === 'Yes' ? data.seCreditReferences?.map((r, i) => `<b>${i+1}. ${r.name} (${r.contact})</b>: ${r.behavior || ''} ${r.behaviorAudio ? `<a href="${r.behaviorAudio}">[Audio]</a>` : ''}`).join('<br>') : 'None provided'}
-            </td></tr>
-            <tr><th>Monthly Sales Sharing</th><td>${data.seWillShareSales ? 'Confirmed' : 'Not Confirmed'}</td></tr>
-            <tr><th>Security Deposit</th><td>₹ ${data.seSecurityDeposit || '0'}</td></tr>
-          </table>
-        </div>
-
-        <div class="signatures">
-          <div class="sig-box">
-            ${renderSignature(data.dealerSignature)}
-            <div class="sig-line">Dealer Signature</div>
+            <div class="sub-heading">Uploaded Documents & Photos</div>
+            <div class="table-wrapper">
+              <table>
+                ${Object.entries(data.documents || {}).filter(([k]) => k !== 'demo_farmers_list' && k !== 'se_payment_proof').map(([k, v]) => {
+                  const title = k.toUpperCase().replace(/_/g, ' ');
+                  if (Array.isArray(v)) {
+                    return `<tr><th>${title}</th><td>${v.map((url, i) => `<a href="${getNativeViewerUrl(url)}" target="_blank" style="margin-right:15px;">File ${i + 1}</a>`).join('')}</td></tr>`;
+                  }
+                  return `<tr><th>${title}</th><td><a href="${getNativeViewerUrl(v)}" target="_blank">View File</a></td></tr>`;
+                }).join('') || '<tr><td colspan="2" class="empty-text">No documents uploaded.</td></tr>'}
+              </table>
+            </div>
           </div>
-          <div class="sig-box">
-            ${renderSignature(data.seSignature)}
-            <div class="sig-line">Sales Executive Signature</div>
+
+          <div class="section page-break">
+            <div class="section-title">5. Commercial Annexures (SE Evaluated)</div>
+            
+            <div class="sub-heading" style="margin-top:0;">Territory Coverage</div>
+            <div class="table-wrapper">
+              <table>
+                <tr style="background-color: #F1F5F9; font-weight: 600;"><td>#</td><td>Location (Taluka, Village)</td><td>Cultivable Area</td><td>Major Crops</td></tr>
+                ${data.seTerritories?.map((t, i) => `<tr><td>${i+1}</td><td><strong>${t.taluka}, ${t.village?.join(', ')}</strong></td><td>${t.cultivableArea} Acres</td><td>${t.majorCrops?.join(', ')}</td></tr>`).join('') || '<tr><td colspan="4" class="empty-text">No territories defined</td></tr>'}
+              </table>
+            </div>
+
+            <div class="sub-heading">Business Portfolio & Expansion</div>
+            <div class="table-wrapper">
+              <table>
+                <tr><th>Principal Suppliers</th><td>${data.sePrincipalSuppliers?.map(s => `<span class="pill">${s}</span>`).join('') || '<span class="empty-text">None</span>'}</td></tr>
+                <tr><th>Chemical Range</th><td>${data.seChemicalProducts?.map(s => `<span class="pill">${s}</span>`).join('') || '<span class="empty-text">None</span>'}</td></tr>
+                <tr><th>Bio/Organic Range</th><td>${data.seBioProducts?.map(s => `<span class="pill">${s}</span>`).join('') || '<span class="empty-text">None</span>'}</td></tr>
+                <tr><th>Other Products</th><td>${data.seOtherProducts?.map(s => `<span class="pill">${s}</span>`).join('') || '<span class="empty-text">None</span>'}</td></tr>
+                <tr><th>Will Share Sales Data?</th><td><strong>${data.seWillShareSales ? 'Yes, Confirmed' : 'Not Confirmed'}</strong></td></tr>
+                <tr><th>2-Year Growth Vision</th><td>${data.seGrowthVision || '<span class="empty-text">No text provided</span>'} ${data.seGrowthVisionAudio ? `<br><a href="${data.seGrowthVisionAudio}">▶ Play Audio</a>` : ''}</td></tr>
+              </table>
+            </div>
+
+            <div class="sub-heading">Credit References & Security</div>
+            <div class="table-wrapper">
+              <table>
+                <tr>
+                  <th>Credit References</th>
+                  <td>
+                    ${data.seHasCreditReferences === 'Yes' ? data.seCreditReferences?.map((r, i) => `
+                      <div style="margin-bottom:8px; border-bottom:1px solid #E2E8F0; padding-bottom:8px;">
+                        <strong>${i+1}. ${r.name} (${r.contact})</strong><br>
+                        <span style="color:#64748B; font-size:13px;">${r.behavior || 'No text behavior'} ${r.behaviorAudio ? `| <a href="${r.behaviorAudio}">▶ Audio</a>` : ''}</span>
+                      </div>
+                    `).join('') : '<span class="empty-text">No references provided</span>'}
+                  </td>
+                </tr>
+                <tr><th>Security Deposit</th><td><strong>₹ ${data.seSecurityDeposit || '0'}</strong></td></tr>
+                ${data.seSecurityDeposit && parseInt(data.seSecurityDeposit || '0') > 0 ? `
+                  <tr><th>Payment Txn/Cheque No.</th><td>${data.sePaymentProofText || '<span class="empty-text">Not Provided</span>'}</td></tr>
+                  <tr><th>Payment Media Proof</th><td>${data.documents?.se_payment_proof ? `<a href="${getNativeViewerUrl(data.documents.se_payment_proof)}" target="_blank">View Uploaded Proof</a>` : '<span class="empty-text">Not Provided</span>'}</td></tr>
+                ` : ''}
+              </table>
+            </div>
           </div>
+
+          <div class="page-break" style="page-break-inside: avoid;">
+            <div style="background-color: #F8FAFC; padding: 20px; border-radius: 8px; border: 1px solid #E2E8F0;">
+              <h3 style="font-size: 16px; font-weight: 900; color: #16A34A; margin-top: 0; margin-bottom: 16px; text-align: center; text-decoration: underline;">General Terms & Conditions</h3>
+              
+              <p style="font-size: 13px; line-height: 22px; color: #64748B; margin: 0 0 12px 0;">
+                <strong style="font-weight: 800; color: #1E293B;">1. Territory: </strong>The Dealer shall operate primarily in the area mentioned in Annexure A and agrees not to actively sell GLS products outside the agreed area without prior approval.
+              </p>
+              
+              <p style="font-size: 13px; line-height: 22px; color: #64748B; margin: 0 0 12px 0;">
+                <strong style="font-weight: 800; color: #1E293B;">2. Status & Focus: </strong>As an Authorised Dealer, the Dealer can directly honour GLS farmer schemes and Farm Card discounts. As an Exclusive Dealer, the Dealer shall focus primarily on GLS biological products.
+              </p>
+              
+              <p style="font-size: 13px; line-height: 22px; color: #64748B; margin: 0 0 12px 0;">
+                <strong style="font-weight: 800; color: #1E293B;">3. Payment Terms: </strong>Payment to be made to the linked Distributor as per mutually agreed terms. Delayed payments may result in temporary suspension of supplies.
+              </p>
+              
+              <p style="font-size: 13px; line-height: 22px; color: #64748B; margin: 0 0 12px 0;">
+                <strong style="font-weight: 800; color: #1E293B;">4. Security Deposit: </strong>
+                ${data.seSecurityDeposit && parseInt(data.seSecurityDeposit || '0') > 0 
+                  ? `A refundable security deposit of ₹${data.seSecurityDeposit} has been agreed upon. Payment Reference: ${data.sePaymentProofText || (data.documents?.se_payment_proof ? '[Media Uploaded]' : 'Pending')}.`
+                  : 'No security deposit is required at this time.'}
+              </p>
+
+              <p style="font-size: 13px; line-height: 22px; color: #64748B; margin: 0 0 12px 0;">
+                <strong style="font-weight: 800; color: #1E293B;">5. Support & Obligations: </strong>GLS will provide technical support, Farm Cards, and promotional material. The Dealer must promote GLS products, allow Field Executives to engage with farmers, and maintain valid FCO/Insecticide licenses.
+              </p>
+
+              <p style="font-size: 13px; line-height: 22px; color: #64748B; margin: 0 0 12px 0;">
+                <strong style="font-weight: 800; color: #1E293B;">6. Data Sharing & Confidentiality: </strong>The Dealer agrees to share farmer details, crop history, and sales records strictly for the purpose of technical support and loyalty programs. Both parties shall keep all shared information confidential.
+              </p>
+
+              <p style="font-size: 13px; line-height: 22px; color: #64748B; margin: 0 0 12px 0;">
+                <strong style="font-weight: 800; color: #1E293B;">7. Termination & Jurisdiction: </strong>Either party may terminate with 30 days’ written notice. Disputes shall be subject to the exclusive jurisdiction of courts in Vadodara, Gujarat.
+              </p>
+
+              <div style="background-color: #E2E8F0; padding: 12px; border-radius: 6px; margin-top: 16px; border-left: 3px solid #16A34A;">
+                <div style="font-weight: 900; color: #16A34A; margin-bottom: 6px; font-size: 14px;">I/We formally agree to:</div>
+                <div style="font-size: 13px; line-height: 22px; color: #1E293B; font-weight: 600;">
+                  • Promote GLS biological inputs following recommended packages.<br>
+                  • Allow GLS field team to engage with my farmers for support.<br>
+                  • Honour loyalty program and Farm Card benefits.<br>
+                  • Maintain proper storage and display for GLS products.
+                </div>
+              </div>
+            </div>
+
+            <div class="signatures">
+              <div class="sig-box">
+                ${renderSignature(data.dealerSignature)}
+                <div class="sig-line">Authorised Dealer Signature</div>
+              </div>
+              <div class="sig-box">
+                ${renderSignature(data.seSignature)}
+                <div class="sig-line">Sales Executive Signature</div>
+              </div>
+            </div>
+            
+            <div style="text-align: center; margin-top: 40px; color: #94A3B8; font-size: 12px; border-top: 1px solid #E2E8F0;">
+              This document and its annexures constitute a formal record of the dealer evaluation and initial MoU.<br>
+              <strong>Agreement Acceptance:</strong> ${data.agreementAccepted ? 'Digitally accepted by Dealer' : 'Pending Acceptance'}
+            </div>
+          </div>
+
         </div>
       </body>
       </html>
@@ -393,8 +710,7 @@ export function useDealerOnboarding(navigation: any, route: any) {
     const useCamera = type === 'camera' || type === 'image';
     const perm = useCamera ? await requestCameraPermission() : await requestMediaPermission();
     if (!perm.granted) return Alert.alert("Permission Denied", perm.fallbackMessage);
-
-    // 🔥 Launch Camera BEFORE asking for GPS so it feels instant
+  
     let result = useCamera ? await ImagePicker.launchCameraAsync({ quality: 0.7 }) : await DocumentPicker.getDocumentAsync({ type: "*/*" });
     if (result.canceled) return;
     
@@ -411,10 +727,9 @@ export function useDealerOnboarding(navigation: any, route: any) {
         setUploading(prev => ({ ...prev, [key]: false }));
         return; 
       }
-      // Fetch GPS while the image is processing
       location = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
     }
-
+  
     try {
       const url = await uploadFileToCloudinary(uri, useCamera ? 'image' : 'raw');
       const currentDocs = form.getValues('documents') || {};
@@ -426,7 +741,14 @@ export function useDealerOnboarding(navigation: any, route: any) {
         form.setValue('documents', { ...currentDocs, [key]: url }, { shouldValidate: true });
       }
       
-      if (location) form.setValue('shopLocation', { lat: location.coords.latitude, lng: location.coords.longitude }, { shouldValidate: true });
+      // UPDATED: Store GPS by its specific key (exterior, interior, or godown)
+      if (location) {
+        const currentLocs = form.getValues('shopLocations') || {};
+        form.setValue('shopLocations', { 
+          ...currentLocs, 
+          [key]: { lat: location.coords.latitude, lng: location.coords.longitude } 
+        }, { shouldValidate: true });
+      }
     } catch(e) {
       Alert.alert("Error", "Upload failed.");
     } finally {
@@ -436,8 +758,48 @@ export function useDealerOnboarding(navigation: any, route: any) {
 
   const generatePDF = async () => {
     const html = generateHTML();
-    const { uri } = await Print.printToFileAsync({ html });
-    await Sharing.shareAsync(uri);
+    const data = form.getValues();
+    
+    // Create a safe, standardized file name from the shop name
+    const rawShopName = data.shopName ? data.shopName.replace(/[^a-zA-Z0-9]/g, '_') : 'Dealer';
+    const finalFileName = `${rawShopName}_Dossier.pdf`;
+
+    try {
+      // Print HTML into a temporary default PDF URI
+      const { uri } = await Print.printToFileAsync({ html });
+      
+      const fs: any = FileSystem;
+      const baseDir = fs.cacheDirectory || fs.documentDirectory;
+      
+      // If we are on Native (iOS/Android) and have a valid directory, rename it
+      if (baseDir && Platform.OS !== 'web') {
+        const renamedUri = `${baseDir}${finalFileName}`;
+        
+        await fs.copyAsync({
+          from: uri,
+          to: renamedUri
+        });
+        
+        // Share the freshly named file
+        await Sharing.shareAsync(renamedUri, { 
+          UTI: '.pdf', 
+          mimeType: 'application/pdf',
+          dialogTitle: `Share ${finalFileName}`
+        });
+      } else {
+        // FALLBACK: If FileSystem is unavailable (e.g., Web browser), 
+        // just share/download the original URI directly.
+        await Sharing.shareAsync(uri, { 
+          UTI: '.pdf', 
+          mimeType: 'application/pdf',
+          dialogTitle: `Share Dealer Dossier`
+        });
+      }
+
+    } catch (error) {
+      console.error("Error renaming or sharing PDF:", error);
+      Alert.alert("Error", "Could not generate or share the PDF file.");
+    }
   };
 
   return { form, step, setStep, saveDraft, submit, scoreData, handleUpload, handleAudioUpload, uploading, isSubmitting, isNextEnabled, showSuccess, setShowSuccess, generatePDF, isEditing: !!editData };

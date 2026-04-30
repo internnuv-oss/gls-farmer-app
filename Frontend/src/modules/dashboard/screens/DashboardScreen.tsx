@@ -12,6 +12,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   RefreshControl,
+  Linking,
 } from "react-native";
 import { useTranslation } from "react-i18next";
 import i18n from "../../../core/i18n";
@@ -20,7 +21,7 @@ import { MaterialIcons } from "@expo/vector-icons";
 import { useFocusEffect } from "@react-navigation/native";
 import { useDraftStore } from "../../../store/draftStore";
 import { useAuthStore } from "../../../store/authStore";
-import { fetchMyDealers, deleteDealer } from "../services/dashboardService";
+import { fetchMyDealers } from "../services/dashboardService";
 import {
   FloatingActionMenu,
   Button,
@@ -36,12 +37,45 @@ import {
 
 const { width } = Dimensions.get("window");
 
+const FilterChipGroup = ({ label, options, selected, onSelect }: { label: string, options: {label: string, value: string}[], selected: string, onSelect: (val: string) => void }) => (
+  <View style={{ marginBottom: spacing.lg }}>
+    <Text style={{ fontSize: 14, fontWeight: "700", color: colors.text, marginBottom: spacing.sm }}>{label}</Text>
+    <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+      {options.map((opt) => {
+        const isActive = selected === opt.value;
+        return (
+          <Pressable
+            key={opt.value}
+            onPress={() => onSelect(opt.value)}
+            style={{
+              paddingHorizontal: 16,
+              paddingVertical: 8,
+              borderRadius: radius.pill,
+              backgroundColor: isActive ? colors.primary : colors.surface,
+              borderWidth: 1,
+              borderColor: isActive ? colors.primary : colors.border,
+            }}
+          >
+            <Text style={{ 
+              fontSize: 13, 
+              fontWeight: isActive ? "700" : "600", 
+              color: isActive ? '#FFFFFF' : colors.textMuted 
+            }}>
+              {opt.label}
+            </Text>
+          </Pressable>
+        );
+      })}
+    </View>
+  </View>
+);
+
 export const DashboardScreen = ({ navigation }: any) => {
   const { t } = useTranslation();
   const drafts = useDraftStore((state) => state.drafts);
   const user = useAuthStore((state) => state.user);
 
-  const [activeTab, setActiveTab] = useState(1);
+  const [activeTab, setActiveTab] = useState(0); // 0 = Distributors
   const [dealers, setDealers] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
@@ -50,28 +84,34 @@ export const DashboardScreen = ({ navigation }: any) => {
   const [page, setPage] = useState(0);
   const [hasMore, setHasMore] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
-  // Search, Filter & Sort State
+
+  const loadingPageRef = useRef<number | null>(null);
+  
   const [searchQuery, setSearchQuery] = useState("");
   const [isFilterModalOpen, setIsFilterModalOpen] = useState(false);
   const [sortBy, setSortBy] = useState("latest");
-  const [filterMinScore, setFilterMinScore] = useState("All");
+  const [filterCategory, setFilterCategory] = useState("All");
   const [filterFirmType, setFilterFirmType] = useState("All");
+  const [filterLinked, setFilterLinked] = useState("All");
 
   const loadData = async (pageNumber: number = 0, isRefresh = false) => {
-    if (!user?.id) return;
+    if (!user?.id || loadingPageRef.current === pageNumber) return; // ✅ Guard against duplicate page calls
     
+    loadingPageRef.current = pageNumber; // ✅ Mark this page as loading
+
     if (isRefresh) setRefreshing(true);
     else if (pageNumber === 0) setLoading(true);
     else setLoadingMore(true);
 
     try {
-      const data = await fetchMyDealers(user.id, pageNumber, 10, i18n.language); 
+      const PAGE_LIMIT = 5; 
+      const data = await fetchMyDealers(user.id, pageNumber, PAGE_LIMIT);
       const mapped = data.map((d: any) => ({
         id: d.id,
-        name: d.shop_name,
-        type: t("Dealer"), 
-        city: d.city,
-        state: d.state,
+        name: d.primary_shop_name || d.shop_name,
+        type: "Dealer",
+        city: d.primary_shop_location?.city || d.city,
+        state: d.primary_shop_location?.state || d.state,
         score: d.total_score,
         raw: d,
       }));
@@ -79,10 +119,16 @@ export const DashboardScreen = ({ navigation }: any) => {
       if (pageNumber === 0) {
         setDealers(mapped);
       } else {
-        setDealers(prev => [...prev, ...mapped]);
+        setDealers(prev => {
+          // ✅ FIX: DE-DUPLICATION LOGIC
+          // Only add items whose IDs are not already in the list
+          const existingIds = new Set(prev.map(item => item.id));
+          const uniqueNewItems = mapped.filter(item => !existingIds.has(item.id));
+          return [...prev, ...uniqueNewItems];
+        });
       }
 
-      setHasMore(data.length === 10);
+      setHasMore(data.length === PAGE_LIMIT);
       setPage(pageNumber);
     } catch (e) {
       console.error(e);
@@ -90,57 +136,70 @@ export const DashboardScreen = ({ navigation }: any) => {
       setLoading(false);
       setRefreshing(false);
       setLoadingMore(false);
+      loadingPageRef.current = null; // ✅ Reset after completion
     }
   };
 
+  // Fixed: Removed activeTab from dependency array so it doesn't refetch/reset on swipe
   useFocusEffect(
     useCallback(() => {
-      loadData(0); 
-    }, [user?.id, i18n.language]) 
+      loadData(0);
+    }, [user?.id])
   );
   
   const onRefresh = () => loadData(0, true);
 
-  // Apply Search, Filter, and Sort
   const processedDealers = useMemo(() => {
     let result = [...dealers];
 
-    // 1. Search
+    // 1. Search Query Filter
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase();
       result = result.filter(
         (d) =>
           (d.name || "").toLowerCase().includes(query) ||
           (d.city || "").toLowerCase().includes(query) ||
-          (d.state || "").toLowerCase().includes(query),
+          (d.state || "").toLowerCase().includes(query) ||
+          (d.raw?.contact_person || "").toLowerCase().includes(query),
       );
     }
 
-    // 2. Filter
-    if (filterMinScore !== "All") {
-      const minScore = parseInt(filterMinScore, 10);
-      result = result.filter((d) => d.score >= minScore);
+    // 2. Category / Band Filter
+    if (filterCategory !== "All") {
+      result = result.filter((d) => d.raw?.category === filterCategory);
     }
 
+    // 3. Firm Type Filter
     if (filterFirmType !== "All") {
-      result = result.filter((d) => d.raw.firm_type === filterFirmType);
+      result = result.filter((d) => d.raw?.firm_type === filterFirmType);
     }
 
-    // 3. Sort
+    // 4. Distributor Linkage Filter
+    if (filterLinked !== "All") {
+      if (filterLinked === "Linked") {
+        result = result.filter((item) => item.raw?.distributor_links?.isLinked === 'Yes');
+      }
+      if (filterLinked === "Unlinked") {
+        result = result.filter((item) => item.raw?.distributor_links?.isLinked !== 'Yes');
+      }
+    }
+
+    // 5. Sorting
     result.sort((a, b) => {
       if (sortBy === "score_high") return b.score - a.score;
       if (sortBy === "score_low") return a.score - b.score;
-      return 0; // 'latest' relies on the default DB fetch order
+      // "latest" relies on the DB's native ordering, so we just return 0 to maintain it.
+      return 0; 
     });
 
     return result;
-  }, [dealers, searchQuery, filterMinScore, sortBy]);
+  }, [dealers, searchQuery, filterCategory, filterFirmType, filterLinked, sortBy]);
 
   // Define Tabs
   const tabPages = [
     {
       key: "Distributors",
-      data: [],
+      data: [], // Distributors will show an empty state until integrated
       emptyMsg: "Onboard distributors to streamline your agricultural supply chain.",
       icon: "domain",
       actionId: "distributor",
@@ -149,7 +208,7 @@ export const DashboardScreen = ({ navigation }: any) => {
     },
     {
       key: "Dealers",
-      data: processedDealers,
+      data: processedDealers, // Loaded Dealers data
       emptyMsg: "Start building your network by onboarding your first dealer.",
       icon: "storefront",
       actionId: "dealer",
@@ -158,7 +217,7 @@ export const DashboardScreen = ({ navigation }: any) => {
     },
     {
       key: "Farmers",
-      data: [],
+      data: [], // Farmers will show an empty state until integrated
       emptyMsg: "Connect with farmers and manage their profiles efficiently here.",
       icon: "agriculture",
       actionId: "farmer",
@@ -167,34 +226,19 @@ export const DashboardScreen = ({ navigation }: any) => {
     },
   ];
 
-  const handleDelete = useCallback((id: string, name: string) => {
-    Alert.alert("Delete Profile", `Are you sure you want to delete ${name}?`, [
-      { text: "Cancel", style: "cancel" },
-      {
-        text: "Delete",
-        style: "destructive",
-        onPress: async () => {
-          try {
-            await deleteDealer(id);
-            loadData();
-          } catch (e: any) {
-            Alert.alert("Error", e.message);
-          }
-        },
-      },
-    ]);
-  }, []);
-
   const renderDealerItem = useCallback(({ item }: any) => (
     <EntityCard 
       item={item} 
       navigation={navigation} 
       t={t} 
-      onDelete={handleDelete} 
     />
-  ), [navigation, t, handleDelete]);
+  ), [navigation, t]);
 
   const getScoreColor = (score: number) => {
+    if (score > 60) return '#3730A3';
+    if (score >= 46) return '#166534';
+    if (score >= 26) return '#B45309';
+    return '#991B1B';                  
     if (score > 60) return '#3730A3';
     if (score >= 46) return '#166534';
     if (score >= 26) return '#B45309';
@@ -205,13 +249,14 @@ export const DashboardScreen = ({ navigation }: any) => {
     item: any;
     navigation: any;
     t: any;
-    onDelete: (id: string, name: string) => void;
   }
 
-  const EntityCard = React.memo(({ item, navigation, t, onDelete }: EntityCardProps) => {
+  const EntityCard = React.memo(({ item, navigation, t }: EntityCardProps) => {
     const [menuVisible, setMenuVisible] = useState(false);
     const iconRef = useRef<View>(null);
     const [menuCoords, setMenuCoords] = useState({ top: 0, right: 0 });
+    
+    const gps = item.raw.primary_shop_location?.gps?.exterior;
 
     const handleMenuPress = () => {
       if (menuVisible) {
@@ -241,10 +286,34 @@ export const DashboardScreen = ({ navigation }: any) => {
           
           <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start" }}>
             <View style={{ flex: 1 }}>
-              <Text style={{ fontSize: 18, fontWeight: "800", color: colors.text }}>{item.name}</Text>
-              <View style={{ flexDirection: "row", alignItems: "center", marginTop: 4 }}>
-                <MaterialIcons name="location-on" size={14} color={colors.textMuted} />
-                <Text style={{ fontSize: 13, color: colors.textMuted, marginLeft: 4 }}>{item.city}, {item.state}</Text>
+              <Text style={{ fontSize: 18, fontWeight: "800", color: colors.text }}>
+                {item.name}
+              </Text>
+              
+              <View style={{ flexDirection: "row", alignItems: "center", marginTop: 4, flexWrap: "wrap", gap: 8 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                  <MaterialIcons name="location-on" size={14} color={colors.textMuted} />
+                  <Text style={{ fontSize: 13, color: colors.textMuted, marginLeft: 4 }}>
+                    {item.city || 'N/A'}, {item.state || 'N/A'}
+                  </Text>
+                </View>
+                
+                {gps?.lat && gps?.lng && (
+                  <Pressable 
+                    onPress={() => Linking.openURL(`https://maps.google.com/?q=${gps.lat},${gps.lng}`)}
+                    style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#EFF6FF', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, borderWidth: 1, borderColor: '#BFDBFE' }}
+                  >
+                    <MaterialIcons name="map" size={12} color="#2563EB" style={{ marginRight: 2 }} />
+                    <Text style={{ fontSize: 10, color: '#2563EB', fontWeight: '800' }}>MAP</Text>
+                  </Pressable>
+                )}
+
+                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                  <MaterialIcons name="date-range" size={14} color={colors.textMuted} />
+                  <Text style={{ fontSize: 13, color: colors.textMuted, marginLeft: 4 }}>
+                    Since {item.raw.created_at ? new Date(item.raw.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : 'N/A'}
+                  </Text>
+                </View>
               </View>
             </View>
 
@@ -262,18 +331,14 @@ export const DashboardScreen = ({ navigation }: any) => {
                     }}
                   >
                     <Pressable
-                      onPress={() => { setMenuVisible(false); navigation.navigate("DealerOnboarding", { editData: item.raw }); }}
-                      style={{ flexDirection: "row", alignItems: "center", padding: spacing.md, borderBottomWidth: 1, borderBottomColor: colors.border }}
+                      onPress={() => {
+                        setMenuVisible(false);
+                        navigation.navigate("DealerOnboarding", { editData: item.raw });
+                      }}
+                      style={{ flexDirection: "row", alignItems: "center", padding: spacing.md }}
                     >
                       <MaterialIcons name="edit" size={18} color={colors.primary} style={{ marginRight: spacing.sm }} />
                       <Text style={{ fontSize: 14, fontWeight: "700", color: colors.text }}>{t("Edit Profile")}</Text>
-                    </Pressable>
-                    <Pressable
-                      onPress={() => { setMenuVisible(false); handleDelete(item.id, item.name); }}
-                      style={{ flexDirection: "row", alignItems: "center", padding: spacing.md }}
-                    >
-                      <MaterialIcons name="delete" size={18} color={colors.danger} style={{ marginRight: spacing.sm }} />
-                      <Text style={{ fontSize: 14, fontWeight: "700", color: colors.danger }}>{t("Delete Profile")}</Text>
                     </Pressable>
                   </View>
                 </Pressable>
@@ -281,16 +346,37 @@ export const DashboardScreen = ({ navigation }: any) => {
             </View>
           </View>
 
-          <View style={{ marginTop: spacing.md, backgroundColor: '#F8FAFC', padding: spacing.md, borderRadius: radius.md, borderWidth: 1, borderColor: colors.border }}>
+          <View style={{ 
+            marginTop: spacing.md, 
+            backgroundColor: '#F8FAFC', 
+            padding: spacing.md, 
+            borderRadius: radius.md, 
+            borderWidth: 1, 
+            borderColor: colors.border 
+          }}>
             <View style={{ flexDirection: 'row', gap: spacing.sm, marginBottom: 10 }}>
               <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
                 <MaterialIcons name="person" size={16} color={colors.primary} />
-                <Text style={{ fontSize: 13, color: colors.text, marginLeft: 6, fontWeight: '600' }} numberOfLines={1}>{item.raw.owner_name || 'N/A'}</Text>
+                <Text style={{ fontSize: 13, color: colors.text, marginLeft: 6, fontWeight: '600' }} numberOfLines={1}>
+                  {item.raw.contact_person || 'N/A'}
+                </Text>
               </View>
-              <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
-                <MaterialIcons name="phone" size={16} color={colors.primary} />
-                <Text style={{ fontSize: 13, color: colors.text, marginLeft: 6, fontWeight: '600' }}>{item.raw.contact_mobile ? `+91 ${item.raw.contact_mobile}` : 'N/A'}</Text>
-              </View>
+              
+              <Pressable 
+                onPress={() => item.raw.contact_mobile && Linking.openURL(`tel:${item.raw.contact_mobile}`)}
+                style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}
+              >
+                <MaterialIcons name="phone" size={16} color={item.raw.contact_mobile ? colors.primary : colors.textMuted} />
+                <Text style={{ 
+                  fontSize: 13, 
+                  color: item.raw.contact_mobile ? colors.primary : colors.text, 
+                  marginLeft: 6, 
+                  fontWeight: '700', 
+                  textDecorationLine: item.raw.contact_mobile ? 'underline' : 'none' 
+                }}>
+                  {item.raw.contact_mobile ? `+91 ${item.raw.contact_mobile}` : 'N/A'}
+                </Text>
+              </Pressable>
             </View>
             
             <View style={{ flexDirection: 'row', gap: spacing.sm }}>
@@ -327,8 +413,13 @@ export const DashboardScreen = ({ navigation }: any) => {
 
           <View style={{ height: 1, backgroundColor: colors.border, marginVertical: spacing.md }} />
 
-          <Pressable onPress={() => navigation.navigate("EntityProfile", { entity: item })} style={{ flexDirection: "row", justifyContent: "center", alignItems: "center" }}>
-            <Text style={{ color: colors.primary, fontWeight: "800", fontSize: 14, marginRight: 4 }}>{t("View Profile")}</Text>
+          <Pressable
+            onPress={() => navigation.navigate("EntityProfile", { entity: item })}
+            style={{ flexDirection: "row", justifyContent: "center", alignItems: "center" }}
+          >
+            <Text style={{ color: colors.primary, fontWeight: "800", fontSize: 14, marginRight: 4 }}>
+              {t("View Profile")}
+            </Text>
             <MaterialIcons name="chevron-right" size={18} color={colors.primary} />
           </Pressable>
         </View>
@@ -338,8 +429,15 @@ export const DashboardScreen = ({ navigation }: any) => {
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.screen, paddingTop: 50 }}>
-      {/* Header */}
-      <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingHorizontal: spacing.lg, paddingBottom: spacing.md }}>
+      <View
+        style={{
+          flexDirection: "row",
+          justifyContent: "space-between",
+          alignItems: "center",
+          paddingHorizontal: spacing.lg,
+          paddingBottom: spacing.md,
+        }}
+      >
         <View style={{ flexDirection: "row", alignItems: "center" }}>
           <View style={{ backgroundColor: colors.primarySoft, padding: 8, borderRadius: 12, marginRight: spacing.sm }}>
             <Leaf size={24} color={colors.primary} />
@@ -378,88 +476,125 @@ export const DashboardScreen = ({ navigation }: any) => {
           onPress={() => setIsFilterModalOpen(true)}
           style={{
             width: 48, height: 48,
-            backgroundColor: sortBy !== "latest" || filterMinScore !== "All" ? colors.primarySoft : colors.surface,
+            backgroundColor: (sortBy !== "latest" || filterCategory !== "All" || filterFirmType !== "All" || filterLinked !== "All") ? colors.primarySoft : colors.surface,
             borderRadius: radius.md, borderWidth: 1,
-            borderColor: sortBy !== "latest" || filterMinScore !== "All" ? colors.primary : colors.border,
+            borderColor: (sortBy !== "latest" || filterCategory !== "All" || filterFirmType !== "All" || filterLinked !== "All") ? colors.primary : colors.border,
             justifyContent: "center", alignItems: "center",
           }}
         >
-          <Filter size={20} color={sortBy !== "latest" || filterMinScore !== "All" ? colors.primary : colors.text} />
+          <Filter size={20} color={(sortBy !== "latest" || filterCategory !== "All" || filterFirmType !== "All" || filterLinked !== "All") ? colors.primary : colors.textMuted} />
         </Pressable>
       </View>
 
-      {/* Tabs */}
-      <View style={{ flexDirection: "row", paddingHorizontal: spacing.lg, marginBottom: spacing.sm }}>
-        {tabPages.map((tab, index) => (
-          <Pressable
-            key={tab.key}
-            onPress={() => {
-              setActiveTab(index);
-              pagerRef.current?.scrollToIndex({ index, animated: true });
-            }}
+          <View
             style={{
-              flex: 1, paddingVertical: 12, borderBottomWidth: 2,
-              borderBottomColor: activeTab === index ? colors.primary : "transparent",
-              alignItems: "center",
+              flexDirection: "row",
+              paddingHorizontal: spacing.lg,
+              marginBottom: spacing.sm,
             }}
           >
-            <Text style={{ fontWeight: "800", color: activeTab === index ? colors.primary : colors.textMuted }}>
-              {t(tab.key)}
-            </Text>
-          </Pressable>
-        ))}
-      </View>
+            {tabPages.map((tab, index) => (
+              <Pressable
+                key={tab.key}
+                onPress={() => {
+                  setActiveTab(index);
+                  pagerRef.current?.scrollToIndex({ index, animated: true });
+                }}
+                style={{
+                  flex: 1,
+                  paddingVertical: 12,
+                  borderBottomWidth: 2,
+                  borderBottomColor:
+                    activeTab === index ? colors.primary : "transparent",
+                  alignItems: "center",
+                }}
+              >
+                <Text
+                  style={{
+                    fontWeight: "800",
+                    color: activeTab === index ? colors.primary : colors.textMuted,
+                  }}
+                >
+                  {t(tab.key)}
+                </Text>
+              </Pressable>
+            ))}
+          </View>
 
-      {loading && !refreshing ? (
-        <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
-          <ActivityIndicator size="large" color={colors.primary} />
-        </View>
-      ) : (
-        <FlatList
-          ref={pagerRef}
-          data={tabPages}
-          keyExtractor={(item) => item.key}
-          horizontal
-          pagingEnabled
-          showsHorizontalScrollIndicator={false}
-          initialScrollIndex={1}
-          getItemLayout={(data, index) => ({ length: width, offset: width * index, index })}
-          onMomentumScrollEnd={(event) => {
-            const index = Math.round(event.nativeEvent.contentOffset.x / width);
-            if (activeTab !== index) setActiveTab(index);
-          }}
-          renderItem={({ item }) => (
-            <View style={{ width }}>
-              <FlatList
-                data={item.data}
-                renderItem={renderDealerItem}
-                keyExtractor={(i) => i.id}
-                contentContainerStyle={{ padding: spacing.lg, paddingBottom: 100 }}
-                showsVerticalScrollIndicator={false}
-                initialNumToRender={5}
-                maxToRenderPerBatch={5}
-                windowSize={5}
-                removeClippedSubviews={true}
-                updateCellsBatchingPeriod={50}
-                refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[colors.primary]} tintColor={colors.primary} />}
-                ListEmptyComponent={
-                  <EmptyState
-                    title={t(searchQuery ? "No Results Found" : `No ${item.key} Yet`)}
-                    description={t(searchQuery ? "Try adjusting your search criteria." : item.emptyMsg)}
-                    iconName={item.icon as any}
-                    actionLabel={t(item.actionLabel)}
-                    actionIcon={item.actionIcon}
-                    onAction={() => {
-                      if (item.actionId === "dealer") navigation.navigate("DealerOnboarding");
-                      else navigation.navigate("ComingSoonScreen");
+          {/* FIX: FlatList is no longer unmounted when loading. */}
+          <FlatList
+            ref={pagerRef}
+            data={tabPages}
+            keyExtractor={(item) => item.key}
+            horizontal
+            pagingEnabled
+            showsHorizontalScrollIndicator={false}
+            initialScrollIndex={0}
+            getItemLayout={(data, index) => ({
+              length: width,
+              offset: width * index,
+              index,
+            })}
+            onMomentumScrollEnd={(event) => {
+              const index = Math.round(event.nativeEvent.contentOffset.x / width);
+              if (activeTab !== index) setActiveTab(index);
+            }}
+            renderItem={({ item }) => (
+              <View style={{ width }}>
+                <FlatList
+                    data={item.data}
+                    renderItem={renderDealerItem}
+                    keyExtractor={(i) => i.id}
+                    contentContainerStyle={{
+                      padding: spacing.lg,
+                      paddingBottom: 100,
                     }}
-                  />
-                }
-              />
-            </View>
-          )}
-        />
-      )}
+                    showsVerticalScrollIndicator={false}
+                    // ✅ UPDATED: Added item.key check and ensured guards are tight
+                    onEndReached={() => {
+                      if (item.key === "Dealers" && hasMore && !loadingMore && !loading && !refreshing) {
+                        loadData(page + 1);
+                      }
+                    }}
+                    onEndReachedThreshold={0.5}
+  ListFooterComponent={() => (
+    loadingMore ? (
+      <View style={{ paddingVertical: spacing.md }}>
+        <ActivityIndicator color={colors.primary} />
+      </View>
+    ) : null
+  )}
+  refreshControl={
+    <RefreshControl
+      refreshing={refreshing}
+      onRefresh={onRefresh}
+      colors={[colors.primary]}
+      tintColor={colors.primary}
+    />
+  }
+                  ListEmptyComponent={
+                    loading && !refreshing ? (
+                      <View style={{ marginTop: 60, alignItems: 'center' }}>
+                        <ActivityIndicator size="large" color={colors.primary} />
+                      </View>
+                    ) : (
+                      <EmptyState
+                        title={t(searchQuery ? "No Results Found" : `No ${item.key} Yet`)}
+                        description={t(searchQuery ? "Try adjusting your search criteria." : item.emptyMsg)}
+                        iconName={item.icon as any}
+                        actionLabel={t(item.actionLabel)}
+                        actionIcon={item.actionIcon}
+                        onAction={() => {
+                          if (item.actionId === "dealer") navigation.navigate("DealerOnboarding");
+                          else navigation.navigate("ComingSoonScreen");
+                        }}
+                      />
+                    )
+                  }
+                />
+              </View>
+            )}
+          />
 
       {/* Floating Action Menu is now completely unlocked! */}
       <FloatingActionMenu
@@ -474,26 +609,108 @@ export const DashboardScreen = ({ navigation }: any) => {
         }}
       />
 
-      {/* Filter & Sort Modal */}
-      <Modal visible={isFilterModalOpen} transparent animationType="fade" onRequestClose={() => setIsFilterModalOpen(false)}>
+<Modal
+        visible={isFilterModalOpen}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setIsFilterModalOpen(false)}
+      >
         <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={{ flex: 1 }}>
-          <View style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.5)", justifyContent: "flex-end" }}>
+          <View style={{ flex: 1, backgroundColor: "rgba(15, 23, 42, 0.6)", justifyContent: "flex-end" }}>
+            
             <Pressable style={{ flex: 1 }} onPress={() => setIsFilterModalOpen(false)} />
-            <View style={{ backgroundColor: colors.surface, borderTopLeftRadius: radius.lg, borderTopRightRadius: radius.lg, padding: spacing.lg, paddingBottom: spacing["3xl"], ...shadows.soft }}>
-              <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: spacing.lg }}>
-                <Text style={{ fontSize: 18, fontWeight: "800", color: colors.text }}>Filter & Sort</Text>
-                <Pressable onPress={() => setIsFilterModalOpen(false)}><MaterialIcons name="close" size={24} color={colors.textMuted} /></Pressable>
+            
+            <View style={{
+              backgroundColor: colors.screen,
+              borderTopLeftRadius: 24,
+              borderTopRightRadius: 24,
+              padding: spacing.xl,
+              paddingBottom: Platform.OS === 'ios' ? 40 : spacing.xl,
+              maxHeight: '85%'
+            }}>
+              
+              {/* Header with Clear Button */}
+              <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: spacing.xl }}>
+                <Text style={{ fontSize: 20, fontWeight: "900", color: colors.text }}>Filter & Sort</Text>
+                
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 16 }}>
+                  <Pressable onPress={() => {
+                    setSortBy("latest");
+                    setFilterCategory("All");
+                    setFilterFirmType("All");
+                    setFilterLinked("All");
+                  }}>
+                    <Text style={{ color: colors.textMuted, fontWeight: '700', fontSize: 14 }}>Clear All</Text>
+                  </Pressable>
+                  <Pressable onPress={() => setIsFilterModalOpen(false)} style={{ backgroundColor: colors.surface, padding: 6, borderRadius: 20 }}>
+                    <MaterialIcons name="close" size={20} color={colors.text} />
+                  </Pressable>
+                </View>
               </View>
 
-              <RadioGroup label="Sort By" options={["latest", "score_high", "score_low"]} value={sortBy} onChange={setSortBy} />
-              <View style={{ height: spacing.md }} />
-              <RadioGroup label="Minimum Score" options={["All", "50", "70", "85"]} value={filterMinScore} onChange={setFilterMinScore} />
-              <View style={{ height: spacing.md }} />
-              <RadioGroup label="Firm Type" options={["All", "Proprietorship", "Partnership", "Pvt Ltd"]} value={filterFirmType} onChange={setFilterFirmType} />
+              <FlatList 
+                data={[]} 
+                renderItem={null} 
+                showsVerticalScrollIndicator={false}
+                ListHeaderComponent={
+                  <View>
+                    <FilterChipGroup 
+                      label="Sort By" 
+                      selected={sortBy} 
+                      onSelect={setSortBy}
+                      options={[
+                        { label: "Newest First", value: "latest" },
+                        { label: "Highest Score", value: "score_high" },
+                        { label: "Lowest Score", value: "score_low" }
+                      ]} 
+                    />
 
-              <View style={{ marginTop: spacing.xl }}>
-                <Button label="Apply" onPress={() => setIsFilterModalOpen(false)} />
+                    <View style={{ height: 1, backgroundColor: colors.border, marginBottom: spacing.lg }} />
+
+                    <FilterChipGroup 
+                      label="Category" 
+                      selected={filterCategory} 
+                      onSelect={setFilterCategory}
+                      options={[
+                        { label: "All", value: "All" },
+                        { label: "Elite", value: "Elite" },
+                        { label: "A-Category", value: "A-Category" },
+                        { label: "B-Category", value: "B-Category" },
+                        { label: "C-Category", value: "C-Category" }
+                      ]} 
+                    />
+
+                    <FilterChipGroup 
+                      label="Distributor Linkage" 
+                      selected={filterLinked} 
+                      onSelect={setFilterLinked}
+                      options={[
+                        { label: "All", value: "All" },
+                        { label: "Linked", value: "Linked" },
+                        { label: "Unlinked", value: "Unlinked" }
+                      ]} 
+                    />
+
+                    <FilterChipGroup 
+                      label="Firm Type" 
+                      selected={filterFirmType} 
+                      onSelect={setFilterFirmType}
+                      options={[
+                        { label: "All", value: "All" },
+                        { label: "Proprietorship", value: "Proprietorship" },
+                        { label: "Partnership", value: "Partnership" },
+                        { label: "Pvt Ltd", value: "Pvt Ltd" }
+                      ]} 
+                    />
+                  </View>
+                }
+              />
+
+              {/* Sticky Apply Button */}
+              <View style={{ marginTop: spacing.md, paddingTop: spacing.md, borderTopWidth: 1, borderTopColor: colors.border }}>
+                <Button label="Apply Filters" onPress={() => setIsFilterModalOpen(false)} />
               </View>
+
             </View>
           </View>
         </KeyboardAvoidingView>

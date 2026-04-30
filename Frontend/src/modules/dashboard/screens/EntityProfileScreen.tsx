@@ -1,30 +1,163 @@
 import React, { useState } from 'react';
-import { View, Text, Alert, Pressable, ActivityIndicator, Modal, Image, Platform } from 'react-native';
+import { View, Text, Alert, Pressable, ActivityIndicator, Modal, Image, Platform, ScrollView, Linking } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { MaterialIcons } from '@expo/vector-icons';
-import { documentDirectory, cacheDirectory, downloadAsync, StorageAccessFramework, EncodingType, readAsStringAsync, writeAsStringAsync } from 'expo-file-system/legacy';
+import { documentDirectory, cacheDirectory, downloadAsync, StorageAccessFramework, EncodingType, readAsStringAsync, writeAsStringAsync, getContentUriAsync } from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
+import * as IntentLauncher from 'expo-intent-launcher';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { SimpleScreenTemplate } from '../../../design-system/templates/Templates';
 import { Button } from '../../../design-system/components/Button';
-import { deleteDealer } from '../services/dashboardService';
 import { colors, radius, spacing, shadows } from '../../../design-system/tokens';
 
-// ✅ FIX: DetailRow now explicitly returns "N/A" for any empty, null, or empty-array values
-const DetailRow = ({ label, value }: { label: string, value: any }) => {
+// --- Reusable UI Components --- //
+
+const SectionCard = ({ title, icon, children }: { title: string, icon?: any, children: React.ReactNode }) => (
+  <View style={{ backgroundColor: colors.surface, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.border, ...shadows.soft, padding: spacing.lg, marginBottom: spacing.lg }}>
+    <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: spacing.lg, borderBottomWidth: 1, borderBottomColor: colors.border, paddingBottom: spacing.sm }}>
+      {icon && <MaterialIcons name={icon} size={22} color={colors.primary} style={{ marginRight: 8 }} />}
+      <Text style={{ fontSize: 16, fontWeight: '900', color: colors.primary }}>{title}</Text>
+    </View>
+    {children}
+  </View>
+);
+
+const DetailRow = ({ label, value, isVertical = false }: { label: string, value: any, isVertical?: boolean }) => {
   const displayValue = (!value || value === '' || (Array.isArray(value) && value.length === 0)) ? 'N/A' : value;
   
-  return (
-    <View>
-      <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: spacing.md }}>
-        <Text style={{ color: colors.textMuted, fontWeight: '700', flex: 1 }}>{label}</Text>
-        <Text style={{ color: colors.text, fontWeight: '800', flex: 1.5, textAlign: 'right' }}>{displayValue}</Text>
+  if (isVertical) {
+    return (
+      <View style={{ marginBottom: spacing.md }}>
+        <Text style={{ color: colors.textMuted, fontWeight: '700', marginBottom: 4 }}>{label}</Text>
+        <View>{typeof displayValue === 'string' ? <Text style={{ color: colors.text, fontWeight: '600', lineHeight: 20 }}>{displayValue}</Text> : displayValue}</View>
       </View>
-      <View style={{ height: 1, backgroundColor: colors.border, marginBottom: spacing.md }} />
+    );
+  }
+
+  return (
+    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: spacing.md }}>
+      <Text style={{ color: colors.textMuted, fontWeight: '700', flex: 1, marginRight: spacing.sm }}>{label}</Text>
+      <View style={{ flex: 1.5, alignItems: 'flex-end' }}>
+        {typeof displayValue === 'string' ? <Text style={{ color: colors.text, fontWeight: '800', textAlign: 'right' }}>{displayValue}</Text> : displayValue}
+      </View>
     </View>
   );
 };
+
+const PillList = ({ items, align = 'flex-end' }: { items: any[], align?: 'flex-start' | 'flex-end' | 'center' }) => {
+  if (!items || items.length === 0) return <Text style={{ color: colors.text, fontWeight: '800' }}>N/A</Text>;
+  return (
+    <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, justifyContent: align }}>
+      {items.map((item, i) => (
+        <View key={i} style={{ backgroundColor: '#F1F5F9', paddingHorizontal: 10, paddingVertical: 4, borderRadius: radius.pill, borderWidth: 1, borderColor: '#E2E8F0' }}>
+          <Text style={{ color: colors.text, fontSize: 12, fontWeight: '700' }}>{item.name || item}</Text>
+        </View>
+      ))}
+    </View>
+  );
+};
+
+const AudioLink = ({ url, label = "Play Audio" }: { url: string, label?: string }) => {
+  const [loading, setLoading] = useState(false);
+
+  const handlePlay = async () => {
+    if (!url) return;
+    setLoading(true);
+    
+    try {
+      // Determine audio extension
+      let ext = 'mp3';
+      if (url.toLowerCase().includes('.m4a')) ext = 'm4a';
+      else if (url.toLowerCase().includes('.wav')) ext = 'wav';
+      else if (url.toLowerCase().includes('.aac')) ext = 'aac';
+
+      // Create a clean, secure file name in the hidden cache
+      const fileName = `secure_audio_${Date.now()}.${ext}`;
+      const localUri = `${cacheDirectory}${fileName}`;
+
+      // Download silently
+      const result = await downloadAsync(url, localUri);
+
+      if (result.status === 200) {
+        if (Platform.OS === 'android') {
+          // Open natively in Android's default media player
+          const contentUri = await getContentUriAsync(result.uri);
+          await IntentLauncher.startActivityAsync('android.intent.action.VIEW', {
+            data: contentUri,
+            flags: 1, // Grants read permission safely
+            type: 'audio/*'
+          });
+        } else {
+          // Open natively via iOS QuickLook
+          await Sharing.shareAsync(result.uri, { 
+            UTI: 'public.audio', 
+            mimeType: `audio/${ext}` 
+          });
+        }
+      } else {
+        Alert.alert("Error", "Could not load the audio from the server.");
+      }
+    } catch (error) {
+      console.error(error);
+      Alert.alert("Error", "An error occurred while trying to play the audio.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (!url) return null;
+
+  return (
+    <Pressable 
+      onPress={handlePlay} 
+      disabled={loading}
+      style={{ 
+        flexDirection: 'row', 
+        alignItems: 'center', 
+        marginTop: 4, 
+        backgroundColor: '#EFF6FF', 
+        alignSelf: 'flex-start', 
+        paddingHorizontal: 10, 
+        paddingVertical: 6, 
+        borderRadius: radius.sm, 
+        borderWidth: 1, 
+        borderColor: '#BFDBFE' 
+      }}
+    >
+      {loading ? (
+        <ActivityIndicator size="small" color="#2563EB" style={{ marginRight: 4 }} />
+      ) : (
+        <MaterialIcons name="headset" size={16} color="#2563EB" style={{ marginRight: 4 }} />
+      )}
+      <Text style={{ color: "#2563EB", fontSize: 12, fontWeight: '700' }}>
+        {loading ? "Loading..." : label}
+      </Text>
+    </Pressable>
+  );
+};
+
+// Custom component to handle Phone Calls
+const ActionablePhone = ({ phone }: { phone: string }) => {
+  if (!phone) return <Text style={{ color: colors.text, fontWeight: '800' }}>N/A</Text>;
+  return (
+    <Pressable onPress={() => Linking.openURL(`tel:${phone}`)} style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+      <MaterialIcons name="phone" size={16} color={colors.primary} />
+      <Text style={{ color: colors.primary, fontWeight: '800', textDecorationLine: 'underline' }}>+91 {phone}</Text>
+    </Pressable>
+  );
+};
+
+// Custom component to handle Google Maps Navigation
+const ActionableMap = ({ lat, lng, label }: { lat: number, lng: number, label: string }) => {
+  return (
+    <Pressable onPress={() => Linking.openURL(`https://maps.google.com/?q=${lat},${lng}`)} style={{ flexDirection: 'row', alignItems: 'center' }}>
+      <Text style={{ color: colors.primary, fontWeight: '800', marginRight: 6, textDecorationLine: 'underline' }}>{label}</Text>
+      <MaterialIcons name="map" size={16} color={colors.primary} />
+    </Pressable>
+  );
+};
+
 
 export const EntityProfileScreen = ({ navigation, route }: any) => {
   const { t } = useTranslation();
@@ -45,6 +178,17 @@ export const EntityProfileScreen = ({ navigation, route }: any) => {
     return '#991B1B';
   };
 
+  const ScoreRow = ({ label, score, remark, audio }: any) => (
+    <View style={{ marginBottom: spacing.md, paddingBottom: spacing.sm, borderBottomWidth: 1, borderBottomColor: '#F1F5F9' }}>
+      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+        <Text style={{ color: colors.text, fontWeight: '700', fontSize: 14 }}>{label}</Text>
+        <Text style={{ color: getScoreColor(score), fontWeight: '900', fontSize: 16 }}>{score}/10</Text>
+      </View>
+      {remark ? <Text style={{ color: colors.textMuted, fontSize: 13, fontStyle: 'italic', marginBottom: 4 }}>"{remark}"</Text> : null}
+      <AudioLink url={audio} />
+    </View>
+  );
+
   const onRefresh = () => {
     setRefreshing(true);
     setTimeout(() => setRefreshing(false), 600);
@@ -54,81 +198,48 @@ export const EntityProfileScreen = ({ navigation, route }: any) => {
     navigation.navigate("DealerOnboarding", { editData: raw });
   };
 
-  const handleDelete = () => {
-    Alert.alert("Delete Profile", "Are you sure you want to delete this profile? This action cannot be undone.", [
-      { text: "Cancel", style: "cancel" },
-      { text: "Delete", style: "destructive", onPress: async () => {
-          try {
-            await deleteDealer(entity.id);
-            navigation.goBack();
-          } catch(e: any) {
-            Alert.alert("Error", e.message);
-          }
-      }}
-    ]);
-  };
-
-  // ✅ FIX: Reusable function to handle both Dossier downloads and Document downloads securely
-  // ✅ FIX: Improved Download Function with clear UI feedback
   const downloadFile = async (url: string, defaultFileName: string) => {
     setDownloading(true);
     try {
       const tempUri = `${documentDirectory}${defaultFileName}`; 
       
       if (Platform.OS === 'android') {
-        // 1. Ask Android user where they want to save it
         const permissions = await StorageAccessFramework.requestDirectoryPermissionsAsync();
         
         if (permissions.granted) {
-          // 2. Download from Cloudinary to hidden app cache first
           const result = await downloadAsync(url, tempUri);
           if (result.status !== 200) {
             Alert.alert("Download Error", "Could not access the file from the server.");
             return;
           }
           
-          // 3. Move it from hidden cache to their chosen public folder
           const base64 = await readAsStringAsync(result.uri, { encoding: EncodingType.Base64 });
           const mimeType = url.toLowerCase().endsWith('.pdf') ? 'application/pdf' : '*/*';
           const savedUri = await StorageAccessFramework.createFileAsync(permissions.directoryUri, defaultFileName, mimeType);
           await writeAsStringAsync(savedUri, base64, { encoding: EncodingType.Base64 });
           
-          console.log("File saved successfully to:", savedUri);
-          
-          // 4. Force a highly visible success alert
-          Alert.alert(
-            "✅ Download Complete", 
-            `File saved as:\n${defaultFileName}\n\nCheck your device's Files or Downloads folder.`
-          );
-        } else {
-          console.log("User cancelled the Android folder picker.");
+          Alert.alert("✅ Download Complete", `File saved as:\n${defaultFileName}\n\nCheck your device's Files or Downloads folder.`);
         }
       } else {
-        // iOS Behavior: Must use Share Sheet to "Save to Files"
         const result = await downloadAsync(url, tempUri);
         if (result.status !== 200) {
           Alert.alert("Download Error", "Could not access the file.");
           return;
         }
         const mimeType = url.toLowerCase().endsWith('.pdf') ? 'application/pdf' : 'application/octet-stream';
-        
-        // This opens the iOS Share Sheet where they must click "Save to Files"
-        await Sharing.shareAsync(result.uri, { 
-          UTI: 'public.data', 
-          mimeType, 
-          dialogTitle: 'Save File' // iOS instruction
-        });
+        await Sharing.shareAsync(result.uri, { UTI: 'public.data', mimeType, dialogTitle: 'Save File' });
       }
     } catch (error) {
-      console.error("Download Error Crash:", error);
       Alert.alert("Error", "Failed to download the file. Check your connection.");
     } finally {
       setDownloading(false);
     }
   };
+
   const handleDownloadPDF = () => {
     if (!raw.pdf_url) return Alert.alert("Not Found", "PDF document is not available.");
-    const fileName = `${raw.shop_name.replace(/[^a-zA-Z0-9]/g, '_')}_Dossier.pdf`;
+    const safeName = (raw.primary_shop_name || "Dealer").replace(/[^a-zA-Z0-9]/g, '_');
+    const fileName = `${safeName}_Dossier.pdf`;
     downloadFile(raw.pdf_url, fileName);
   };
 
@@ -136,15 +247,13 @@ export const EntityProfileScreen = ({ navigation, route }: any) => {
     if (!raw.pdf_url) return Alert.alert("Not Found", "PDF document is not available.");
     setSharing(true);
     try {
-      const fileName = `${raw.shop_name.replace(/[^a-zA-Z0-9]/g, '_')}_Dossier.pdf`;
+      const safeName = (raw.primary_shop_name || "Dealer").replace(/[^a-zA-Z0-9]/g, '_');
+      const fileName = `${safeName}_Dossier.pdf`;
       const fileUri = `${documentDirectory}${fileName}`; 
       
       const result = await downloadAsync(raw.pdf_url, fileUri);
       
-      if (result.status !== 200) {
-        Alert.alert("Share Error", "Could not access the PDF.");
-        return;
-      }
+      if (result.status !== 200) return Alert.alert("Share Error", "Could not access the PDF.");
       
       const canShare = await Sharing.isAvailableAsync();
       if (canShare) {
@@ -153,41 +262,72 @@ export const EntityProfileScreen = ({ navigation, route }: any) => {
         Alert.alert("Error", "Sharing is not available on this device.");
       }
     } catch (error) {
-      console.log("Share Error:", error);
       Alert.alert("Error", "Failed to share the PDF document.");
     } finally {
       setSharing(false);
     }
   };
 
-  // ✅ FIX: Triggers a Download Alert instead of a viewer for non-image files
   const handleViewDocument = async (key: string, url: string) => {
-    const isPdfOrRaw = url.toLowerCase().endsWith('.pdf') || url.includes('/raw/upload');
-
+    const isPdfOrRaw = url.toLowerCase().endsWith('.pdf') || url.includes('/raw/upload') || url.match(/\.(doc|docx|xls|xlsx|csv)$/i);
+    
     if (isPdfOrRaw) {
-      Alert.alert(
-        "Download Document",
-        "This file format cannot be viewed directly in the app. Would you like to download it?",
-        [
-          { text: "Cancel", style: "cancel" },
-          { 
-            text: "Download", 
-            onPress: () => {
-              const ext = url.toLowerCase().endsWith('.pdf') ? 'pdf' : 'doc';
-              downloadFile(url, `${key}_document_${Date.now()}.${ext}`);
-            }
+      setDownloading(true); 
+      try {
+        let ext = 'pdf';
+        let mimeType = 'application/pdf';
+        let uti = 'com.adobe.pdf';
+
+        if (url.toLowerCase().includes('.xlsx')) { ext = 'xlsx'; mimeType = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'; uti = 'com.microsoft.excel.xls'; }
+        else if (url.toLowerCase().includes('.xls')) { ext = 'xls'; mimeType = 'application/vnd.ms-excel'; uti = 'com.microsoft.excel.xls'; }
+        else if (url.toLowerCase().includes('.csv')) { ext = 'csv'; mimeType = 'text/csv'; uti = 'public.comma-separated-values-text'; }
+        else if (url.toLowerCase().includes('.docx')) { ext = 'docx'; mimeType = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'; uti = 'org.openxmlformats.wordprocessingml.document'; }
+        else if (url.toLowerCase().includes('.doc')) { ext = 'doc'; mimeType = 'application/msword'; uti = 'com.microsoft.word.doc'; }
+        
+        const cleanKeyName = key.replace(/[^a-zA-Z0-9]/g, '_');
+        const fileName = `secure_${cleanKeyName}_${Date.now()}.${ext}`;
+        const localUri = `${cacheDirectory}${fileName}`;
+        
+        const result = await downloadAsync(url, localUri);
+        
+        if (result.status === 200) {
+          if (Platform.OS === 'android') {
+            const contentUri = await getContentUriAsync(result.uri);
+            await IntentLauncher.startActivityAsync('android.intent.action.VIEW', {
+              data: contentUri,
+              flags: 1, 
+              type: mimeType
+            });
+          } else {
+            await Sharing.shareAsync(result.uri, { UTI: uti, mimeType: mimeType });
           }
-        ]
-      );
+        } else {
+          Alert.alert("Error", "Could not load the document from the server.");
+        }
+      } catch (error) {
+        console.error(error);
+        Alert.alert("Error", "An error occurred while opening the document natively.");
+      } finally {
+        setDownloading(false);
+      }
     } else {
-      setViewerDoc(url); // Standard images still use the viewer
+      setViewerDoc(url); 
     }
   };
+
+  // Safe extractions
+  const banks = raw.bank_details || [];
+  const annexures = raw.annexures || {};
+  const scoring = raw.scoring || {};
+  const linkedDistributors = raw.distributor_links?.distributors || [];
+  const addShops = raw.additional_locations?.shops || [];
+  const godowns = raw.additional_locations?.godowns || [];
+  const gpsExt = raw.primary_shop_location?.gps?.exterior;
 
   return (
     <SimpleScreenTemplate 
       title={t('Profile Overview')} 
-      onBack={() => navigation.navigate("Dashboard")}
+      onBack={() => navigation.goBack()}
       refreshing={refreshing}
       onRefresh={onRefresh}
       rightAction={
@@ -198,26 +338,10 @@ export const EntityProfileScreen = ({ navigation, route }: any) => {
 
           <Modal visible={menuVisible} transparent animationType="fade" onRequestClose={() => setMenuVisible(false)}>
             <Pressable style={{ flex: 1 }} onPress={() => setMenuVisible(false)}>
-              <View style={{
-                position: 'absolute',
-                top: Math.max(insets.top, 24) + 45,
-                right: spacing.lg,
-                backgroundColor: colors.surface,
-                borderRadius: radius.md,
-                borderWidth: 1,
-                borderColor: colors.border,
-                width: 170,
-                ...shadows.medium,
-                elevation: 5
-              }}>
-                <Pressable onPress={() => { setMenuVisible(false); handleEdit(); }} style={{ flexDirection: 'row', alignItems: 'center', padding: spacing.md, borderBottomWidth: 1, borderBottomColor: colors.border }}>
+              <View style={{ position: 'absolute', top: Math.max(insets.top, 24) + 45, right: spacing.lg, backgroundColor: colors.surface, borderRadius: radius.md, borderWidth: 1, borderColor: colors.border, width: 170, ...shadows.medium, elevation: 5 }}>
+                <Pressable onPress={() => { setMenuVisible(false); handleEdit(); }} style={{ flexDirection: 'row', alignItems: 'center', padding: spacing.md }}>
                   <MaterialIcons name="edit" size={18} color={colors.primary} style={{ marginRight: spacing.sm }} />
                   <Text style={{ fontSize: 14, fontWeight: '700', color: colors.text }}>{t('Edit Profile')}</Text>
-                </Pressable>
-
-                <Pressable onPress={() => { setMenuVisible(false); handleDelete(); }} style={{ flexDirection: 'row', alignItems: 'center', padding: spacing.md }}>
-                  <MaterialIcons name="delete" size={18} color={colors.danger} style={{ marginRight: spacing.sm }} />
-                  <Text style={{ fontSize: 14, fontWeight: '700', color: colors.danger }}>{t('Delete Profile')}</Text>
                 </Pressable>
               </View>
             </Pressable>
@@ -225,173 +349,279 @@ export const EntityProfileScreen = ({ navigation, route }: any) => {
         </View>
       }
     >
-      <View style={{ backgroundColor: colors.surface, padding: spacing.xl, borderRadius: radius.lg, alignItems: 'center', marginBottom: spacing.lg, borderWidth: 1, borderColor: colors.border, ...shadows.soft }}>
-        <View style={{ width: 80, height: 80, borderRadius: 40, backgroundColor: colors.primarySoft, alignItems: 'center', justifyContent: 'center', marginBottom: spacing.md }}>
-          <MaterialIcons name={entity.type === 'Dealer' ? 'storefront' : 'agriculture'} size={40} color={colors.primary} />
-        </View>
-        <Text style={{ fontSize: 24, fontWeight: '900', color: colors.text, textAlign: 'center' }}>{entity.name}</Text>
-        <View style={{ backgroundColor: colors.screen, paddingHorizontal: 12, paddingVertical: 4, borderRadius: radius.pill, marginTop: 8, borderWidth: 1, borderColor: colors.border }}>
-          <Text style={{ color: colors.textMuted, fontSize: 12, fontWeight: '800', textTransform: 'uppercase' }}>{entity.type}</Text>
-        </View>
-      </View>
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 40 }}>
+        
+        {/* --- HEADER BANNER --- */}
+        <View style={{ backgroundColor: colors.surface, padding: spacing.xl, borderRadius: radius.lg, alignItems: 'center', marginBottom: spacing.lg, borderWidth: 1, borderColor: colors.border, ...shadows.soft }}>
+          <View style={{ width: 80, height: 80, borderRadius: 40, backgroundColor: colors.primarySoft, alignItems: 'center', justifyContent: 'center', marginBottom: spacing.md }}>
+            <MaterialIcons name={entity.type === 'Dealer' ? 'storefront' : 'agriculture'} size={40} color={colors.primary} />
+          </View>
+          <Text style={{ fontSize: 24, fontWeight: '900', color: colors.text, textAlign: 'center' }}>{entity.name}</Text>
 
-      <View style={{ flexDirection: 'row', gap: spacing.md, marginBottom: spacing.lg }}>
-        <View style={{ flex: 1, backgroundColor: colors.surface, padding: spacing.lg, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.border, ...shadows.soft, alignItems: 'center' }}>
-          <MaterialIcons name="speed" size={28} color={getScoreColor(entity.score)} style={{ marginBottom: 8 }} />
-          <Text style={{ fontSize: 26, fontWeight: '900', color: getScoreColor(entity.score) }}>{entity.score}</Text>
-          <Text style={{ fontSize: 11, fontWeight: '800', color: colors.textMuted, marginTop: 4 }}>{t('PROFILE SCORE')}</Text>
-        </View>
-        <View style={{ flex: 1, backgroundColor: colors.surface, padding: spacing.lg, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.border, ...shadows.soft, alignItems: 'center' }}>
-          <MaterialIcons name="location-city" size={28} color={colors.primary} style={{ marginBottom: 8 }} />
-          <Text style={{ fontSize: 15, fontWeight: '800', color: colors.text, textAlign: 'center' }} numberOfLines={2}>
-            {raw.city && raw.state ? `${raw.city}, ${raw.state}` : (entity.location || 'N/A')}
-          </Text>
-          <Text style={{ fontSize: 11, fontWeight: '800', color: colors.textMuted, marginTop: 4 }}>{t('LOCATION')}</Text>
-        </View>
-      </View>
+          <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 12, gap: spacing.sm }}>
+            <View style={{ backgroundColor: colors.screen, paddingHorizontal: 12, paddingVertical: 4, borderRadius: radius.pill, borderWidth: 1, borderColor: colors.border }}>
+              <Text style={{ color: colors.textMuted, fontSize: 12, fontWeight: '800', textTransform: 'uppercase' }}>{entity.type}</Text>
+            </View>
+            
+            <View style={{ backgroundColor: colors.screen, paddingHorizontal: 12, paddingVertical: 4, borderRadius: radius.pill, borderWidth: 1, borderColor: colors.border }}>
+              <Text style={{ color: colors.textMuted, fontSize: 12, fontWeight: '800', textTransform: 'uppercase' }}>
+                Since {raw.created_at ? new Date(raw.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : 'N/A'}
+              </Text>
+            </View>
 
-      {/* ✅ N/A fallbacks added throughout all data displays */}
-      <View style={{ backgroundColor: colors.surface, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.border, ...shadows.soft, padding: spacing.lg, marginBottom: spacing.lg }}>
-        <Text style={{ fontSize: 16, fontWeight: '900', color: colors.text, marginBottom: spacing.lg }}>{t('Basic Information')}</Text>
-        <DetailRow label="Contact Person" value={raw.owner_name} />
-        <DetailRow label="Mobile Number" value={raw.contact_mobile ? `+91 ${raw.contact_mobile}` : ''} />
-        <DetailRow label="Address" value={raw.address} />
-        <DetailRow label="Landmark" value={raw.landmark} />
-        <DetailRow label="GST Number" value={raw.gst_number} />
-        <DetailRow label="PAN Number" value={raw.pan_number} />
-        <DetailRow label="Est. Year" value={raw.est_year} />
-        <DetailRow label="Firm Type" value={raw.firm_type} />
-        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-          <Text style={{ color: colors.textMuted, fontWeight: '700' }}>{t('Onboarding Status')}</Text>
-          <View style={{ backgroundColor: '#DCFCE7', paddingHorizontal: 10, paddingVertical: 4, borderRadius: radius.sm }}>
-            <Text style={{ color: '#166534', fontWeight: '800', fontSize: 12 }}>{t('Approved')}</Text>
+            <View style={{ backgroundColor: raw.status === 'SUBMITTED' ? '#DCFCE7' : '#F1F5F9', paddingHorizontal: 12, paddingVertical: 4, borderRadius: radius.pill, borderWidth: 1, borderColor: raw.status === 'SUBMITTED' ? '#BBF7D0' : '#E2E8F0' }}>
+              <Text style={{ color: raw.status === 'SUBMITTED' ? '#166534' : colors.textMuted, fontWeight: '800', fontSize: 12, textTransform: 'uppercase' }}>
+                {raw.status === 'SUBMITTED' ? 'Approved' : 'Draft'}
+              </Text>
+            </View>
           </View>
         </View>
-      </View>
 
-      <View style={{ backgroundColor: colors.surface, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.border, ...shadows.soft, padding: spacing.lg, marginBottom: spacing.lg }}>
-        <Text style={{ fontSize: 16, fontWeight: '900', color: colors.text, marginBottom: spacing.lg }}>{t('Bank Details')}</Text>
-        <DetailRow label="Bank Name" value={raw.bank_details?.bankName} />
-        <DetailRow label="Branch" value={raw.bank_details?.bankBranch} />
-        <DetailRow label="Account Name" value={raw.bank_details?.accountName} />
-        <DetailRow label="Account Number" value={raw.bank_details?.accountNo} />
-        <DetailRow label="IFSC Code" value={raw.bank_details?.ifsc} />
-      </View>
+        {/* --- SCORE & LOCATION WIDGETS --- */}
+        <View style={{ flexDirection: 'row', gap: spacing.md, marginBottom: spacing.lg }}>
+          <View style={{ flex: 1, backgroundColor: colors.surface, padding: spacing.lg, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.border, ...shadows.soft, alignItems: 'center', justifyContent: 'space-between' }}>
+            <MaterialIcons name="speed" size={28} color={getScoreColor(entity.score)} style={{ marginBottom: 8 }} />
+            <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+              <Text style={{ fontSize: 26, fontWeight: '900', color: getScoreColor(entity.score) }}>{entity.score}</Text>
+            </View>
+            <Text style={{ fontSize: 11, fontWeight: '800', color: colors.textMuted, marginTop: 8 }}>{t('PROFILE SCORE')}</Text>
+          </View>
 
-      <View style={{ backgroundColor: colors.surface, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.border, ...shadows.soft, padding: spacing.lg, marginBottom: spacing.lg }}>
-        <Text style={{ fontSize: 16, fontWeight: '900', color: colors.text, marginBottom: spacing.lg }}>{t('Business Area & Status')}</Text>
-        <DetailRow label="Major Crops" value={raw.commitments?.majorCrops?.join(', ')} />
-        <DetailRow label="Acres Served" value={raw.commitments?.acresServed ? `${raw.commitments.acresServed} Acres` : ''} />
-        <DetailRow label="Proposed Status" value={raw.commitments?.proposedStatus} />
-        <DetailRow label="Willing Demo Farmers" value={raw.commitments?.willingDemoFarmers} />
-        
-        <Text style={{ color: colors.textMuted, fontWeight: '700', marginBottom: spacing.sm, marginTop: spacing.sm }}>Linked Distributors:</Text>
-        {raw.commitments?.linkedDistributors?.length > 0 ? (
-          raw.commitments.linkedDistributors.map((dist: any, i: number) => (
-            <Text key={i} style={{ color: colors.text, fontWeight: '700', marginBottom: 4 }}>• {dist.name} ({dist.contact})</Text>
-          ))
-        ) : (
-          <Text style={{ color: colors.text, fontWeight: '800', marginBottom: 4 }}>N/A</Text>
-        )}
-      </View>
+          <View style={{ flex: 1, backgroundColor: colors.surface, padding: spacing.lg, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.border, ...shadows.soft, alignItems: 'center', justifyContent: 'space-between' }}>
+            <MaterialIcons name="location-city" size={28} color={colors.primary} style={{ marginBottom: 8 }} />
+            <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+              <Text style={{ fontSize: 14, fontWeight: '800', color: colors.text, textAlign: 'center', lineHeight: 20 }} numberOfLines={2}>
+                {raw.primary_shop_location?.city && raw.primary_shop_location?.state ? `${raw.primary_shop_location.city}, ${raw.primary_shop_location.state}` : 'N/A'}
+              </Text>
+            </View>
+            
+            {/* Added Interactive Map Button */}
+            {gpsExt?.lat && gpsExt?.lng ? (
+              <Pressable onPress={() => Linking.openURL(`https://maps.google.com/?q=${gpsExt.lat},${gpsExt.lng}`)} style={{ flexDirection: 'row', alignItems: 'center', marginTop: 8, backgroundColor: '#EFF6FF', paddingHorizontal: 10, paddingVertical: 4, borderRadius: radius.pill, borderWidth: 1, borderColor: '#BFDBFE' }}>
+                <MaterialIcons name="map" size={14} color="#2563EB" style={{ marginRight: 4 }} />
+                <Text style={{ fontSize: 11, fontWeight: '800', color: "#2563EB" }}>VIEW ON MAP</Text>
+              </Pressable>
+            ) : (
+              <Text style={{ fontSize: 11, fontWeight: '800', color: colors.textMuted, marginTop: 8 }}>{t('LOCATION')}</Text>
+            )}
+          </View>
+        </View>
 
-      <View style={{ backgroundColor: colors.surface, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.border, ...shadows.soft, padding: spacing.lg, marginBottom: spacing.lg }}>
-        <Text style={{ fontSize: 16, fontWeight: '900', color: colors.text, marginBottom: spacing.lg }}>{t('Scoring Breakdown')}</Text>
-        <DetailRow label="Financial Health" value={`${raw.scoring?.financial || 0} / 10`} />
-        <DetailRow label="Market Reputation" value={`${raw.scoring?.reputation || 0} / 10`} />
-        <DetailRow label="Operations & Infra" value={`${raw.scoring?.operations || 0} / 10`} />
-        <DetailRow label="Farmer Network" value={`${raw.scoring?.farmerNetwork || 0} / 10`} />
-        <DetailRow label="Team & Professionalism" value={`${raw.scoring?.team || 0} / 10`} />
-        <DetailRow label="Portfolio" value={`${raw.scoring?.portfolio || 0} / 10`} />
-        <DetailRow label="Experience" value={`${raw.scoring?.experience || 0} / 10`} />
-        <DetailRow label="Growth Orientation" value={`${raw.scoring?.growth || 0} / 10`} />
-        
-        {raw.scoring?.redFlags ? (
-          <View style={{ backgroundColor: '#FEE2E2', padding: spacing.md, borderRadius: radius.sm, marginTop: spacing.sm }}>
+        {/* --- 1. BUSINESS PROFILE --- */}
+        <SectionCard title="1. Business Profile" icon="business-center">
+          <DetailRow label="Primary Shop Name" value={raw.primary_shop_name} />
+          <DetailRow label="Contact Person" value={raw.contact_person} />
+          <DetailRow label="Owner(s) / Partner(s)" value={<PillList items={raw.owners_list || []} />} />
+          <DetailRow label="Mobile Number" value={raw.contact_mobile ? <ActionablePhone phone={raw.contact_mobile} /> : ''} />
+          <DetailRow label="Landline Number" value={raw.landline_number} />
+          <DetailRow label="Primary Address" value={raw.primary_address} isVertical />
+          <DetailRow label="Landmark" value={raw.landmark} />
+          <DetailRow label="Firm Type" value={raw.firm_type} />
+          <DetailRow label="Established Year" value={raw.est_year} />
+          <DetailRow label="GST Number" value={raw.gst_number} />
+          <DetailRow label="PAN Number" value={raw.pan_number} />
+        </SectionCard>
+
+        {/* --- 2. BANK DETAILS --- */}
+        <SectionCard title="2. Bank Details" icon="account-balance">
+          {banks.length > 0 ? banks.map((bank: any, i: number) => (
+            <View key={i} style={{ backgroundColor: '#F8FAFC', padding: spacing.md, borderRadius: radius.md, borderWidth: 1, borderColor: '#E2E8F0', marginBottom: i !== banks.length - 1 ? spacing.md : 0 }}>
+              <Text style={{ fontSize: 14, fontWeight: '800', color: colors.text, marginBottom: spacing.sm }}>Account {i + 1} <Text style={{ color: colors.textMuted }}>({bank.accountType || 'Unknown Type'})</Text></Text>
+              <DetailRow label="Bank Name" value={bank.bankName} />
+              <DetailRow label="Branch" value={bank.bankBranch} />
+              <DetailRow label="A/C Name" value={bank.accountName} />
+              <DetailRow label="A/C Number" value={bank.accountNumber} />
+              <DetailRow label="IFSC Code" value={bank.bankIfsc} />
+            </View>
+          )) : <Text style={{ color: colors.textMuted, fontWeight: '600', fontStyle: 'italic' }}>No bank details recorded.</Text>}
+        </SectionCard>
+
+        {/* --- 3. PROFILING & EVALUATION --- */}
+        <SectionCard title="3. Profiling & Evaluation" icon="assignment-turned-in">
+          <ScoreRow label="Financial Health" score={scoring.financial || 0} remark={scoring.remarks?.financial} audio={scoring.audio?.financial} />
+          <ScoreRow label="Market Reputation" score={scoring.reputation || 0} remark={scoring.remarks?.reputation} audio={scoring.audio?.reputation} />
+          <ScoreRow label="Operations & Infra" score={scoring.operations || 0} remark={scoring.remarks?.operations} audio={scoring.audio?.operations} />
+          <ScoreRow label="Farmer Network" score={scoring.farmerNetwork || 0} remark={scoring.remarks?.farmerNetwork} audio={scoring.audio?.farmerNetwork} />
+          <ScoreRow label="Team & Professionalism" score={scoring.team || 0} remark={scoring.remarks?.team} audio={scoring.audio?.team} />
+          <ScoreRow label="Portfolio Alignment" score={scoring.portfolio || 0} remark={scoring.remarks?.portfolio} audio={scoring.audio?.portfolio} />
+          <ScoreRow label="Experience" score={scoring.experience || 0} remark={scoring.remarks?.experience} audio={scoring.audio?.experience} />
+          <ScoreRow label="Growth Orientation" score={scoring.growth || 0} remark={scoring.remarks?.growth} audio={scoring.audio?.growth} />
+          
+          <View style={{ backgroundColor: '#FEF2F2', padding: spacing.md, borderRadius: radius.md, borderWidth: 1, borderColor: '#FECACA', marginTop: spacing.sm }}>
             <Text style={{ color: '#991B1B', fontWeight: '800', marginBottom: 4 }}>Red Flags Noted:</Text>
-            <Text style={{ color: '#991B1B', fontWeight: '500' }}>{raw.scoring.redFlags}</Text>
+            <Text style={{ color: '#991B1B', fontWeight: '600', fontSize: 13, marginBottom: scoring.audio?.redFlags ? 8 : 0 }}>{scoring.redFlags || 'None Reported'}</Text>
+            <AudioLink url={scoring.audio?.redFlags} label="Play Alert Audio" />
           </View>
-        ) : (
-          <DetailRow label="Red Flags Noted" value="N/A" />
-        )}
-      </View>
+        </SectionCard>
 
-      <View style={{ backgroundColor: colors.surface, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.border, ...shadows.soft, padding: spacing.lg, marginBottom: spacing.xl }}>
-        <Text style={{ fontSize: 16, fontWeight: '900', color: colors.text, marginBottom: spacing.lg }}>{t('Commitments & Compliance')}</Text>
-        
-        <Text style={{ color: colors.textMuted, fontWeight: '700', marginBottom: spacing.sm }}>GLS Commitments Accepted:</Text>
-        {raw.commitments?.glsCommitments?.length > 0 ? raw.commitments.glsCommitments.map((item: string, i: number) => (
-          <Text key={i} style={{ color: colors.text, fontWeight: '600', marginBottom: 6 }}>✓ {item}</Text>
-        )) : <Text style={{ color: colors.text, fontWeight: '800', marginBottom: 6 }}>N/A</Text>}
+        {/* --- 4. BUSINESS INFRA & STATUS --- */}
+        <SectionCard title="4. Business Infrastructure" icon="store">
+          <DetailRow label="Proposed Status" value={raw.proposed_status} />
+          <DetailRow label="Willing Demo Farmers" value={raw.demo_farmers_data?.willing} />
+          
+          {/* Actionable Map component for GPS Coordinates */}
+          {gpsExt && <DetailRow label="GPS Coordinates" value={<ActionableMap lat={gpsExt.lat} lng={gpsExt.lng} label={`${gpsExt.lat.toFixed(5)}, ${gpsExt.lng.toFixed(5)}`} />} />}
 
-        <View style={{ height: 1, backgroundColor: colors.border, marginVertical: spacing.md }} />
+          <Text style={{ color: colors.textMuted, fontWeight: '700', marginTop: spacing.md, marginBottom: spacing.sm }}>Linked Distributors:</Text>
+          {linkedDistributors.length > 0 ? linkedDistributors.map((d: any, i: number) => (
+            <View key={i} style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 4 }}>
+              <MaterialIcons name="link" size={16} color={colors.primary} style={{ marginRight: 6 }} />
+              <Text style={{ color: colors.text, fontWeight: '700' }}>{d.name} <Text style={{ color: colors.textMuted }}>({d.contact})</Text></Text>
+            </View>
+          )) : <Text style={{ color: colors.text, fontWeight: '700' }}>N/A</Text>}
 
-        <Text style={{ color: colors.textMuted, fontWeight: '700', marginBottom: spacing.sm }}>Regulatory Documents Verified:</Text>
-        {raw.commitments?.complianceChecklist?.length > 0 ? raw.commitments.complianceChecklist.map((item: string, i: number) => (
-          <Text key={i} style={{ color: colors.text, fontWeight: '600', marginBottom: 6 }}>✓ {item}</Text>
-        )) : <Text style={{ color: colors.text, fontWeight: '800', marginBottom: 6 }}>N/A</Text>}
-      </View>
+          {addShops.length > 0 && (
+            <View style={{ marginTop: spacing.lg }}>
+              <Text style={{ color: colors.primary, fontWeight: '800', marginBottom: spacing.sm }}>Additional Shops ({addShops.length})</Text>
+              {addShops.map((s: any, i: number) => (
+                <View key={i} style={{ backgroundColor: '#F8FAFC', padding: spacing.sm, borderRadius: radius.sm, marginBottom: 8, borderWidth: 1, borderColor: '#E2E8F0' }}>
+                  <Text style={{ fontWeight: '800', color: colors.text }}>{s.shopName} <Text style={{ fontWeight: '500', color: colors.textMuted }}>({s.estYear})</Text></Text>
+                  <Text style={{ fontSize: 12, color: colors.textMuted, marginTop: 2 }}>{s.address}, {s.city}</Text>
+                </View>
+              ))}
+            </View>
+          )}
 
-      <View style={{ backgroundColor: colors.surface, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.border, ...shadows.soft, padding: spacing.lg, marginBottom: spacing.xl }}>
-        <Text style={{ fontSize: 16, fontWeight: '900', color: colors.text, marginBottom: spacing.lg }}>{t('Uploaded Documents')}</Text>
-        
-        {raw.documents && Object.keys(raw.documents).length > 0 ? (
-          Object.entries(raw.documents).flatMap(([key, val]) => {
-            const urls = Array.isArray(val) ? val : [val];
-            return urls.map((url, index) => {
-              const isPdf = typeof url === 'string' && (url.toLowerCase().endsWith('.pdf') || url.includes('/raw/upload'));
-              return (
-                <Pressable 
-                  key={`${key}-${index}`} 
-                  onPress={() => handleViewDocument(key, url as string)}
-                  style={{ flexDirection: 'row', alignItems: 'center', marginBottom: spacing.md }}
-                >
-                  <MaterialIcons name={isPdf ? "file-download" : "image"} size={20} color={colors.primary} style={{ marginRight: 8 }} />
-                  <Text style={{ color: colors.primary, fontWeight: '700', fontSize: 14, textDecorationLine: 'underline' }}>
-                    {key.toUpperCase().replace(/_/g, ' ')} {Array.isArray(val) ? `(${index + 1})` : ''}
-                  </Text>
-                </Pressable>
-              );
-            });
-          })
-        ) : (
-          <Text style={{ color: colors.textMuted, fontWeight: '500' }}>N/A</Text>
-        )}
-      </View>
+          {godowns.length > 0 && (
+            <View style={{ marginTop: spacing.md }}>
+              <Text style={{ color: colors.primary, fontWeight: '800', marginBottom: spacing.sm }}>Godowns ({godowns.length})</Text>
+              {godowns.map((g: any, i: number) => (
+                <View key={i} style={{ backgroundColor: '#F8FAFC', padding: spacing.sm, borderRadius: radius.sm, marginBottom: 8, borderWidth: 1, borderColor: '#E2E8F0' }}>
+                  <Text style={{ fontWeight: '800', color: colors.text }}>Capacity: {g.capacity} {g.capacityUnit}</Text>
+                  <Text style={{ fontSize: 12, color: colors.textMuted, marginTop: 2 }}>{g.address}</Text>
+                </View>
+              ))}
+            </View>
+          )}
+        </SectionCard>
 
-      <View style={{ marginBottom: spacing.lg }}>
-        {raw.pdf_url ? (
-          <View style={{ flexDirection: 'row', gap: spacing.md, marginBottom: spacing.md }}>
-            <Pressable onPress={handleDownloadPDF} disabled={downloading} style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', height: 48, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.primary, borderRadius: radius.md }}>
-              {downloading ? <ActivityIndicator color={colors.primary} /> : (
-                <><MaterialIcons name="file-download" size={20} color={colors.primary} style={{ marginRight: 8 }} /><Text style={{ color: colors.primary, fontWeight: '700' }}>Download</Text></>
-              )}
-            </Pressable>
-            <Pressable onPress={handleSharePDF} disabled={sharing} style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', height: 48, backgroundColor: colors.primary, borderRadius: radius.md }}>
-              {sharing ? <ActivityIndicator color="#FFF" /> : (
-                <><MaterialIcons name="share" size={20} color="#FFF" style={{ marginRight: 8 }} /><Text style={{ color: "#FFF", fontWeight: '700' }}>Share</Text></>
-              )}
-            </Pressable>
+        {/* --- 5. COMMERCIAL ANNEXURES --- */}
+        <SectionCard title="5. Commercial Annexures" icon="request-quote">
+          
+          <Text style={{ color: colors.primary, fontWeight: '800', marginBottom: spacing.sm }}>Territory Coverage</Text>
+          {annexures.territories?.map((t: any, i: number) => (
+            <View key={i} style={{ backgroundColor: '#F8FAFC', padding: spacing.sm, borderRadius: radius.sm, marginBottom: spacing.md, borderWidth: 1, borderColor: '#E2E8F0' }}>
+              <Text style={{ fontWeight: '800', color: colors.text }}>{t.taluka}</Text>
+              <Text style={{ fontSize: 12, color: colors.textMuted, marginTop: 2 }}>Villages: {t.village?.join(', ') || 'N/A'}</Text>
+              <Text style={{ fontSize: 12, color: colors.textMuted, marginTop: 2 }}>{t.cultivableArea} Acres | {t.majorCrops?.join(', ')}</Text>
+            </View>
+          ))}
+
+          <DetailRow label="Principal Suppliers" value={<PillList items={annexures.principalSuppliers || []} align="flex-start" />} isVertical />
+          <DetailRow label="Chemical Range" value={<PillList items={annexures.chemicalProducts || []} align="flex-start" />} isVertical />
+          <DetailRow label="Bio/Organic Range" value={<PillList items={annexures.bioProducts || []} align="flex-start" />} isVertical />
+          <DetailRow label="Other Products" value={<PillList items={annexures.otherProducts || []} align="flex-start" />} isVertical />
+          
+          <DetailRow label="Will Share Sales Data?" value={annexures.willShareSales ? 'Yes, Confirmed' : 'Not Confirmed'} />
+          
+          <View style={{ marginBottom: spacing.md }}>
+            <Text style={{ color: colors.textMuted, fontWeight: '700', marginBottom: 4 }}>2-Year Growth Vision</Text>
+            <Text style={{ color: colors.text, fontWeight: '600', fontStyle: 'italic', marginBottom: annexures.growthVisionAudio ? 4 : 0 }}>"{annexures.growthVision || 'N/A'}"</Text>
+            <AudioLink url={annexures.growthVisionAudio} />
           </View>
-        ) : (
-          <View style={{ marginBottom: spacing.md }}><Button label="Generate PDF Dossier" variant="secondary" onPress={handleEdit} /></View>
-        )}
-      </View>
 
+          <Text style={{ color: colors.textMuted, fontWeight: '700', marginBottom: spacing.sm, marginTop: spacing.md }}>Credit References:</Text>
+          {annexures.hasCreditReferences === 'Yes' && annexures.creditReferences?.length > 0 ? annexures.creditReferences.map((ref: any, i: number) => (
+            <View key={i} style={{ backgroundColor: '#F8FAFC', padding: spacing.sm, borderRadius: radius.sm, marginBottom: 8, borderWidth: 1, borderColor: '#E2E8F0' }}>
+              <Text style={{ fontWeight: '800', color: colors.text }}>{ref.name} <Text style={{ fontWeight: '500', color: colors.textMuted }}>({ref.contact})</Text></Text>
+              {ref.behavior && <Text style={{ fontSize: 12, color: colors.textMuted, marginTop: 4, fontStyle: 'italic' }}>"{ref.behavior}"</Text>}
+              <AudioLink url={ref.behaviorAudio} label="Reference Audio" />
+            </View>
+          )) : <Text style={{ color: colors.text, fontWeight: '700', marginBottom: spacing.md }}>N/A</Text>}
+
+          <DetailRow label="Security Deposit" value={annexures.securityDeposit ? `₹ ${annexures.securityDeposit}` : 'N/A'} />
+          <DetailRow label="Payment Media Proof" value={raw.documents?.se_payment_proof ? 'Uploaded ✓' : 'N/A'} />
+          <DetailRow label="Payment Reference / Cheque No." value={annexures.paymentProofText} />
+
+        </SectionCard>
+
+        {/* --- 6. COMPLIANCE & MEDIA --- */}
+        <SectionCard title="6. Compliance & Media Attachments" icon="verified-user">
+          <Text style={{ color: colors.textMuted, fontWeight: '700', marginBottom: spacing.sm }}>GLS Commitments Accepted:</Text>
+          {raw.commitments?.glsCommitments?.length > 0 ? raw.commitments.glsCommitments.map((item: string, i: number) => (
+            <Text key={i} style={{ color: colors.text, fontWeight: '600', marginBottom: 6 }}>✓ {item}</Text>
+          )) : <Text style={{ color: colors.text, fontWeight: '800', marginBottom: spacing.md }}>N/A</Text>}
+
+          <View style={{ height: 1, backgroundColor: colors.border, marginVertical: spacing.md }} />
+
+          <Text style={{ color: colors.textMuted, fontWeight: '700', marginBottom: spacing.sm }}>Regulatory Documents Verified:</Text>
+          {raw.commitments?.complianceChecklist?.length > 0 ? raw.commitments.complianceChecklist.map((item: string, i: number) => (
+            <Text key={i} style={{ color: colors.text, fontWeight: '600', marginBottom: 6 }}>✓ {item}</Text>
+          )) : <Text style={{ color: colors.text, fontWeight: '800', marginBottom: spacing.md }}>N/A</Text>}
+
+          <View style={{ height: 1, backgroundColor: colors.border, marginVertical: spacing.md }} />
+
+          <Text style={{ color: colors.primary, fontWeight: '800', marginBottom: spacing.md }}>Uploaded Documents Directory</Text>
+          {raw.documents && Object.keys(raw.documents).length > 0 ? (
+            Object.entries(raw.documents).flatMap(([key, val]) => {
+              const urls = Array.isArray(val) ? val : [val];
+              return urls.map((url, index) => {
+                if(!url) return null;
+                const isPdf = typeof url === 'string' && (url.toLowerCase().endsWith('.pdf') || url.includes('/raw/upload') || url.match(/\.(doc|docx|xls|xlsx|csv)$/i));
+                return (
+                  <Pressable key={`${key}-${index}`} onPress={() => handleViewDocument(key, url as string)} style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#F8FAFC', padding: spacing.md, borderRadius: radius.md, borderWidth: 1, borderColor: '#E2E8F0', marginBottom: 8 }}>
+                    <MaterialIcons name={isPdf ? "picture-as-pdf" : "image"} size={24} color={colors.primary} style={{ marginRight: 12 }} />
+                    <Text style={{ color: colors.text, fontWeight: '700', fontSize: 14, flex: 1 }}>{key.toUpperCase().replace(/_/g, ' ')} {Array.isArray(val) ? `(${index + 1})` : ''}</Text>
+                    {downloading ? <ActivityIndicator size="small" color={colors.primary} /> : <MaterialIcons name="open-in-new" size={20} color={colors.textMuted} />}
+                  </Pressable>
+                );
+              });
+            })
+          ) : <Text style={{ color: colors.textMuted, fontWeight: '600', fontStyle: 'italic' }}>No documents uploaded.</Text>}
+        </SectionCard>
+
+        {/* --- 7. SIGNATURES --- */}
+        <SectionCard title="7. Signatures & Approvals" icon="draw">
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+            <View style={{ flex: 1, alignItems: 'center' }}>
+              <View style={{ width: 60, height: 60, borderRadius: 30, backgroundColor: raw.dealer_signature ? '#DCFCE7' : '#FEE2E2', justifyContent: 'center', alignItems: 'center', marginBottom: 8 }}>
+                <MaterialIcons name={raw.dealer_signature ? "check" : "close"} size={30} color={raw.dealer_signature ? "#166534" : "#991B1B"} />
+              </View>
+              <Text style={{ fontSize: 12, fontWeight: '800', color: colors.text, textAlign: 'center' }}>Dealer</Text>
+              <Text style={{ fontSize: 10, color: colors.textMuted, marginTop: 2 }}>{raw.dealer_signature ? 'Digitally Signed' : 'Pending'}</Text>
+            </View>
+            
+            <View style={{ height: 40, width: 1, backgroundColor: colors.border }} />
+
+            <View style={{ flex: 1, alignItems: 'center' }}>
+              <View style={{ width: 60, height: 60, borderRadius: 30, backgroundColor: raw.se_signature ? '#DCFCE7' : '#FEE2E2', justifyContent: 'center', alignItems: 'center', marginBottom: 8 }}>
+                <MaterialIcons name={raw.se_signature ? "check" : "close"} size={30} color={raw.se_signature ? "#166534" : "#991B1B"} />
+              </View>
+              <Text style={{ fontSize: 12, fontWeight: '800', color: colors.text, textAlign: 'center' }}>Sales Executive</Text>
+              <Text style={{ fontSize: 10, color: colors.textMuted, marginTop: 2 }}>{raw.se_signature ? 'Digitally Signed' : 'Pending'}</Text>
+            </View>
+          </View>
+        </SectionCard>
+
+        {/* --- PDF ACTIONS --- */}
+        <View style={{ marginTop: spacing.lg }}>
+          {raw.pdf_url ? (
+            <View style={{ flexDirection: 'row', gap: spacing.md }}>
+              <Pressable onPress={handleDownloadPDF} disabled={downloading} style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', height: 50, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.primary, borderRadius: radius.md, ...shadows.soft }}>
+                {downloading ? <ActivityIndicator color={colors.primary} /> : (
+                  <><MaterialIcons name="file-download" size={20} color={colors.primary} style={{ marginRight: 8 }} /><Text style={{ color: colors.primary, fontWeight: '800' }}>Download PDF</Text></>
+                )}
+              </Pressable>
+              <Pressable onPress={handleSharePDF} disabled={sharing} style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', height: 50, backgroundColor: colors.primary, borderRadius: radius.md, ...shadows.soft }}>
+                {sharing ? <ActivityIndicator color="#FFF" /> : (
+                  <><MaterialIcons name="share" size={20} color="#FFF" style={{ marginRight: 8 }} /><Text style={{ color: "#FFF", fontWeight: '800' }}>Share PDF</Text></>
+                )}
+              </Pressable>
+            </View>
+          ) : (
+            <Button label="Generate PDF Dossier" variant="secondary" onPress={handleEdit} />
+          )}
+        </View>
+
+      </ScrollView>
+
+      {/* --- IMAGE VIEWER MODAL --- */}
       <Modal visible={!!viewerDoc} transparent animationType="fade" onRequestClose={() => setViewerDoc(null)}>
         <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.95)', justifyContent: 'center', alignItems: 'center' }}>
-          <Pressable 
-            style={{ position: 'absolute', top: Math.max(insets.top, 20), right: 20, zIndex: 10, padding: 8, backgroundColor: 'rgba(255,255,255,0.2)', borderRadius: 20 }} 
-            onPress={() => setViewerDoc(null)}
-          >
+          <Pressable style={{ position: 'absolute', top: Math.max(insets.top, 20), right: 20, zIndex: 10, padding: 8, backgroundColor: 'rgba(255,255,255,0.2)', borderRadius: 20 }} onPress={() => setViewerDoc(null)}>
             <MaterialIcons name="close" size={28} color="#FFF" />
           </Pressable>
-          {viewerDoc && (
-            <Image 
-              source={{ uri: viewerDoc }} 
-              style={{ width: '100%', height: '80%', resizeMode: 'contain' }} 
-            />
-          )}
+          {viewerDoc && <Image source={{ uri: viewerDoc }} style={{ width: '100%', height: '80%', resizeMode: 'contain' }} />}
         </View>
       </Modal>
 

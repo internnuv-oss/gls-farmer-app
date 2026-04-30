@@ -1,3 +1,4 @@
+import i18n from "../../../core/i18n";
 import { supabase } from "../../../core/supabase";
 import { translateText } from "../../../core/translationService";
 
@@ -9,7 +10,7 @@ export async function fetchOnboardedCount() {
   return count ?? 0;
 }
 
-export const fetchMyDealers = async (userId: string, page: number = 0, limit: number = 10, targetLang: string = 'en') => {
+export const fetchMyDealers = async (userId: string, page: number = 0, limit: number = 5) => { // Updated limit to 5
   const from = page * limit;
   const to = from + limit - 1;
 
@@ -24,17 +25,17 @@ export const fetchMyDealers = async (userId: string, page: number = 0, limit: nu
   if (!data) return [];
 
   // If language is English, just return the data immediately
-  if (targetLang === 'en') return data;
+  if (i18n.language === 'en') return data;
 
   // 🚀 Translate dynamic fields on the fly using Promise.all to do it in parallel
   const translatedData = await Promise.all(data.map(async (dealer) => {
     return {
       ...dealer,
-      shop_name: await translateText(dealer.shop_name, targetLang),
-      city: await translateText(dealer.city, targetLang),
-      state: await translateText(dealer.state, targetLang),
-      firm_type: await translateText(dealer.firm_type, targetLang),
-      owner_name: await translateText(dealer.owner_name, targetLang),
+      shop_name: await translateText(dealer.shop_name, i18n.language),
+      city: await translateText(dealer.city, i18n.language),
+      state: await translateText(dealer.state, i18n.language),
+      firm_type: await translateText(dealer.firm_type, i18n.language),
+      owner_name: await translateText(dealer.owner_name, i18n.language),
     };
   }));
 

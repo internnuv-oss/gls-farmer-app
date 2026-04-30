@@ -1,0 +1,28 @@
+---
+alwaysApply: true
+---
+
+
+---
+description: Strict frontend UI guidelines, Design Tokens, Templates inventory, and Component usage.
+globs: ["src/design-system/**/*.ts", "src/**/*.tsx"]
+---
+# FRONTEND DESIGN SYSTEM & UI RULES
+
+## DESIGN TOKENS
+- Primary: Earthy Green (`#2E7D32`)
+- Secondary: Warm Orange (`#F57C00`)
+- Cards: Pure White with `shadows.soft`.
+- Hide all scrollbars globally (`showsVerticalScrollIndicator={false}`).
+
+## TEMPLATE USAGE (MANDATORY)
+- Never build a screen from scratch.
+- Wrap multi-step forms in `WizardFlowTemplate`.
+- Wrap basic views in `SimpleScreenTemplate`.
+- Wrap dashboard views in `DashboardScreenTemplate`.
+
+## MICRO-INTERACTIONS
+- Use Skeleton loaders when fetching from Supabase.
+- Add active states to Buttons and Selection Cards.
+- Implement Toast/Alerts for success/error handling.
+- Use `lucide-react` or `MaterialIcons` extensively.
