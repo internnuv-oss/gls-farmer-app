@@ -1,6 +1,6 @@
-# 🌱 FarmerApp - Sales Executive Portal
+# 🌱 Field Commander
 
-FarmerApp is a comprehensive, mobile-first React Native application built for Sales Executives (SE). It streamlines the onboarding and management process for Agricultural Dealers, Distributors, and Farmers. 
+Field Commander is a comprehensive, mobile-first React Native application built for Sales Executives (SE). It streamlines the onboarding and management process for Agricultural Dealers, Distributors, and Farmers. 
 
 With offline-first draft capabilities, rich media uploads, dynamic PDF dossier generation, and a Supabase backend, it serves as the ultimate on-the-go tool for field executives.
 
@@ -29,7 +29,7 @@ With offline-first draft capabilities, rich media uploads, dynamic PDF dossier g
 
 ## 📁 Folder Structure
 ```text
-FarmerApp/
+FieldCommander/
 ├── .cursor/               # Cursor IDE specific configurations
 ├── Frontend/              # React Native Expo Application
 │   ├── assets/            # Static images and icons
@@ -58,8 +58,8 @@ Make sure you have the following installed:
 
 ### 2. Clone the repository
 ```bash
-git clone https://github.com/your-username/FarmerApp.git
-cd FarmerApp/Frontend
+git clone https://github.com/your-username/gls-farmer-app.git
+cd FieldCommander/Frontend
 ```
 
 ### 3. Install Dependencies
