@@ -19,10 +19,15 @@ type Props = {
 };
 
 export const AudioRecorder: React.FC<Props> = ({ value, loading, onRecord, onClear }) => {
-  const audioRecorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
+  const audioRecorder = useAudioRecorder(RecordingPresets.LOW_QUALITY);
   const recorderState = useAudioRecorderState(audioRecorder);
 
-  const player = useAudioPlayer(value || null);
+  const audioSource = React.useMemo(() => {
+    if (!value) return null;
+    return value.startsWith('http') ? { uri: value } : value;
+  }, [value]);
+  
+  const player = useAudioPlayer(audioSource);
   const playerStatus = useAudioPlayerStatus(player);
 
   // Local state for recording timer & animation

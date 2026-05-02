@@ -32,7 +32,7 @@ export const Step5Documents = ({ form, uploading, handleUpload }: Step5Props) =>
       </View>
 
       <View style={{ marginBottom: spacing.md }}>
-  <Text style={{ fontWeight: '700', fontSize: 14, marginBottom: 8, color: colors.text }}>{t("Aadhar Card (Front & Back) *")}</Text>
+  <Text style={{ fontWeight: '700', fontSize: 14, marginBottom: 8, color: colors.text }}>{t("Aadhar Card *")}</Text>
   <UploadTile 
     value={watch('documents')?.aadharCard} 
     loading={uploading['aadharCard']} 

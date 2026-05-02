@@ -33,14 +33,21 @@ export const Step1BasicInfo = ({ form, cities, talukas, villages, loadingLoc }: 
   const owners = watch('owners') || [{ name: '' }];
   const banks = watch('bankAccounts') || [{ accountType: '', accountName: '', accountNumber: '', bankIfsc: '', bankName: '', bankBranch: '' }];
 
-  // Auto-inject additional slots if Proprietorship/Partnership is selected
+  // Auto-manage additional slots based on Firm Type
   React.useEffect(() => {
     const currentOwners = getValues('owners') || [{ name: '' }];
     const currentBanks = getValues('bankAccounts') || [{ accountType: '', accountName: '', accountNumber: '', bankIfsc: '', bankName: '', bankBranch: '' }];
+    
     if (isMultiAllowed) {
-      if (currentOwners.length === 1) setValue('owners', [...currentOwners, { name: '' }]);
-      if (currentBanks.length === 1) setValue('bankAccounts', [...currentBanks, { accountType: '', accountName: '', accountNumber: '', bankIfsc: '', bankName: '', bankBranch: '' }]);
+      // Keep the original multiple owners auto-injection exactly as it was
+      if (currentOwners.length === 1) {
+        setValue('owners', [...currentOwners, { name: '' }]);
+      }
+      
+      // We removed the auto-injection for bankAccounts here. 
+      // Additional bank accounts will now rely entirely on the manual "+ Add Another Bank Account" button.
     } else {
+      // Strip arrays down to 1 if they switch to a firm type that restricts multiple entries
       if (currentOwners.length > 1) setValue('owners', [currentOwners[0]]);
       if (currentBanks.length > 1) setValue('bankAccounts', [currentBanks[0]]);
     }

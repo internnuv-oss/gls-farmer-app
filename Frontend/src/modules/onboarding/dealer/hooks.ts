@@ -8,7 +8,9 @@ import * as Location from 'expo-location';
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
 import * as FileSystem from 'expo-file-system';
+import { documentDirectory, copyAsync } from 'expo-file-system/legacy';
 import { AppState } from "react-native";
+import * as ImageManipulator from 'expo-image-manipulator';
 
 
 import { requestMediaPermission, requestCameraPermission } from "../../../core/permissions";
@@ -17,6 +19,7 @@ import { useAuthStore } from "../../../store/authStore";
 import { uploadFileToCloudinary } from "../services/cloudinaryService";
 import { saveDealerOnboarding, mapDealerDbToForm, updateDealerPdfUrl } from "../services/onboardingService";
 import { dealerOnboardingSchema, DealerOnboardingValues, GLS_COMMITMENTS } from "./schema";
+import { useAlertStore } from "../../../store/alertStore";
 
 export function useDealerOnboarding(navigation: any, route: any) {
   const user = useAuthStore((s) => s.user);
@@ -49,24 +52,32 @@ export function useDealerOnboarding(navigation: any, route: any) {
     }
   };
 
+  // --- NEW: Add a ref to track success reliably for the cleanup function ---
+  const showSuccessRef = useRef(showSuccess);
+  useEffect(() => { 
+    showSuccessRef.current = showSuccess; 
+  }, [showSuccess]);
+
   useEffect(() => {
     // Save when app is pushed to the background
     const subscription = AppState.addEventListener("change", nextAppState => {
       if (nextAppState === "inactive" || nextAppState === "background") {
-        autoSave();
+        if (!showSuccessRef.current) autoSave();
       }
     });
 
     // Save when user abruptly navigates away
     return () => {
       subscription.remove();
-      if (!showSuccess) autoSave(); // Don't save a draft if they just successfully submitted it
+      // Use the ref to ensure we read the latest state, preventing the closure trap!
+      if (!showSuccessRef.current) autoSave(); 
     };
-  }, [showSuccess, editData]);
+  // We removed showSuccess from the dependency array because we rely on the ref now
+  }, [editData]);
 
   const saveDraft = () => {
     autoSave();
-    Alert.alert("Saved", "Dealer onboarding saved as draft.");
+    useAlertStore.getState().showAlert("Saved", "Dealer onboarding saved as draft.");
     navigation.goBack();
   };
   
@@ -284,7 +295,7 @@ export function useDealerOnboarding(navigation: any, route: any) {
       const url = await uploadFileToCloudinary(uri, 'audio');
       form.setValue(key as any, url, { shouldValidate: true });
     } catch(e) {
-      Alert.alert("Error", "Audio upload failed.");
+      useAlertStore.getState().showAlert("Error", "Audio upload failed.");
     } finally {
       setUploading(prev => ({ ...prev, [key]: false }));
     }
@@ -296,17 +307,7 @@ export function useDealerOnboarding(navigation: any, route: any) {
     const dateObj = new Date(dateValue);
     const dateStr = dateObj.toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' });
 
-    // Helper to open documents in a native-like viewer instead of raw Cloudinary downloads
-    const getNativeViewerUrl = (url?: string) => {
-      if (!url) return '#';
-      // Route documents (PDF, Excel, Word) through Google Docs Viewer for an in-built reading experience
-      if (url.match(/\.(pdf|doc|docx|xls|xlsx|csv)$/i)) {
-        return `https://docs.google.com/viewer?url=${encodeURIComponent(url)}&embedded=true`;
-      }
-      // Return raw URL for images/audio as mobile browsers already use native media viewers for these
-      return url;
-    };
-
+    // Helper to render signature SVGs
     const renderSignature = (sigData?: string) => {
       if (!sigData) return '<span style="color:red">No Signature</span>';
       try {
@@ -316,11 +317,16 @@ export function useDealerOnboarding(navigation: any, route: any) {
           return `M ${points[0].x} ${points[0].y} ` + points.slice(1).map(p => `L ${p.x} ${p.y}`).join(' ');
         };
         const paths = strokes.map((pts: any[]) => `<path d="${toPath(pts)}" stroke="#16A34A" stroke-width="4" fill="none" stroke-linecap="round" stroke-linejoin="round" />`).join('');
-        return `<svg viewBox="0 0 400 250" style="width: 100%; max-width: 250px; height: 80px;">${paths}</svg>`;
+        // BUG FIX: Added xmlns attribute to prevent Android Webview SVG crashes
+        return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 250" style="width: 100%; max-width: 250px; height: 80px;">${paths}</svg>`;
       } catch (e) {
         return '<span style="color:red">Invalid Signature Format</span>';
       }
     };
+
+    // BUG FIX: Added xmlns attribute to inline SVGs
+    const checkIcon = `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#166534" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: -2px; margin-right: 4px;"><polyline points="20 6 9 17 4 12"></polyline></svg>`;
+    const flagIcon = `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#DC2626" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: -2px; margin-right: 4px;"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"></path><line x1="4" y1="22" x2="4" y2="15"></line></svg>`;
 
     const bandColor = scoreData.band === 'Elite' ? '#166534' : scoreData.band === 'A-Category' ? '#15803D' : scoreData.band === 'B-Category' ? '#92400E' : '#991B1B';
     const bandBg = scoreData.band === 'Elite' ? '#DCFCE7' : scoreData.band === 'A-Category' ? '#BBF7D0' : scoreData.band === 'B-Category' ? '#FEF3C7' : '#FEE2E2';
@@ -333,53 +339,40 @@ export function useDealerOnboarding(navigation: any, route: any) {
         <style>
           @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap');
           
-          /* Set consistent margins for print layout */
-          @page {
-            margin: 20mm; 
-            size: A4;
-          }
-
+          @page { margin: 20mm; size: A4; }
           body { font-family: 'Inter', Helvetica, Arial, sans-serif; color: #1E293B; margin: 0; padding: 0; line-height: 1.6; background-color: #FFFFFF; }
           .container { background-color: #FFFFFF; width: 100%; padding: 0; }
-          
           .header { border-bottom: 3px solid #16A34A; padding-bottom: 20px; margin-bottom: 30px; text-align: center; }
           .header h1 { margin: 0; color: #16A34A; font-size: 32px; text-transform: uppercase; letter-spacing: 1.5px; font-weight: 800; }
           .header p { margin: 8px 0 0; color: #64748B; font-size: 15px; }
-          
           .score-card { background: ${bandBg}; color: ${bandColor}; padding: 20px; border-radius: 8px; text-align: center; margin-bottom: 30px; border: 1px solid ${bandColor}; }
           .score-card h2 { margin: 0 0 5px 0; font-size: 24px; font-weight: 800; }
           .score-card p { margin: 0; font-size: 14px; opacity: 0.9; }
-
           .section { margin-bottom: 35px; }
           .page-break { page-break-before: always; }
-          
           .section-title { font-size: 18px; color: #16A34A; border-bottom: 2px solid #E2E8F0; padding-bottom: 8px; margin-bottom: 20px; text-transform: uppercase; font-weight: 800; }
-          
           table { width: 100%; border-collapse: collapse; font-size: 14px; background-color: #FFFFFF; }
           table, tr, td, th { page-break-inside: avoid; } 
           th, td { padding: 12px 16px; text-align: left; border-bottom: 1px solid #E2E8F0; vertical-align: top; }
           th { width: 35%; color: #475569; font-weight: 600; background-color: #F1F5F9; border-right: 1px solid #E2E8F0; }
           td { color: #0F172A; font-weight: 500; }
           tr:last-child th, tr:last-child td { border-bottom: none; }
-          
           .table-wrapper { border: 1px solid #E2E8F0; border-radius: 8px; overflow: hidden; margin-bottom: 15px; }
           .sub-heading { font-size: 15px; font-weight: 700; color: #334155; margin: 20px 0 10px 0; border-left: 4px solid #16A34A; padding-left: 10px; }
-          
           .grid-2 { display: table; width: 100%; table-layout: fixed; margin-bottom: 15px; }
           .grid-col { display: table-cell; width: 50%; padding-right: 10px; vertical-align: top; }
           .grid-col:last-child { padding-right: 0; padding-left: 10px; }
-
           .list { margin: 0; padding-left: 20px; font-size: 14px; }
           .list li { margin-bottom: 6px; color: #334155; }
           .pill { display: inline-block; background-color: #E2E8F0; color: #334155; padding: 4px 10px; border-radius: 15px; font-size: 12px; font-weight: 600; margin: 2px 4px 2px 0; }
-          
           .signatures { display: table; width: 100%; margin-top: 50px; page-break-inside: avoid; }
           .sig-box { display: table-cell; width: 50%; text-align: center; }
           .sig-line { border-top: 2px solid #94A3B8; margin: 10px 60px 0; padding-top: 8px; font-weight: 800; color: #1E293B; font-size: 14px; text-transform: uppercase; }
           .sig-img { max-height: 80px; max-width: 200px; margin-bottom: 10px; }
-          
-          a { color: #2563EB; text-decoration: none; font-weight: 600; }
           .empty-text { color: #94A3B8; font-style: italic; font-weight: 400; }
+          .success-badge { color: #166534; font-weight: 800; font-size: 13px; }
+          .danger-badge { color: #DC2626; font-weight: 800; font-size: 13px; }
+          .action-link { color: #2563EB; text-decoration: none; font-weight: 700; border-bottom: 1px dashed #2563EB; }
         </style>
       </head>
       <body>
@@ -404,7 +397,13 @@ export function useDealerOnboarding(navigation: any, route: any) {
                 <tr><th>Primary Address</th><td>${data.address || '-'}<br><span style="color:#64748B; font-size:12px;">${data.village || '-'}, ${data.taluka || '-'}, ${data.city || '-'}, ${data.state || '-'}</span></td></tr>
                 <tr><th>Landmark</th><td>${data.landmark || '<span class="empty-text">N/A</span>'}</td></tr>
                 <tr><th>Owner(s) / Partner(s)</th><td>${data.owners?.map(o => `<span class="pill">${o.name}</span>`).join('') || '-'}</td></tr>
-                <tr><th>Contact Numbers</th><td>+91 ${data.contactMobile || '-'} ${data.landlineNumber ? `<br><span style="color:#64748B; font-size:12px;">Landline: ${data.landlineNumber}</span>` : ''}</td></tr>
+                
+                <!-- BUG FIX: Removed 'a href=tel:' tags to prevent Android PDF Generator crashes. The text is now just wrapped in a span for styling. Native PDF viewers will auto-link the phone numbers. -->
+                <tr><th>Contact Numbers</th><td>
+                  ${data.contactMobile ? `<a href="tel:+91${data.contactMobile}" class="action-link">+91 ${data.contactMobile}</a>` : '-'} 
+                  ${data.landlineNumber ? `<br><span style="color:#64748B; font-size:12px;">Landline: <a href="tel:${data.landlineNumber}" class="action-link">${data.landlineNumber}</a></span>` : ''}
+                </td></tr>
+                
                 <tr><th>Tax IDs</th><td><strong>GST:</strong> ${data.gstNumber || '-'}<br><strong>PAN:</strong> ${data.panNumber || '-'}</td></tr>
               </table>
             </div>
@@ -429,17 +428,18 @@ export function useDealerOnboarding(navigation: any, route: any) {
                   <td style="text-align: center; width: 15%;">Score</td>
                   <td>Remarks & Audio Evidence</td>
                 </tr>
-                <tr><th>Financial Health</th><td style="text-align: center; font-weight: 800;">${data.scoreFinancial}/10</td><td>${data.remFinancial || '<span class="empty-text">No text remarks</span>'} ${data.audioFinancial ? `<br><a href="${data.audioFinancial}">▶ Play Audio</a>` : ''}</td></tr>
-                <tr><th>Market Reputation</th><td style="text-align: center; font-weight: 800;">${data.scoreReputation}/10</td><td>${data.remReputation || '<span class="empty-text">No text remarks</span>'} ${data.audioReputation ? `<br><a href="${data.audioReputation}">▶ Play Audio</a>` : ''}</td></tr>
-                <tr><th>Operations & Infra</th><td style="text-align: center; font-weight: 800;">${data.scoreOperations}/10</td><td>${data.remOperations || '<span class="empty-text">No text remarks</span>'} ${data.audioOperations ? `<br><a href="${data.audioOperations}">▶ Play Audio</a>` : ''}</td></tr>
-                <tr><th>Farmer Network</th><td style="text-align: center; font-weight: 800;">${data.scoreFarmerNetwork}/10</td><td>${data.remFarmerNetwork || '<span class="empty-text">No text remarks</span>'} ${data.audioFarmerNetwork ? `<br><a href="${data.audioFarmerNetwork}">▶ Play Audio</a>` : ''}</td></tr>
-                <tr><th>Team & Professionalism</th><td style="text-align: center; font-weight: 800;">${data.scoreTeam}/10</td><td>${data.remTeam || '<span class="empty-text">No text remarks</span>'} ${data.audioTeam ? `<br><a href="${data.audioTeam}">▶ Play Audio</a>` : ''}</td></tr>
-                <tr><th>Portfolio Alignment</th><td style="text-align: center; font-weight: 800;">${data.scorePortfolio}/10</td><td>${data.remPortfolio || '<span class="empty-text">No text remarks</span>'} ${data.audioPortfolio ? `<br><a href="${data.audioPortfolio}">▶ Play Audio</a>` : ''}</td></tr>
-                <tr><th>Experience</th><td style="text-align: center; font-weight: 800;">${data.scoreExperience}/10</td><td>${data.remExperience || '<span class="empty-text">No text remarks</span>'} ${data.audioExperience ? `<br><a href="${data.audioExperience}">▶ Play Audio</a>` : ''}</td></tr>
-                <tr><th>Growth Orientation</th><td style="text-align: center; font-weight: 800;">${data.scoreGrowth}/10</td><td>${data.remGrowth || '<span class="empty-text">No text remarks</span>'} ${data.audioGrowth ? `<br><a href="${data.audioGrowth}">▶ Play Audio</a>` : ''}</td></tr>
+                
+                <tr><th>Financial Health</th><td style="text-align: center; font-weight: 800;">${data.scoreFinancial}/10</td><td>${data.remFinancial || '<span class="empty-text">No text remarks</span>'} ${data.audioFinancial ? `<br><span class="success-badge">${checkIcon} Audio Recorded</span>` : ''}</td></tr>
+                <tr><th>Market Reputation</th><td style="text-align: center; font-weight: 800;">${data.scoreReputation}/10</td><td>${data.remReputation || '<span class="empty-text">No text remarks</span>'} ${data.audioReputation ? `<br><span class="success-badge">${checkIcon} Audio Recorded</span>` : ''}</td></tr>
+                <tr><th>Operations & Infra</th><td style="text-align: center; font-weight: 800;">${data.scoreOperations}/10</td><td>${data.remOperations || '<span class="empty-text">No text remarks</span>'} ${data.audioOperations ? `<br><span class="success-badge">${checkIcon} Audio Recorded</span>` : ''}</td></tr>
+                <tr><th>Farmer Network</th><td style="text-align: center; font-weight: 800;">${data.scoreFarmerNetwork}/10</td><td>${data.remFarmerNetwork || '<span class="empty-text">No text remarks</span>'} ${data.audioFarmerNetwork ? `<br><span class="success-badge">${checkIcon} Audio Recorded</span>` : ''}</td></tr>
+                <tr><th>Team & Professionalism</th><td style="text-align: center; font-weight: 800;">${data.scoreTeam}/10</td><td>${data.remTeam || '<span class="empty-text">No text remarks</span>'} ${data.audioTeam ? `<br><span class="success-badge">${checkIcon} Audio Recorded</span>` : ''}</td></tr>
+                <tr><th>Portfolio Alignment</th><td style="text-align: center; font-weight: 800;">${data.scorePortfolio}/10</td><td>${data.remPortfolio || '<span class="empty-text">No text remarks</span>'} ${data.audioPortfolio ? `<br><span class="success-badge">${checkIcon} Audio Recorded</span>` : ''}</td></tr>
+                <tr><th>Experience</th><td style="text-align: center; font-weight: 800;">${data.scoreExperience}/10</td><td>${data.remExperience || '<span class="empty-text">No text remarks</span>'} ${data.audioExperience ? `<br><span class="success-badge">${checkIcon} Audio Recorded</span>` : ''}</td></tr>
+                <tr><th>Growth Orientation</th><td style="text-align: center; font-weight: 800;">${data.scoreGrowth}/10</td><td>${data.remGrowth || '<span class="empty-text">No text remarks</span>'} ${data.audioGrowth ? `<br><span class="success-badge">${checkIcon} Audio Recorded</span>` : ''}</td></tr>
                 <tr>
                   <th style="color:#DC2626;">Red Flags Noted</th>
-                  <td colspan="2" style="color:#DC2626; font-weight:bold;">${data.redFlags || 'None Reported'} ${data.audioRedFlags ? `<br><a style="color:#DC2626;" href="${data.audioRedFlags}">▶ Play Audio Alert</a>` : ''}</td>
+                  <td colspan="2" style="color:#DC2626; font-weight:bold;">${data.redFlags || 'None Reported'} ${data.audioRedFlags ? `<br><span class="danger-badge">${flagIcon} Audio Alert Recorded</span>` : ''}</td>
                 </tr>
               </table>
             </div>
@@ -454,7 +454,8 @@ export function useDealerOnboarding(navigation: any, route: any) {
                   <table>
                     <tr><th>Proposed Status</th><td><strong>${data.proposedStatus || '-'}</strong></td></tr>
                     <tr><th>Demo Farmers</th><td>${data.willingDemoFarmers || '-'}</td></tr>
-                    <tr><th>Linked Distributor</th><td>${data.isLinkedToDistributor === 'Yes' ? data.linkedDistributors?.map(d => `${d.name} (${d.contact})`).join('<br>') : 'No'}</td></tr>
+                    
+                    <tr><th>Linked Distributor</th><td>${data.isLinkedToDistributor === 'Yes' ? data.linkedDistributors?.map(d => `${d.name} (<a href="tel:+91${d.contact}" class="action-link">${d.contact}</a>)`).join('<br>') : 'No'}</td></tr>
                   </table>
                 </div>
               </div>
@@ -463,12 +464,14 @@ export function useDealerOnboarding(navigation: any, route: any) {
                   <table>
                     <tr><th>Additional Shops</th><td>${data.additionalShops?.length || '0'} Recorded</td></tr>
                     <tr><th>Godowns</th><td>${data.godowns?.length || '0'} Recorded</td></tr>
+                    
+                    <!-- Maps URL uses the standard HTTPS protocol, so it remains perfectly safe and clickable -->
                     <tr>
                       <th>GPS Coordinates</th>
                       <td>
                         ${data.shopLocations?.['shop_exterior'] 
-                          ? `${data.shopLocations['shop_exterior'].lat.toFixed(5)}, ${data.shopLocations['shop_exterior'].lng.toFixed(5)}` 
-                          : '<span class="empty-text">Missing</span>'}
+                           ? `<a href="https://maps.google.com/?q=${data.shopLocations['shop_exterior'].lat},${data.shopLocations['shop_exterior'].lng}" class="action-link">📍 View on Map</a><br><span style="font-size: 11px; color: #64748B;">${data.shopLocations['shop_exterior'].lat.toFixed(5)}, ${data.shopLocations['shop_exterior'].lng.toFixed(5)}</span>` 
+                           : '<span class="empty-text">Missing</span>'}
                       </td>
                     </tr>
                   </table>
@@ -503,12 +506,13 @@ export function useDealerOnboarding(navigation: any, route: any) {
             ${data.willingDemoFarmers === 'Yes' ? `
               <div class="sub-heading">Demo Farmers List</div>
               ${data.documents?.demo_farmers_list ? `
-                <p style="margin:0 0 10px 0;"><a href="${getNativeViewerUrl(data.documents.demo_farmers_list)}" target="_blank">📄 View Uploaded Farmer List</a></p>
+                <p style="margin:0 0 10px 0;"><span class="success-badge">${checkIcon} Media Uploaded (Available in digital records)</span></p>
               ` : `
                 <div class="table-wrapper">
                   <table>
                     <tr style="background-color: #F1F5F9; font-weight: 600;"><td>Name</td><td>Contact</td><td>Address</td></tr>
-                    ${data.demoFarmers?.filter(f => f.name).map(f => `<tr><td>${f.name}</td><td>${f.contact}</td><td>${f.address}</td></tr>`).join('') || '<tr><td colspan="3" class="empty-text">No manual entries</td></tr>'}
+                    <!-- BUG FIX: Removed 'a href=tel:' tags for demo farmers -->
+                    ${data.demoFarmers?.filter(f => f.name).map(f => `<tr><td>${f.name}</td><td><span class="action-link">${f.contact}</span></td><td>${f.address}</td></tr>`).join('') || '<tr><td colspan="3" class="empty-text">No manual entries</td></tr>'}
                   </table>
                 </div>
               `}
@@ -533,15 +537,15 @@ export function useDealerOnboarding(navigation: any, route: any) {
               </div>
             </div>
 
-            <div class="sub-heading">Uploaded Documents & Photos</div>
+            <div class="sub-heading">Uploaded Documents & Photos Status</div>
             <div class="table-wrapper">
               <table>
                 ${Object.entries(data.documents || {}).filter(([k]) => k !== 'demo_farmers_list' && k !== 'se_payment_proof').map(([k, v]) => {
                   const title = k.toUpperCase().replace(/_/g, ' ');
                   if (Array.isArray(v)) {
-                    return `<tr><th>${title}</th><td>${v.map((url, i) => `<a href="${getNativeViewerUrl(url)}" target="_blank" style="margin-right:15px;">File ${i + 1}</a>`).join('')}</td></tr>`;
+                    return `<tr><th>${title}</th><td><span class="success-badge">${checkIcon} ${v.length} File(s) Uploaded</span></td></tr>`;
                   }
-                  return `<tr><th>${title}</th><td><a href="${getNativeViewerUrl(v)}" target="_blank">View File</a></td></tr>`;
+                  return `<tr><th>${title}</th><td><span class="success-badge">${checkIcon} Uploaded</span></td></tr>`;
                 }).join('') || '<tr><td colspan="2" class="empty-text">No documents uploaded.</td></tr>'}
               </table>
             </div>
@@ -566,7 +570,7 @@ export function useDealerOnboarding(navigation: any, route: any) {
                 <tr><th>Bio/Organic Range</th><td>${data.seBioProducts?.map(s => `<span class="pill">${s}</span>`).join('') || '<span class="empty-text">None</span>'}</td></tr>
                 <tr><th>Other Products</th><td>${data.seOtherProducts?.map(s => `<span class="pill">${s}</span>`).join('') || '<span class="empty-text">None</span>'}</td></tr>
                 <tr><th>Will Share Sales Data?</th><td><strong>${data.seWillShareSales ? 'Yes, Confirmed' : 'Not Confirmed'}</strong></td></tr>
-                <tr><th>2-Year Growth Vision</th><td>${data.seGrowthVision || '<span class="empty-text">No text provided</span>'} ${data.seGrowthVisionAudio ? `<br><a href="${data.seGrowthVisionAudio}">▶ Play Audio</a>` : ''}</td></tr>
+                <tr><th>2-Year Growth Vision</th><td>${data.seGrowthVision || '<span class="empty-text">No text provided</span>'} ${data.seGrowthVisionAudio ? `<br><span class="success-badge">${checkIcon} Audio Recorded</span>` : ''}</td></tr>
               </table>
             </div>
 
@@ -576,18 +580,20 @@ export function useDealerOnboarding(navigation: any, route: any) {
                 <tr>
                   <th>Credit References</th>
                   <td>
+                    <!-- BUG FIX: Removed 'a href=tel:' tags for credit references -->
                     ${data.seHasCreditReferences === 'Yes' ? data.seCreditReferences?.map((r, i) => `
                       <div style="margin-bottom:8px; border-bottom:1px solid #E2E8F0; padding-bottom:8px;">
-                        <strong>${i+1}. ${r.name} (${r.contact})</strong><br>
-                        <span style="color:#64748B; font-size:13px;">${r.behavior || 'No text behavior'} ${r.behaviorAudio ? `| <a href="${r.behaviorAudio}">▶ Audio</a>` : ''}</span>
+                        <strong>${i+1}. ${r.name} (<a href="tel:+91${r.contact}" class="action-link">${r.contact}</a>)</strong><br>
+                        <span style="color:#64748B; font-size:13px;">${r.behavior || 'No text behavior'} ${r.behaviorAudio ? `| <span class="success-badge">${checkIcon} Audio Recorded</span>` : ''}</span>
                       </div>
                     `).join('') : '<span class="empty-text">No references provided</span>'}
                   </td>
                 </tr>
                 <tr><th>Security Deposit</th><td><strong>₹ ${data.seSecurityDeposit || '0'}</strong></td></tr>
+                
                 ${data.seSecurityDeposit && parseInt(data.seSecurityDeposit || '0') > 0 ? `
                   <tr><th>Payment Txn/Cheque No.</th><td>${data.sePaymentProofText || '<span class="empty-text">Not Provided</span>'}</td></tr>
-                  <tr><th>Payment Media Proof</th><td>${data.documents?.se_payment_proof ? `<a href="${getNativeViewerUrl(data.documents.se_payment_proof)}" target="_blank">View Uploaded Proof</a>` : '<span class="empty-text">Not Provided</span>'}</td></tr>
+                  <tr><th>Payment Media Proof</th><td>${data.documents?.se_payment_proof ? `<span class="success-badge">${checkIcon} Uploaded</span>` : '<span class="empty-text">Not Provided</span>'}</td></tr>
                 ` : ''}
               </table>
             </div>
@@ -612,7 +618,7 @@ export function useDealerOnboarding(navigation: any, route: any) {
               <p style="font-size: 13px; line-height: 22px; color: #64748B; margin: 0 0 12px 0;">
                 <strong style="font-weight: 800; color: #1E293B;">4. Security Deposit: </strong>
                 ${data.seSecurityDeposit && parseInt(data.seSecurityDeposit || '0') > 0 
-                  ? `A refundable security deposit of ₹${data.seSecurityDeposit} has been agreed upon. Payment Reference: ${data.sePaymentProofText || (data.documents?.se_payment_proof ? '[Media Uploaded]' : 'Pending')}.`
+                  ? `A refundable security deposit of ₹ ${data.seSecurityDeposit} has been agreed upon. Payment Reference: ${data.sePaymentProofText || (data.documents?.se_payment_proof ? '[Media Uploaded]' : 'Pending')}.` 
                   : 'No security deposit is required at this time.'}
               </p>
 
@@ -625,7 +631,7 @@ export function useDealerOnboarding(navigation: any, route: any) {
               </p>
 
               <p style="font-size: 13px; line-height: 22px; color: #64748B; margin: 0 0 12px 0;">
-                <strong style="font-weight: 800; color: #1E293B;">7. Termination & Jurisdiction: </strong>Either party may terminate with 30 days’ written notice. Disputes shall be subject to the exclusive jurisdiction of courts in Vadodara, Gujarat.
+                <strong style="font-weight: 800; color: #1E293B;">7. Termination & Jurisdiction: </strong>Either party may terminate with 30 days' written notice. Disputes shall be subject to the exclusive jurisdiction of courts in Vadodara, Gujarat.
               </p>
 
               <div style="background-color: #E2E8F0; padding: 12px; border-radius: 6px; margin-top: 16px; border-left: 3px solid #16A34A;">
@@ -654,8 +660,8 @@ export function useDealerOnboarding(navigation: any, route: any) {
               This document and its annexures constitute a formal record of the dealer evaluation and initial MoU.<br>
               <strong>Agreement Acceptance:</strong> ${data.agreementAccepted ? 'Digitally accepted by Dealer' : 'Pending Acceptance'}
             </div>
-          </div>
 
+          </div>
         </div>
       </body>
       </html>
@@ -664,7 +670,7 @@ export function useDealerOnboarding(navigation: any, route: any) {
 
   const submit = form.handleSubmit(
     async (data) => {
-      if (!user?.id) return Alert.alert("Error", "User session not found.");
+      if (!user?.id) return useAlertStore.getState().showAlert("Error", "User session not found.");
       setIsSubmitting(true);
       try {
         const dbResult = await saveDealerOnboarding(data, "SUBMITTED", scoreData.percentage, scoreData.band, user.id, editData?.id);
@@ -673,10 +679,15 @@ export function useDealerOnboarding(navigation: any, route: any) {
         const pdfUrl = await uploadFileToCloudinary(uri, 'raw');
         await updateDealerPdfUrl(dbResult.id, pdfUrl);
 
-        if (draftId) removeDraft(draftId);
+        // --- UPDATED: Use draftIdRef to delete the draft and clear the ref ---
+        if (draftIdRef.current) {
+          removeDraft(draftIdRef.current);
+          draftIdRef.current = undefined; // Nullify it so autoSave is fully disabled
+        }
+        
         setShowSuccess(true);
       } catch (error: any) {
-        Alert.alert("Submission Failed", error.message);
+        useAlertStore.getState().showAlert("Submission Failed", error.message);
       } finally {
         setIsSubmitting(false);
       }
@@ -698,7 +709,7 @@ export function useDealerOnboarding(navigation: any, route: any) {
       
       extractErrors(errors);
       
-      Alert.alert(
+      useAlertStore.getState().showAlert(
         "Validation Error", 
         "The form has invalid formatting. Please go back and fix the following:\n\n" + 
         Array.from(messages).map(m => `• ${m}`).join('\n')
@@ -709,12 +720,27 @@ export function useDealerOnboarding(navigation: any, route: any) {
   const handleUpload = async (key: string, type: 'camera' | 'image' | 'doc' = 'doc') => {
     const useCamera = type === 'camera' || type === 'image';
     const perm = useCamera ? await requestCameraPermission() : await requestMediaPermission();
-    if (!perm.granted) return Alert.alert("Permission Denied", perm.fallbackMessage);
+    if (!perm.granted) return useAlertStore.getState().showAlert("Permission Denied", perm.fallbackMessage);
   
     let result = useCamera ? await ImagePicker.launchCameraAsync({ quality: 0.7 }) : await DocumentPicker.getDocumentAsync({ type: "*/*" });
     if (result.canceled) return;
+
+    const asset: any = result.assets[0];
+
+    // ---> NEW: FAIL-FAST FILE SIZE LIMIT (5MB) <---
+    if (!useCamera && asset.size) {
+      const fileSizeInMB = asset.size / (1024 * 1024);
+      if (fileSizeInMB > 5) {
+        useAlertStore.getState().showAlert(
+          "File Too Large", 
+          `This document is ${fileSizeInMB.toFixed(1)}MB. Please select a file smaller than 5MB.`
+        );
+        return; 
+      }
+    }
     
-    const uri = result.assets[0].uri;
+    const uri = asset.uri;
+    const isCameraOrImage = type === 'camera' || type === 'image';
     setUploading(prev => ({ ...prev, [key]: true }));
     
     let location: any = null;
@@ -723,7 +749,7 @@ export function useDealerOnboarding(navigation: any, route: any) {
     if (requiresGPS) {
       const { status } = await Location.requestForegroundPermissionsAsync();
       if (status !== 'granted') { 
-        Alert.alert("GPS Required", "GPS location is required when capturing shop photos."); 
+        useAlertStore.getState().showAlert("GPS Required", "GPS location is required when capturing shop photos."); 
         setUploading(prev => ({ ...prev, [key]: false }));
         return; 
       }
@@ -731,7 +757,20 @@ export function useDealerOnboarding(navigation: any, route: any) {
     }
   
     try {
-      const url = await uploadFileToCloudinary(uri, useCamera ? 'image' : 'raw');
+      let finalUri = uri;
+
+      // ---> NEW: COMPRESSION LOGIC <---
+      if (isCameraOrImage) {
+        const manipResult = await ImageManipulator.manipulateAsync(
+          uri,
+          [{ resize: { width: 1024 } }], // Shrinks to 1024px width, maintains aspect ratio
+          { compress: 0.6, format: ImageManipulator.SaveFormat.JPEG } // 60% compression
+        );
+        finalUri = manipResult.uri;
+      }
+
+      const url = await uploadFileToCloudinary(finalUri, isCameraOrImage ? 'image' : 'raw');
+      
       const currentDocs = form.getValues('documents') || {};
       
       if (['shop_interior', 'shop_exterior', 'shop_godown'].includes(key)) {
@@ -741,7 +780,7 @@ export function useDealerOnboarding(navigation: any, route: any) {
         form.setValue('documents', { ...currentDocs, [key]: url }, { shouldValidate: true });
       }
       
-      // UPDATED: Store GPS by its specific key (exterior, interior, or godown)
+      // Store GPS by its specific key (exterior, interior, or godown)
       if (location) {
         const currentLocs = form.getValues('shopLocations') || {};
         form.setValue('shopLocations', { 
@@ -750,7 +789,7 @@ export function useDealerOnboarding(navigation: any, route: any) {
         }, { shouldValidate: true });
       }
     } catch(e) {
-      Alert.alert("Error", "Upload failed.");
+      useAlertStore.getState().showAlert("Error", "Upload failed.");
     } finally {
       setUploading(prev => ({ ...prev, [key]: false }));
     }
@@ -768,37 +807,32 @@ export function useDealerOnboarding(navigation: any, route: any) {
       // Print HTML into a temporary default PDF URI
       const { uri } = await Print.printToFileAsync({ html });
       
-      const fs: any = FileSystem;
-      const baseDir = fs.cacheDirectory || fs.documentDirectory;
-      
-      // If we are on Native (iOS/Android) and have a valid directory, rename it
-      if (baseDir && Platform.OS !== 'web') {
-        const renamedUri = `${baseDir}${finalFileName}`;
+      if (Platform.OS !== 'web') {
+        // IMPORTANT: Use the destructured documentDirectory and copyAsync directly
+        const renamedUri = `${documentDirectory}${finalFileName}`;
         
-        await fs.copyAsync({
+        await copyAsync({
           from: uri,
           to: renamedUri
         });
         
-        // Share the freshly named file
+        // Share the freshly named file with the correct Adobe UTI
         await Sharing.shareAsync(renamedUri, { 
-          UTI: '.pdf', 
+          UTI: 'com.adobe.pdf', 
           mimeType: 'application/pdf',
-          dialogTitle: `Share ${finalFileName}`
+          dialogTitle: 'Share PDF'
         });
       } else {
-        // FALLBACK: If FileSystem is unavailable (e.g., Web browser), 
-        // just share/download the original URI directly.
+        // FALLBACK: If FileSystem is unavailable (e.g., Web browser)
         await Sharing.shareAsync(uri, { 
-          UTI: '.pdf', 
+          UTI: 'com.adobe.pdf', 
           mimeType: 'application/pdf',
-          dialogTitle: `Share Dealer Dossier`
+          dialogTitle: 'Share PDF'
         });
       }
-
     } catch (error) {
       console.error("Error renaming or sharing PDF:", error);
-      Alert.alert("Error", "Could not generate or share the PDF file.");
+      useAlertStore.getState().showAlert("Error", "Could not generate or share the PDF file.");
     }
   };
 

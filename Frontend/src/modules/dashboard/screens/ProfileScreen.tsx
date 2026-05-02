@@ -9,6 +9,7 @@ import * as IntentLauncher from 'expo-intent-launcher';
 
 
 import { useAuthStore } from '../../../store/authStore';
+import { useDraftStore } from '../../../store/draftStore';
 import { Button } from '../../../design-system/components/Button';
 import { fetchNetworkSummary, fetchSEProfile } from '../services/dashboardService';
 import { colors, radius, spacing, shadows } from '../../../design-system/tokens';
@@ -16,6 +17,7 @@ import { colors, radius, spacing, shadows } from '../../../design-system/tokens'
 export const ProfileScreen = () => {
   const { t, i18n } = useTranslation();
   const { user, logout } = useAuthStore();
+  const seDraft = useDraftStore((state) => state.seDraft);
   const navigation = useNavigation<any>();
   
   const [refreshing, setRefreshing] = useState(false);
@@ -184,18 +186,55 @@ export const ProfileScreen = () => {
             : (user?.name || t("Sales Executive"))}
         </Text>
         <Text style={{ color: colors.textMuted, fontWeight: '700', marginTop: 4 }}>
-          {values?.employeeId || user?.mobile || t("No Contact Added")}
+          {values?.employeeId || '+91 ' + user?.mobile || t("No Contact Added")}
         </Text>
       </View>
 
       {!isProfileComplete ? (
         <View style={styles.incompleteCard}>
-          <MaterialIcons name="warning" size={40} color={colors.warning} style={{ marginBottom: spacing.md }} />
-          <Text style={{ fontSize: 18, fontWeight: '800', textAlign: 'center', marginBottom: spacing.sm }}>{t("Profile Incomplete")}</Text>
-          <Text style={{ color: colors.textMuted, textAlign: 'center', marginBottom: spacing.lg, fontWeight: '600' }}>
-            {t("You must complete your onboarding to unlock all network features.")}
+          <MaterialIcons 
+            name={seDraft ? "pending-actions" : "warning"} 
+            size={40} 
+            color={colors.warning} 
+            style={{ marginBottom: spacing.md }} 
+          />
+          <Text style={{ fontSize: 18, fontWeight: '800', textAlign: 'center', marginBottom: spacing.sm }}>
+            {seDraft ? t("Profile In Progress") : t("Profile Incomplete")}
           </Text>
-          <Button label={t("Complete Profile Now")} onPress={() => navigation.navigate('SEOnboardingScreen')} />
+
+          {seDraft ? (
+            <View style={{ width: '100%', marginBottom: spacing.lg }}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6 }}>
+              <Text style={{ color: colors.textMuted, fontSize: 12, fontWeight: '700', textTransform: 'uppercase' }}>
+                {t("Completion Status")}
+              </Text>
+              <Text style={{ color: colors.warning, fontSize: 12, fontWeight: '800' }}>
+                {Math.round(((seDraft.step - 1) / 6) * 100)}%
+              </Text>
+            </View>
+            
+            {/* Progress Bar */}
+            <View style={{ height: 6, backgroundColor: '#FEF3C7', borderRadius: 3, overflow: 'hidden' }}>
+              {/* ---> BUG FIX: Aligned the bar width calculation to match the text percentage <--- */}
+              <View style={{ width: `${((seDraft.step - 1) / 6) * 100}%`, height: '100%', backgroundColor: colors.warning, borderRadius: 3 }} />
+            </View>
+            
+            <Text style={{ color: colors.textMuted, textAlign: 'center', marginTop: 12, fontWeight: '600', fontSize: 13, lineHeight: 20 }}>
+              {t("You are on Step {{current}} of 6. Finish the remaining steps.", { current: seDraft.step })}
+            </Text>
+          </View>
+          ) : (
+            <Text style={{ color: colors.textMuted, textAlign: 'center', marginBottom: spacing.lg, fontWeight: '600', lineHeight: 20 }}>
+              {t("You must complete your onboarding to unlock all network features.")}
+            </Text>
+          )}
+
+          <Button 
+            label={seDraft ? t("Resume Onboarding") : t("Complete Profile Now")} 
+            icon="arrow-forward"
+            iconPosition="right"
+            onPress={() => navigation.navigate('SEOnboardingScreen')} 
+          />
         </View>
       ) : (
         <>
@@ -248,7 +287,7 @@ export const ProfileScreen = () => {
       )}
 
       {/* Preferences */}
-      <Text style={styles.prefTitle}>{t('App Settings')}</Text>
+      <Text style={styles.prefTitle}>{t('Change Language')}</Text>
       <View style={{ flexDirection: 'row', gap: spacing.sm, marginBottom: spacing['2xl'] }}>
         {['en', 'gu', 'hi'].map((lng) => (
           <Pressable key={lng} onPress={() => changeLanguage(lng)} style={[styles.langBtn, i18n.language === lng && styles.langBtnActive]}>
@@ -259,7 +298,7 @@ export const ProfileScreen = () => {
         ))}
       </View>
 
-      <Button label={t('Logout')} variant="danger" onPress={logout} icon="logout" />
+      <Button label={t('Logout')} variant="danger" onPress={logout} icon="logout" iconPosition="right" />
       <View style={{ height: 40 }} />
 
       {/* Image Viewer Modal */}

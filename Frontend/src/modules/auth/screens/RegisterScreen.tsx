@@ -1,31 +1,36 @@
-import React, { useState, useMemo } from "react";
+import React, { useMemo } from "react";
 import { View, Text, KeyboardAvoidingView, Platform, ScrollView, Pressable } from "react-native";
 import { useTranslation } from "react-i18next";
 import { Leaf } from "lucide-react-native";
 import { Controller } from "react-hook-form";
 
 import { useRegisterForm } from "../hooks";
-import { registerUser } from "../services/authService";
-import { Input, Button, DatePickerField, AlertModal } from "../../../design-system/components";
+import { Input, Button, DatePickerField } from "../../../design-system/components";
 import { colors, spacing } from "../../../design-system/tokens";
+import { useAlertStore } from "../../../store/alertStore"; // ✅ Use global alert
 
 export const RegisterScreen = ({ navigation }: any) => {
   const { t } = useTranslation();
-  
-  const [modal, setModal] = useState({ visible: false, title: "", message: "", tone: "danger" as any });
+  const showAlert = useAlertStore((state) => state.showAlert);
 
   const maxDobDate = useMemo(() => {
     const d = new Date();
-    d.setFullYear(d.getFullYear() - 18); // 🚀 18+ validation enforcer on the picker
+    d.setFullYear(d.getFullYear() - 18);
     return d; 
   }, []);
 
   const { form, submit, loading } = useRegisterForm(
     (msg) => {
-      setModal({ visible: true, title: t("Success"), tone: "success", message: t(msg) });
-      setTimeout(() => { setModal({ ...modal, visible: false }); }, 2000);
+      // ✅ Trigger global alert. It will persist during navigation to Dashboard.
+      showAlert(
+        t("Success"), 
+        t("Account created successfully! Welcome to Field Commander."), 
+        [{ text: t("Let's Start"), style: "default" }]
+      );
     },
-    (err) => setModal({ visible: true, title: t("Registration Failed"), message: err, tone: "danger" })
+    (err) => {
+      showAlert(t("Registration Failed"), err, [{ text: t("Try Again"), style: "destructive" }]);
+    }
   );
 
   return (
@@ -52,7 +57,6 @@ export const RegisterScreen = ({ navigation }: any) => {
           </View>
         </View>
 
-        {/* 🚀 Outputs strictly in DD-MM-YYYY format */}
         <Controller control={form.control} name="dob" render={({ field }) => (
           <DatePickerField label={t("Date of Birth (18+ only) *")} value={field.value} onChange={field.onChange} maximumDate={maxDobDate} error={form.formState.errors.dob?.message} />
         )} />
@@ -84,8 +88,6 @@ export const RegisterScreen = ({ navigation }: any) => {
           </Pressable>
         </View>
       </ScrollView>
-
-      <AlertModal visible={modal.visible} title={modal.title} message={modal.message} onClose={() => setModal({ ...modal, visible: false })} />
     </KeyboardAvoidingView>
   );
 };

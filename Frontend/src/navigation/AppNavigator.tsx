@@ -140,15 +140,24 @@ export const AppNavigator = () => {
           </>
         )}
       </Stack.Navigator>
-      <AlertModal 
-        visible={visible} title={title} message={message}
-        buttons={buttons.map(btn => ({
-          label: btn.text,
-          variant: btn.style === 'cancel' ? 'secondary' : btn.style === 'destructive' ? 'danger' : 'primary',
-          onPress: () => { if (btn.onPress) btn.onPress(); hideAlert(); }
-        }))}
-        onClose={hideAlert}
-      />
+      {(() => {
+        let autoTone: 'danger' | 'warning' | 'success' | 'info' = 'info';
+        const lowerTitle = title.toLowerCase();
+        if (lowerTitle.includes('error') || lowerTitle.includes('failed') || lowerTitle.includes('denied') || lowerTitle.includes('incomplete')) autoTone = 'danger';
+        else if (lowerTitle.includes('success') || lowerTitle.includes('complete')) autoTone = 'success';
+        else if (buttons?.some(b => b.style === 'destructive')) autoTone = 'warning'; // Confirmations like Delete are warnings
+
+        return (
+          <AlertModal 
+            visible={visible}
+            title={title}
+            message={message}
+            tone={autoTone}
+            buttons={buttons}
+            onClose={hideAlert}
+          />
+        );
+      })()}
     </NavigationContainer>
   );
 };

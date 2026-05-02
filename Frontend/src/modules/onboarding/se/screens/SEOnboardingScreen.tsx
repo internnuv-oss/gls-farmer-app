@@ -5,8 +5,9 @@ import { useTranslation } from 'react-i18next';
 
 import { WizardFlowTemplate, FeedbackScreenTemplate } from '../../../../design-system/templates';
 import { Button } from '../../../../design-system/components';
-import { colors } from '../../../../design-system/tokens';
+import { colors, spacing } from '../../../../design-system/tokens';
 import { useSEOnboarding } from '../hooks';
+import { useAlertStore } from '../../../../store/alertStore';
 
 // Import our step components
 import { Step1PersonalDetails } from './steps/Step1PersonalDetails';
@@ -19,14 +20,14 @@ import { Step6Review } from './steps/Step6Review';
 export const SEOnboardingScreen = ({ navigation }: any) => {
   const { t } = useTranslation();
   
-  const { form, step, setStep, jumpBackTo, setJumpBackTo, submit, handleUpload, uploading, isSubmitting, isNextEnabled, showSuccess } = useSEOnboarding(navigation);
+  const { form, step, setStep, jumpBackTo, setJumpBackTo, submit, handleUpload, uploading, isSubmitting, isNextEnabled, showSuccess, saveAndExit, isEditing } = useSEOnboarding(navigation);
 
   // Hardware back button logic
   React.useEffect(() => {
     const handleBackPress = () => {
       if (jumpBackTo) { 
         if (!isNextEnabled) {
-          Alert.alert(t("Incomplete"), t("Please fill all required fields correctly before returning to the review screen."));
+          useAlertStore.getState().showAlert(t("Incomplete"), t("Please fill all required fields correctly before returning to the review screen."));
           return true; 
         }
         setStep(jumpBackTo); 
@@ -46,9 +47,9 @@ export const SEOnboardingScreen = ({ navigation }: any) => {
         iconName="check-circle" tone="success" animationType="pulse"
         title={t("Profile Complete!")}
         description={t("Your Sales Executive profile has been successfully saved.")}
-        primaryActionLabel={t("Go to Dashboard")}
-        onPrimaryAction={() => navigation.navigate("MainTabs")}
-        primaryActionIcon="dashboard"
+        primaryActionLabel={t("Go to Profile")}
+        onPrimaryAction={() => navigation.navigate("MainTabs", { screen: "Profile" })}
+        primaryActionIcon="person"
       />
     );
   }
@@ -69,7 +70,7 @@ export const SEOnboardingScreen = ({ navigation }: any) => {
       onBack={() => {
         if (jumpBackTo) { 
           if (!isNextEnabled) {
-            Alert.alert(t("Incomplete"), t("Please fill all required fields correctly before returning to the review screen."));
+            useAlertStore.getState().showAlert(t("Incomplete"), t("Please fill all required fields correctly before returning to the review screen."));
             return; 
           }
           setStep(jumpBackTo); 
@@ -78,16 +79,38 @@ export const SEOnboardingScreen = ({ navigation }: any) => {
         else { step > 1 ? setStep(step - 1) : navigation.goBack(); }
       }}
       footer={
-        <View style={{ flex: 1 }}>
-          {step < 6 ? (
-            <Button 
-              label={t(jumpBackTo ? "Return to Review" : "Next")} 
-              onPress={() => { jumpBackTo ? (setStep(jumpBackTo), setJumpBackTo(null)) : setStep(step + 1); }} 
-              disabled={!isNextEnabled} 
-            /> 
-          ) : (
-            <Button label={t("Complete Onboarding")} onPress={submit} loading={isSubmitting} disabled={!isNextEnabled} />
+        <View style={{ flexDirection: 'row', gap: spacing.sm }}>
+          
+          {/* ---> NEW: Save & Exit Button (Hidden if they are editing a complete profile) <--- */}
+          {!isEditing && (
+            <View style={{ flex: 1 }}>
+              <Button 
+                label={t("Save & Exit")} 
+                variant="secondary" 
+                onPress={saveAndExit} 
+                disabled={isSubmitting} 
+              />
+            </View>
           )}
+
+          {/* Existing Next / Complete Button */}
+          <View style={{ flex: 1 }}>
+            {step < 6 ? (
+              <Button 
+                label={t(jumpBackTo ? "Return to Review" : "Next")} 
+                onPress={() => { jumpBackTo ? (setStep(jumpBackTo), setJumpBackTo(null)) : setStep(step + 1); }} 
+                disabled={!isNextEnabled} 
+              />
+            ) : (
+              <Button 
+                label={t("Complete")} 
+                onPress={submit} 
+                loading={isSubmitting} 
+                disabled={!isNextEnabled} 
+              />
+            )}
+          </View>
+          
         </View>
       }
     >

@@ -206,7 +206,7 @@ export function mapDealerDbToForm(db: any): DealerOnboardingValues {
 
     // 7. Business Linkages & Demo Farmers
     isLinkedToDistributor: isLinked,
-    linkedDistributors: distributors.length > 0 ? distributors : [{ name: '', contact: '' }],
+    linkedDistributors: isLinked === 'Yes' ? (distributors.length > 0 ? distributors : [{ name: '', contact: '' }]) : [],
     proposedStatus: db.proposed_status || "",
     willingDemoFarmers: db.demo_farmers_data?.willing || "No",
     demoFarmers: db.demo_farmers_data?.farmers || [],

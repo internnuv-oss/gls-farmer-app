@@ -1,26 +1,41 @@
-import React, { useMemo, useState } from 'react';
-import { View, Text, FlatList, Pressable, Alert, TextInput, RefreshControl } from 'react-native';
+import React, { useMemo, useState, useEffect } from 'react';
+import { View, Text, FlatList, Pressable, Alert, TextInput, RefreshControl, ActivityIndicator } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useDraftStore } from '../../../store/draftStore';
 import { SimpleScreenTemplate } from '../../../design-system/templates/Templates';
 import { colors, radius, spacing, shadows } from '../../../design-system/tokens';
 import { Search } from 'lucide-react-native';
+import { useAlertStore } from '../../../store/alertStore';
 
 export const DraftsScreen = ({ navigation }: any) => {
   const { t } = useTranslation();
   const drafts = useDraftStore((state) => state.drafts);
   const removeDraft = useDraftStore((state) => state.removeDraft);
-
+  
   const [searchQuery, setSearchQuery] = useState("");
   const [sortOrder, setSortOrder] = useState<"newest" | "oldest">("newest");
   const [refreshing, setRefreshing] = useState(false);
 
+  // --- NEW: Client-Side Pagination State ---
+  const [page, setPage] = useState(1);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const PAGE_LIMIT = 5; // Number of drafts to load per scroll
+
+  // Reset pagination if the user searches or sorts
+  useEffect(() => {
+    setPage(1);
+  }, [searchQuery, sortOrder]);
+
   const onRefresh = () => {
     setRefreshing(true);
-    setTimeout(() => setRefreshing(false), 600); // Simulate brief refresh for UX
+    setTimeout(() => {
+      setPage(1); // Reset to page 1 on pull-to-refresh
+      setRefreshing(false);
+    }, 600);
   };
 
+  // 1. Process the entire array (Filter & Sort)
   const processedDrafts = useMemo(() => {
     let result = [...drafts];
     if (searchQuery.trim()) {
@@ -34,8 +49,27 @@ export const DraftsScreen = ({ navigation }: any) => {
     return result;
   }, [drafts, searchQuery, sortOrder]);
 
+  // 2. Slice the array based on the current page
+  const displayedDrafts = useMemo(() => {
+    return processedDrafts.slice(0, page * PAGE_LIMIT);
+  }, [processedDrafts, page]);
+
+  const hasMore = displayedDrafts.length < processedDrafts.length;
+
+  // 3. Load more function for the FlatList
+  const handleLoadMore = () => {
+    if (hasMore && !loadingMore) {
+      setLoadingMore(true);
+      // Simulate a tiny network delay so it feels like the Dashboard UX
+      setTimeout(() => {
+        setPage(prev => prev + 1);
+        setLoadingMore(false);
+      }, 300);
+    }
+  };
+
   const handleDelete = (id: string) => {
-    Alert.alert(t('Delete Draft'), t('Are you sure you want to delete this draft?'), [
+    useAlertStore.getState().showAlert(t('Delete Draft'), t('Are you sure you want to delete this draft?'), [
       { text: t('Cancel'), style: 'cancel' },
       { text: t('Delete'), style: 'destructive', onPress: () => removeDraft(id) }
     ]);
@@ -57,11 +91,23 @@ export const DraftsScreen = ({ navigation }: any) => {
       </View>
 
       <FlatList
-        data={processedDrafts}
+        data={displayedDrafts}
         keyExtractor={(item) => item.id}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingBottom: spacing['2xl'] }}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[colors.primary]} tintColor={colors.primary} />}
+        
+        // --- NEW: Pagination Props ---
+        onEndReached={handleLoadMore}
+        onEndReachedThreshold={0.5}
+        ListFooterComponent={() => (
+          loadingMore ? (
+            <View style={{ paddingVertical: spacing.md, alignItems: 'center' }}>
+              <ActivityIndicator color={colors.primary} />
+            </View>
+          ) : null
+        )}
+
         ListEmptyComponent={
           <View style={{ alignItems: 'center', marginTop: 80 }}>
             <View style={{ width: 80, height: 80, borderRadius: 40, backgroundColor: '#F1F5F9', alignItems: 'center', justifyContent: 'center', marginBottom: spacing.md }}>

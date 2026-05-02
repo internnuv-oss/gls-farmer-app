@@ -1,107 +1,98 @@
-import React from 'react';
-import { Modal, View, Text, Pressable, StyleSheet } from 'react-native';
-import { MaterialIcons } from '@expo/vector-icons';
-import { colors, radius, spacing, shadows } from '../tokens';
-import { Button } from './Button';
+import React, { useEffect, useRef } from "react";
+import { Modal, View, Text, Pressable, StyleSheet, Animated } from "react-native";
+import { MaterialIcons } from "@expo/vector-icons";
+import { colors, radius, shadows, typography } from "../tokens";
 
-export interface AlertModalProps {
+// Match React Native's standard AlertButton signature
+export type AlertButton = {
+  text: string;
+  style?: 'cancel' | 'default' | 'destructive';
+  onPress?: () => void;
+};
+
+type AlertModalProps = {
   visible: boolean;
   title: string;
   message: string;
-  buttons?: {
-    label: string;
-    variant?: 'primary' | 'secondary' | 'danger' | string;
-    onPress: () => void;
-  }[];
+  tone?: "danger" | "warning" | "success" | "info";
+  buttons?: AlertButton[];
   onClose: () => void;
-}
+  actionLabel?: string;
+};
 
-export const AlertModal: React.FC<AlertModalProps> = ({ 
-  visible, 
-  title, 
-  message, 
-  buttons = [], 
-  onClose 
+export const AlertModal: React.FC<AlertModalProps> = ({
+  visible, title, message, tone = "danger", buttons, onClose, actionLabel = "OK"
 }) => {
+  const scaleValue = useRef(new Animated.Value(0.9)).current;
+
+  useEffect(() => {
+    if (visible) {
+      Animated.spring(scaleValue, { toValue: 1, friction: 6, tension: 60, useNativeDriver: true }).start();
+    } else {
+      scaleValue.setValue(0.9);
+    }
+  }, [visible, scaleValue]);
+
+  const toneConfig = {
+    danger: { icon: "error-outline", color: colors.danger, bg: "#FEE2E2" },
+    warning: { icon: "warning", color: "#D97706", bg: "#FEF3C7" },
+    success: { icon: "check-circle", color: colors.success, bg: "#DCFCE7" },
+    info: { icon: "info-outline", color: colors.primary, bg: colors.primarySoft },
+  };
+  const config = toneConfig[tone];
+
   return (
-    <Modal
-      transparent
-      visible={visible}
-      animationType="fade"
-      onRequestClose={onClose}
-    >
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
       <View style={styles.overlay}>
-        <View style={styles.modalContainer}>
-          
-          <View style={styles.header}>
-            <Text style={styles.title}>{title}</Text>
-            <Pressable onPress={onClose} hitSlop={10}>
-              <MaterialIcons name="close" size={24} color={colors.textMuted} />
-            </Pressable>
+        <Animated.View style={[styles.card, { transform: [{ scale: scaleValue }] }]}>
+          <View style={[styles.iconContainer, { backgroundColor: config.bg }]}>
+            <MaterialIcons name={config.icon as any} size={40} color={config.color} />
           </View>
-
+          
+          <Text style={[typography.headingMd, styles.title]}>{title}</Text>
           <Text style={styles.message}>{message}</Text>
-
-          <View style={styles.buttonContainer}>
-            {buttons.length > 0 ? (
-              buttons.map((btn, index) => (
-                <View key={index} style={{ flex: 1, marginLeft: index > 0 ? spacing.sm : 0 }}>
-                  <Button 
-                    label={btn.label} 
-                    variant={btn.variant as any} 
-                    onPress={btn.onPress} 
-                  />
-                </View>
-              ))
-            ) : (
-              // Fallback default button just in case
-              <View style={{ flex: 1 }}>
-                <Button label="OK" onPress={onClose} />
-              </View>
+          
+          {/* Dynamically render buttons based on array length */}
+          <View style={{ flexDirection: buttons?.length === 2 ? 'row' : 'column', gap: 12, width: '100%' }}>
+            {buttons && buttons.length > 0 ? buttons.map((btn, idx) => (
+              <Pressable
+                key={idx}
+                onPress={() => {
+                  if (btn.onPress) btn.onPress();
+                  onClose(); // Automatically close modal after action
+                }}
+                style={[
+                  styles.button,
+                  buttons.length === 2 && { flex: 1 },
+                  btn.style === 'cancel' && { backgroundColor: 'transparent', borderWidth: 1, borderColor: colors.border },
+                  btn.style === 'destructive' && { backgroundColor: '#FEE2E2' }
+                ]}
+              >
+                <Text style={[
+                  styles.buttonText,
+                  btn.style === 'cancel' && { color: colors.textMuted },
+                  btn.style === 'destructive' && { color: colors.danger }
+                ]}>{btn.text}</Text>
+              </Pressable>
+            )) : (
+              <Pressable onPress={onClose} style={styles.button}>
+                <Text style={styles.buttonText}>{actionLabel}</Text>
+              </Pressable>
             )}
           </View>
 
-        </View>
+        </Animated.View>
       </View>
     </Modal>
   );
 };
 
 const styles = StyleSheet.create({
-  overlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: spacing.lg,
-  },
-  modalContainer: {
-    width: '100%',
-    backgroundColor: colors.surface,
-    borderRadius: radius.lg,
-    padding: spacing.xl,
-    ...shadows.medium,
-  },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: spacing.md,
-  },
-  title: {
-    fontSize: 20,
-    fontWeight: '800',
-    color: colors.text,
-  },
-  message: {
-    fontSize: 16,
-    color: colors.textMuted,
-    lineHeight: 24,
-    marginBottom: spacing.xl,
-  },
-  buttonContainer: {
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
-    marginTop: spacing.sm,
-  },
+  overlay: { flex: 1, backgroundColor: "rgba(15, 23, 42, 0.65)", justifyContent: "center", alignItems: "center", padding: 24 },
+  card: { width: "90%", maxWidth: 340, backgroundColor: colors.surface, borderRadius: radius.lg, padding: 24, alignItems: "center", ...shadows.soft, elevation: 10 },
+  iconContainer: { width: 64, height: 64, borderRadius: 32, alignItems: 'center', justifyContent: 'center', marginBottom: 16 },
+  title: { color: colors.text, marginBottom: 8, textAlign: 'center' },
+  message: { color: colors.textMuted, textAlign: 'center', fontSize: 14, lineHeight: 22, marginBottom: 24 },
+  button: { paddingVertical: 12, paddingHorizontal: 32, width: '100%', borderRadius: 999, alignItems: 'center', justifyContent: 'center', backgroundColor: '#F1F5F9' },
+  buttonText: { fontWeight: '700', color: colors.text, fontSize: 15 }
 });

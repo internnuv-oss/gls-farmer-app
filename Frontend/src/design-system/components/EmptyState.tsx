@@ -41,6 +41,7 @@ export const EmptyState: React.FC<Props> = ({ title, description, iconName, acti
   onPress={onAction} 
   variant="secondary"
   icon={actionIcon}
+  iconPosition="left"
 />
       </View>
     </View>

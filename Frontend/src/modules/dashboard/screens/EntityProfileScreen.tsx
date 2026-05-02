@@ -6,10 +6,12 @@ import { documentDirectory, cacheDirectory, downloadAsync, StorageAccessFramewor
 import * as Sharing from 'expo-sharing';
 import * as IntentLauncher from 'expo-intent-launcher';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useAudioPlayer, useAudioPlayerStatus } from 'expo-audio';
 
 import { SimpleScreenTemplate } from '../../../design-system/templates/Templates';
 import { Button } from '../../../design-system/components/Button';
 import { colors, radius, spacing, shadows } from '../../../design-system/tokens';
+import { useAlertStore } from '../../../store/alertStore';
 
 // --- Reusable UI Components --- //
 
@@ -58,82 +60,67 @@ const PillList = ({ items, align = 'flex-end' }: { items: any[], align?: 'flex-s
   );
 };
 
-const AudioLink = ({ url, label = "Play Audio" }: { url: string, label?: string }) => {
-  const [loading, setLoading] = useState(false);
+const AudioPlayer = ({ url, title = "Voice Note" }: { url?: string, title?: string }) => {
+  // FIX: expo-audio requires remote URLs to be explicitly passed inside an object
+  const audioSource = React.useMemo(() => {
+    if (!url) return null;
+    return url.startsWith('http') ? { uri: url } : url;
+  }, [url]);
 
-  const handlePlay = async () => {
-    if (!url) return;
-    setLoading(true);
-    
-    try {
-      // Determine audio extension
-      let ext = 'mp3';
-      if (url.toLowerCase().includes('.m4a')) ext = 'm4a';
-      else if (url.toLowerCase().includes('.wav')) ext = 'wav';
-      else if (url.toLowerCase().includes('.aac')) ext = 'aac';
-
-      // Create a clean, secure file name in the hidden cache
-      const fileName = `secure_audio_${Date.now()}.${ext}`;
-      const localUri = `${cacheDirectory}${fileName}`;
-
-      // Download silently
-      const result = await downloadAsync(url, localUri);
-
-      if (result.status === 200) {
-        if (Platform.OS === 'android') {
-          // Open natively in Android's default media player
-          const contentUri = await getContentUriAsync(result.uri);
-          await IntentLauncher.startActivityAsync('android.intent.action.VIEW', {
-            data: contentUri,
-            flags: 1, // Grants read permission safely
-            type: 'audio/*'
-          });
-        } else {
-          // Open natively via iOS QuickLook
-          await Sharing.shareAsync(result.uri, { 
-            UTI: 'public.audio', 
-            mimeType: `audio/${ext}` 
-          });
-        }
-      } else {
-        Alert.alert("Error", "Could not load the audio from the server.");
-      }
-    } catch (error) {
-      console.error(error);
-      Alert.alert("Error", "An error occurred while trying to play the audio.");
-    } finally {
-      setLoading(false);
-    }
-  };
+  const player = useAudioPlayer(audioSource);
+  const playerStatus = useAudioPlayerStatus(player);
 
   if (!url) return null;
 
+  const formatTime = (seconds: number) => {
+    if (!seconds || isNaN(seconds)) return "0:00";
+    const m = Math.floor(seconds / 60);
+    const s = Math.floor(seconds % 60);
+    return `${m}:${s < 10 ? '0' : ''}${s}`;
+  };
+
+  const togglePlayback = () => {
+    if (!player) return;
+    if (playerStatus.playing) {
+      player.pause();
+    } else {
+      // Reset to beginning if playback already finished
+      if (playerStatus.currentTime >= playerStatus.duration - 0.1 && playerStatus.duration > 0) {
+        player.seekTo(0);
+      }
+      player.play();
+    }
+  };
+
+  const durationSec = playerStatus.duration || 0;
+  const currentSec = playerStatus.currentTime || 0;
+  const progressPct = durationSec > 0 ? (currentSec / durationSec) * 100 : 0;
+  
+  // If the duration is 0, the audio is still buffering from the network
+  const isLoading = durationSec === 0;
+
   return (
-    <Pressable 
-      onPress={handlePlay} 
-      disabled={loading}
-      style={{ 
-        flexDirection: 'row', 
-        alignItems: 'center', 
-        marginTop: 4, 
-        backgroundColor: '#EFF6FF', 
-        alignSelf: 'flex-start', 
-        paddingHorizontal: 10, 
-        paddingVertical: 6, 
-        borderRadius: radius.sm, 
-        borderWidth: 1, 
-        borderColor: '#BFDBFE' 
-      }}
-    >
-      {loading ? (
-        <ActivityIndicator size="small" color="#2563EB" style={{ marginRight: 4 }} />
-      ) : (
-        <MaterialIcons name="headset" size={16} color="#2563EB" style={{ marginRight: 4 }} />
-      )}
-      <Text style={{ color: "#2563EB", fontSize: 12, fontWeight: '700' }}>
-        {loading ? "Loading..." : label}
-      </Text>
-    </Pressable>
+    <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: colors.primarySoft, padding: 8, borderRadius: radius.md, marginTop: 4, borderWidth: 1, borderColor: '#BBF7D0' }}>
+      <Pressable onPress={togglePlayback} disabled={isLoading} style={{ padding: 8, backgroundColor: '#FFF', borderRadius: 20, ...shadows.soft }}>
+        {isLoading ? (
+          <ActivityIndicator size="small" color={colors.primary} />
+        ) : (
+          <MaterialIcons name={playerStatus.playing ? "pause" : "play-arrow"} size={20} color={colors.primary} />
+        )}
+      </Pressable>
+      
+      <View style={{ flex: 1, marginLeft: 12 }}>
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 }}>
+          <Text style={{ color: colors.primary, fontSize: 10, fontWeight: '800' }}>{title}</Text>
+          <Text style={{ color: colors.primary, fontSize: 10, fontWeight: '700', fontVariant: ['tabular-nums'] }}>
+            {isLoading ? "Loading..." : `${formatTime(currentSec)} / ${formatTime(durationSec)}`}
+          </Text>
+        </View>
+        <View style={{ height: 4, backgroundColor: '#BBF7D0', borderRadius: 2, width: '100%', overflow: 'hidden' }}>
+          <View style={{ width: `${progressPct}%`, height: '100%', backgroundColor: colors.primary, borderRadius: 2 }} />
+        </View>
+      </View>
+    </View>
   );
 };
 
@@ -170,6 +157,7 @@ export const EntityProfileScreen = ({ navigation, route }: any) => {
   const [sharing, setSharing] = useState(false);
   const [menuVisible, setMenuVisible] = useState(false);
   const [viewerDoc, setViewerDoc] = useState<string | null>(null);
+  const [openingDocUrl, setOpeningDocUrl] = useState<string | null>(null);
 
   const getScoreColor = (score: number) => {
     if (score > 60) return '#3730A3';
@@ -185,7 +173,7 @@ export const EntityProfileScreen = ({ navigation, route }: any) => {
         <Text style={{ color: getScoreColor(score), fontWeight: '900', fontSize: 16 }}>{score}/10</Text>
       </View>
       {remark ? <Text style={{ color: colors.textMuted, fontSize: 13, fontStyle: 'italic', marginBottom: 4 }}>"{remark}"</Text> : null}
-      <AudioLink url={audio} />
+      <AudioPlayer url={audio} />
     </View>
   );
 
@@ -209,7 +197,7 @@ export const EntityProfileScreen = ({ navigation, route }: any) => {
         if (permissions.granted) {
           const result = await downloadAsync(url, tempUri);
           if (result.status !== 200) {
-            Alert.alert("Download Error", "Could not access the file from the server.");
+            useAlertStore.getState().showAlert("Download Error", "Could not access the file from the server.");
             return;
           }
           
@@ -218,33 +206,33 @@ export const EntityProfileScreen = ({ navigation, route }: any) => {
           const savedUri = await StorageAccessFramework.createFileAsync(permissions.directoryUri, defaultFileName, mimeType);
           await writeAsStringAsync(savedUri, base64, { encoding: EncodingType.Base64 });
           
-          Alert.alert("✅ Download Complete", `File saved as:\n${defaultFileName}\n\nCheck your device's Files or Downloads folder.`);
+          useAlertStore.getState().showAlert("✅ Download Complete", `File saved as:\n${defaultFileName}\n\nCheck your device's Files or Downloads folder.`);
         }
       } else {
         const result = await downloadAsync(url, tempUri);
         if (result.status !== 200) {
-          Alert.alert("Download Error", "Could not access the file.");
+          useAlertStore.getState().showAlert("Download Error", "Could not access the file.");
           return;
         }
         const mimeType = url.toLowerCase().endsWith('.pdf') ? 'application/pdf' : 'application/octet-stream';
         await Sharing.shareAsync(result.uri, { UTI: 'public.data', mimeType, dialogTitle: 'Save File' });
       }
     } catch (error) {
-      Alert.alert("Error", "Failed to download the file. Check your connection.");
+      useAlertStore.getState().showAlert("Error", "Failed to download the file. Check your connection.");
     } finally {
       setDownloading(false);
     }
   };
 
   const handleDownloadPDF = () => {
-    if (!raw.pdf_url) return Alert.alert("Not Found", "PDF document is not available.");
+    if (!raw.pdf_url) return useAlertStore.getState().showAlert("Not Found", "PDF document is not available.");
     const safeName = (raw.primary_shop_name || "Dealer").replace(/[^a-zA-Z0-9]/g, '_');
     const fileName = `${safeName}_Dossier.pdf`;
     downloadFile(raw.pdf_url, fileName);
   };
 
   const handleSharePDF = async () => {
-    if (!raw.pdf_url) return Alert.alert("Not Found", "PDF document is not available.");
+    if (!raw.pdf_url) return useAlertStore.getState().showAlert("Not Found", "PDF document is not available.");
     setSharing(true);
     try {
       const safeName = (raw.primary_shop_name || "Dealer").replace(/[^a-zA-Z0-9]/g, '_');
@@ -253,16 +241,16 @@ export const EntityProfileScreen = ({ navigation, route }: any) => {
       
       const result = await downloadAsync(raw.pdf_url, fileUri);
       
-      if (result.status !== 200) return Alert.alert("Share Error", "Could not access the PDF.");
+      if (result.status !== 200) return useAlertStore.getState().showAlert("Share Error", "Could not access the PDF.");
       
       const canShare = await Sharing.isAvailableAsync();
       if (canShare) {
         await Sharing.shareAsync(result.uri, { UTI: 'com.adobe.pdf', mimeType: 'application/pdf', dialogTitle: 'Share PDF' });
       } else {
-        Alert.alert("Error", "Sharing is not available on this device.");
+        useAlertStore.getState().showAlert("Error", "Sharing is not available on this device.");
       }
     } catch (error) {
-      Alert.alert("Error", "Failed to share the PDF document.");
+      useAlertStore.getState().showAlert("Error", "Failed to share the PDF document.");
     } finally {
       setSharing(false);
     }
@@ -272,7 +260,7 @@ export const EntityProfileScreen = ({ navigation, route }: any) => {
     const isPdfOrRaw = url.toLowerCase().endsWith('.pdf') || url.includes('/raw/upload') || url.match(/\.(doc|docx|xls|xlsx|csv)$/i);
     
     if (isPdfOrRaw) {
-      setDownloading(true); 
+      setOpeningDocUrl(url); 
       try {
         let ext = 'pdf';
         let mimeType = 'application/pdf';
@@ -302,13 +290,13 @@ export const EntityProfileScreen = ({ navigation, route }: any) => {
             await Sharing.shareAsync(result.uri, { UTI: uti, mimeType: mimeType });
           }
         } else {
-          Alert.alert("Error", "Could not load the document from the server.");
+          useAlertStore.getState().showAlert("Error", "Could not load the document from the server.");
         }
       } catch (error) {
         console.error(error);
-        Alert.alert("Error", "An error occurred while opening the document natively.");
+        useAlertStore.getState().showAlert("Error", "An error occurred while opening the document natively.");
       } finally {
-        setDownloading(false);
+        setOpeningDocUrl(null);
       }
     } else {
       setViewerDoc(url); 
@@ -450,7 +438,7 @@ export const EntityProfileScreen = ({ navigation, route }: any) => {
           <View style={{ backgroundColor: '#FEF2F2', padding: spacing.md, borderRadius: radius.md, borderWidth: 1, borderColor: '#FECACA', marginTop: spacing.sm }}>
             <Text style={{ color: '#991B1B', fontWeight: '800', marginBottom: 4 }}>Red Flags Noted:</Text>
             <Text style={{ color: '#991B1B', fontWeight: '600', fontSize: 13, marginBottom: scoring.audio?.redFlags ? 8 : 0 }}>{scoring.redFlags || 'None Reported'}</Text>
-            <AudioLink url={scoring.audio?.redFlags} label="Play Alert Audio" />
+            <AudioPlayer url={scoring.audio?.redFlags} title="Alert Audio" />
           </View>
         </SectionCard>
 
@@ -517,7 +505,7 @@ export const EntityProfileScreen = ({ navigation, route }: any) => {
           <View style={{ marginBottom: spacing.md }}>
             <Text style={{ color: colors.textMuted, fontWeight: '700', marginBottom: 4 }}>2-Year Growth Vision</Text>
             <Text style={{ color: colors.text, fontWeight: '600', fontStyle: 'italic', marginBottom: annexures.growthVisionAudio ? 4 : 0 }}>"{annexures.growthVision || 'N/A'}"</Text>
-            <AudioLink url={annexures.growthVisionAudio} />
+            <AudioPlayer url={annexures.growthVisionAudio} title="Vision Audio" />
           </View>
 
           <Text style={{ color: colors.textMuted, fontWeight: '700', marginBottom: spacing.sm, marginTop: spacing.md }}>Credit References:</Text>
@@ -525,7 +513,7 @@ export const EntityProfileScreen = ({ navigation, route }: any) => {
             <View key={i} style={{ backgroundColor: '#F8FAFC', padding: spacing.sm, borderRadius: radius.sm, marginBottom: 8, borderWidth: 1, borderColor: '#E2E8F0' }}>
               <Text style={{ fontWeight: '800', color: colors.text }}>{ref.name} <Text style={{ fontWeight: '500', color: colors.textMuted }}>({ref.contact})</Text></Text>
               {ref.behavior && <Text style={{ fontSize: 12, color: colors.textMuted, marginTop: 4, fontStyle: 'italic' }}>"{ref.behavior}"</Text>}
-              <AudioLink url={ref.behaviorAudio} label="Reference Audio" />
+              <AudioPlayer url={ref.behaviorAudio} title="Reference Audio" />
             </View>
           )) : <Text style={{ color: colors.text, fontWeight: '700', marginBottom: spacing.md }}>N/A</Text>}
 
@@ -552,22 +540,29 @@ export const EntityProfileScreen = ({ navigation, route }: any) => {
           <View style={{ height: 1, backgroundColor: colors.border, marginVertical: spacing.md }} />
 
           <Text style={{ color: colors.primary, fontWeight: '800', marginBottom: spacing.md }}>Uploaded Documents Directory</Text>
-          {raw.documents && Object.keys(raw.documents).length > 0 ? (
-            Object.entries(raw.documents).flatMap(([key, val]) => {
-              const urls = Array.isArray(val) ? val : [val];
-              return urls.map((url, index) => {
-                if(!url) return null;
-                const isPdf = typeof url === 'string' && (url.toLowerCase().endsWith('.pdf') || url.includes('/raw/upload') || url.match(/\.(doc|docx|xls|xlsx|csv)$/i));
-                return (
-                  <Pressable key={`${key}-${index}`} onPress={() => handleViewDocument(key, url as string)} style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#F8FAFC', padding: spacing.md, borderRadius: radius.md, borderWidth: 1, borderColor: '#E2E8F0', marginBottom: 8 }}>
-                    <MaterialIcons name={isPdf ? "picture-as-pdf" : "image"} size={24} color={colors.primary} style={{ marginRight: 12 }} />
-                    <Text style={{ color: colors.text, fontWeight: '700', fontSize: 14, flex: 1 }}>{key.toUpperCase().replace(/_/g, ' ')} {Array.isArray(val) ? `(${index + 1})` : ''}</Text>
-                    {downloading ? <ActivityIndicator size="small" color={colors.primary} /> : <MaterialIcons name="open-in-new" size={20} color={colors.textMuted} />}
-                  </Pressable>
-                );
-              });
-            })
-          ) : <Text style={{ color: colors.textMuted, fontWeight: '600', fontStyle: 'italic' }}>No documents uploaded.</Text>}
+{raw.documents && Object.keys(raw.documents).length > 0 ? (
+  Object.entries(raw.documents).flatMap(([key, val]) => {
+    const urls = Array.isArray(val) ? val : [val];
+    return urls.map((url, index) => {
+      if(!url) return null;
+      const isPdf = typeof url === 'string' && (url.toLowerCase().endsWith('.pdf') || url.includes('/raw/upload') || url.match(/\.(doc|docx|xls|xlsx|csv)$/i));
+      return (
+        <Pressable 
+          key={`${key}-${index}`} 
+          onPress={() => handleViewDocument(key, url as string)} 
+          disabled={openingDocUrl === url} // <-- ADDED: Prevent double clicks
+          style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#F8FAFC', padding: spacing.md, borderRadius: radius.md, borderWidth: 1, borderColor: '#E2E8F0', marginBottom: 8 }}
+        >
+          <MaterialIcons name={isPdf ? "picture-as-pdf" : "image"} size={24} color={colors.primary} style={{ marginRight: 12 }} />
+          <Text style={{ color: colors.text, fontWeight: '700', fontSize: 14, flex: 1 }}>{key.toUpperCase().replace(/_/g, ' ')} {Array.isArray(val) ? `(${index + 1})` : ''}</Text>
+          
+          {/* ---> CHANGED: Now strictly checks against the specific URL <--- */}
+          {openingDocUrl === url ? <ActivityIndicator size="small" color={colors.primary} /> : <MaterialIcons name="open-in-new" size={20} color={colors.textMuted} />}
+        </Pressable>
+      );
+    });
+  })
+) : <Text style={{ color: colors.textMuted, fontWeight: '600', fontStyle: 'italic' }}>No documents uploaded.</Text>}
         </SectionCard>
 
         {/* --- 7. SIGNATURES --- */}

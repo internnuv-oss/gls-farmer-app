@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-// Helper to calculate age from a date string (YYYY-MM-DD)
+// Helper to calculate age from a date string (DD-MM-YYYY)
 const calculateAge = (dob: string) => {
     // 🚀 Parse dd-mm-yyyy format
     const [day, month, year] = dob.split('-').map(Number);

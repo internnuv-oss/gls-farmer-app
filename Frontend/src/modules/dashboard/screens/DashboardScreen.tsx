@@ -34,6 +34,7 @@ import {
   spacing,
   shadows,
 } from "../../../design-system/tokens";
+import { FilterModal, FilterState, defaultFilters } from "../../../design-system/components/FilterModal";
 
 const { width } = Dimensions.get("window");
 
@@ -90,9 +91,7 @@ export const DashboardScreen = ({ navigation }: any) => {
   const [searchQuery, setSearchQuery] = useState("");
   const [isFilterModalOpen, setIsFilterModalOpen] = useState(false);
   const [sortBy, setSortBy] = useState("latest");
-  const [filterCategory, setFilterCategory] = useState("All");
-  const [filterFirmType, setFilterFirmType] = useState("All");
-  const [filterLinked, setFilterLinked] = useState("All");
+  const [filters, setFilters] = useState<FilterState>(defaultFilters);
 
   const loadData = async (pageNumber: number = 0, isRefresh = false) => {
     if (!user?.id || loadingPageRef.current === pageNumber) return; // ✅ Guard against duplicate page calls
@@ -164,36 +163,48 @@ export const DashboardScreen = ({ navigation }: any) => {
       );
     }
 
-    // 2. Category / Band Filter
-    if (filterCategory !== "All") {
-      result = result.filter((d) => d.raw?.category === filterCategory);
+    // 2. Risk Category Filter (Multi-select array)
+    if (filters.category.length > 0) {
+      result = result.filter((d) => filters.category.includes(d.raw?.category));
     }
 
-    // 3. Firm Type Filter
-    if (filterFirmType !== "All") {
-      result = result.filter((d) => d.raw?.firm_type === filterFirmType);
+    // 3. Proposed Status Filter (Multi-select array)
+    if (filters.proposedStatus.length > 0) {
+      result = result.filter((d) => filters.proposedStatus.includes(d.raw?.proposed_status));
     }
 
-    // 4. Distributor Linkage Filter
-    if (filterLinked !== "All") {
-      if (filterLinked === "Linked") {
-        result = result.filter((item) => item.raw?.distributor_links?.isLinked === 'Yes');
-      }
-      if (filterLinked === "Unlinked") {
-        result = result.filter((item) => item.raw?.distributor_links?.isLinked !== 'Yes');
-      }
+    // 4. Firm Type Filter (Multi-select array)
+    if (filters.firmType.length > 0) {
+      result = result.filter((d) => filters.firmType.includes(d.raw?.firm_type));
     }
 
-    // 5. Sorting
+    // 5. Distributor Linkage Filter (Multi-select array)
+    if (filters.linkedStatus.length > 0) {
+      result = result.filter((item) => {
+        const isLinked = item.raw?.distributor_links?.isLinked === 'Yes' ? 'Linked' : 'Unlinked';
+        return filters.linkedStatus.includes(isLinked);
+      });
+    }
+
+    // 6. Demo Farmers Willingness Filter (Multi-select array)
+    if (filters.willingDemoFarmers.length > 0) {
+      result = result.filter((item) => {
+        const willing = item.raw?.demo_farmers_data?.willing === 'Yes' ? 'Yes' : 'No';
+        return filters.willingDemoFarmers.includes(willing);
+      });
+    }
+
+    // 7. Sorting
     result.sort((a, b) => {
-      if (sortBy === "score_high") return b.score - a.score;
-      if (sortBy === "score_low") return a.score - b.score;
-      // "latest" relies on the DB's native ordering, so we just return 0 to maintain it.
-      return 0; 
+      if (filters.sortBy === "score_high") return b.score - a.score;
+      if (filters.sortBy === "score_low") return a.score - b.score;
+      return 0; // "latest"
     });
 
     return result;
-  }, [dealers, searchQuery, filterCategory, filterFirmType, filterLinked, sortBy]);
+  }, [dealers, searchQuery, filters]);
+
+  const isFilterActive = JSON.stringify(filters) !== JSON.stringify(defaultFilters);
 
   // Define Tabs
   const tabPages = [
@@ -476,13 +487,13 @@ export const DashboardScreen = ({ navigation }: any) => {
           onPress={() => setIsFilterModalOpen(true)}
           style={{
             width: 48, height: 48,
-            backgroundColor: (sortBy !== "latest" || filterCategory !== "All" || filterFirmType !== "All" || filterLinked !== "All") ? colors.primarySoft : colors.surface,
+            backgroundColor: isFilterActive ? colors.primarySoft : colors.surface,
             borderRadius: radius.md, borderWidth: 1,
-            borderColor: (sortBy !== "latest" || filterCategory !== "All" || filterFirmType !== "All" || filterLinked !== "All") ? colors.primary : colors.border,
+            borderColor: isFilterActive ? colors.primary : colors.border,
             justifyContent: "center", alignItems: "center",
           }}
         >
-          <Filter size={20} color={(sortBy !== "latest" || filterCategory !== "All" || filterFirmType !== "All" || filterLinked !== "All") ? colors.primary : colors.textMuted} />
+          <Filter size={20} color={isFilterActive ? colors.primary : colors.textMuted} />
         </Pressable>
       </View>
 
@@ -609,112 +620,13 @@ export const DashboardScreen = ({ navigation }: any) => {
         }}
       />
 
-<Modal
+<FilterModal
         visible={isFilterModalOpen}
-        transparent
-        animationType="slide"
-        onRequestClose={() => setIsFilterModalOpen(false)}
-      >
-        <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={{ flex: 1 }}>
-          <View style={{ flex: 1, backgroundColor: "rgba(15, 23, 42, 0.6)", justifyContent: "flex-end" }}>
-            
-            <Pressable style={{ flex: 1 }} onPress={() => setIsFilterModalOpen(false)} />
-            
-            <View style={{
-              backgroundColor: colors.screen,
-              borderTopLeftRadius: 24,
-              borderTopRightRadius: 24,
-              padding: spacing.xl,
-              paddingBottom: Platform.OS === 'ios' ? 40 : spacing.xl,
-              maxHeight: '85%'
-            }}>
-              
-              {/* Header with Clear Button */}
-              <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: spacing.xl }}>
-                <Text style={{ fontSize: 20, fontWeight: "900", color: colors.text }}>Filter & Sort</Text>
-                
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 16 }}>
-                  <Pressable onPress={() => {
-                    setSortBy("latest");
-                    setFilterCategory("All");
-                    setFilterFirmType("All");
-                    setFilterLinked("All");
-                  }}>
-                    <Text style={{ color: colors.textMuted, fontWeight: '700', fontSize: 14 }}>Clear All</Text>
-                  </Pressable>
-                  <Pressable onPress={() => setIsFilterModalOpen(false)} style={{ backgroundColor: colors.surface, padding: 6, borderRadius: 20 }}>
-                    <MaterialIcons name="close" size={20} color={colors.text} />
-                  </Pressable>
-                </View>
-              </View>
-
-              <FlatList 
-                data={[]} 
-                renderItem={null} 
-                showsVerticalScrollIndicator={false}
-                ListHeaderComponent={
-                  <View>
-                    <FilterChipGroup 
-                      label="Sort By" 
-                      selected={sortBy} 
-                      onSelect={setSortBy}
-                      options={[
-                        { label: "Newest First", value: "latest" },
-                        { label: "Highest Score", value: "score_high" },
-                        { label: "Lowest Score", value: "score_low" }
-                      ]} 
-                    />
-
-                    <View style={{ height: 1, backgroundColor: colors.border, marginBottom: spacing.lg }} />
-
-                    <FilterChipGroup 
-                      label="Category" 
-                      selected={filterCategory} 
-                      onSelect={setFilterCategory}
-                      options={[
-                        { label: "All", value: "All" },
-                        { label: "Elite", value: "Elite" },
-                        { label: "A-Category", value: "A-Category" },
-                        { label: "B-Category", value: "B-Category" },
-                        { label: "C-Category", value: "C-Category" }
-                      ]} 
-                    />
-
-                    <FilterChipGroup 
-                      label="Distributor Linkage" 
-                      selected={filterLinked} 
-                      onSelect={setFilterLinked}
-                      options={[
-                        { label: "All", value: "All" },
-                        { label: "Linked", value: "Linked" },
-                        { label: "Unlinked", value: "Unlinked" }
-                      ]} 
-                    />
-
-                    <FilterChipGroup 
-                      label="Firm Type" 
-                      selected={filterFirmType} 
-                      onSelect={setFilterFirmType}
-                      options={[
-                        { label: "All", value: "All" },
-                        { label: "Proprietorship", value: "Proprietorship" },
-                        { label: "Partnership", value: "Partnership" },
-                        { label: "Pvt Ltd", value: "Pvt Ltd" }
-                      ]} 
-                    />
-                  </View>
-                }
-              />
-
-              {/* Sticky Apply Button */}
-              <View style={{ marginTop: spacing.md, paddingTop: spacing.md, borderTopWidth: 1, borderTopColor: colors.border }}>
-                <Button label="Apply Filters" onPress={() => setIsFilterModalOpen(false)} />
-              </View>
-
-            </View>
-          </View>
-        </KeyboardAvoidingView>
-      </Modal>
+        entityType={tabPages[activeTab].key} // Passes "Dealers", "Distributors", or "Farmers" dynamically
+        currentFilters={filters}
+        onApply={(newFilters) => setFilters(newFilters)}
+        onClose={() => setIsFilterModalOpen(false)}
+      />
     </View>
   );
 };

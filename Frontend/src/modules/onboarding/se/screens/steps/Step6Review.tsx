@@ -9,6 +9,7 @@ import * as IntentLauncher from 'expo-intent-launcher';
 import { colors, radius, spacing } from '../../../../../design-system/tokens';
 import { SEOnboardingValues } from '../../../se/schema';
 import { useTranslation } from 'react-i18next';
+import { useAlertStore } from '../../../../../store/alertStore';
 
 interface Step6Props {
   form: UseFormReturn<SEOnboardingValues>;
@@ -46,7 +47,7 @@ export const Step6Review = ({ form, renderEditBtn }: Step6Props) => {
           await Sharing.shareAsync(uri, { UTI: 'com.adobe.pdf', mimeType: 'application/pdf' });
         }
       } catch (error) {
-        Alert.alert(t("Error"), t("Could not load the document."));
+        useAlertStore.getState().showAlert(t("Error"), t("Could not load the document."));
       } finally {
         setDownloadingDoc(null);
       }

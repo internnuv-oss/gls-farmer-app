@@ -11,11 +11,12 @@ import { MaterialIcons } from "@expo/vector-icons";
 type Props = {
   label: string;
   onPress: () => void;
-  variant?: "primary" | "secondary" | "danger";
+  variant?: "primary" | "secondary" | "danger" | "text"; // Added 'text' variant for plain buttons
   disabled?: boolean;
   loading?: boolean;
   style?: ViewStyle;
   icon?: React.ComponentProps<typeof MaterialIcons>["name"];
+  iconPosition?: "left" | "right"; // <-- Added iconPosition prop
 };
 
 export const Button: React.FC<Props> = ({
@@ -26,17 +27,19 @@ export const Button: React.FC<Props> = ({
   loading,
   style,
   icon,
+  iconPosition = "left", // Defaults to left
 }) => {
   const getBgColor = () => {
-    if (disabled) return "#E2E8F0"; // Light gray when disabled
+    if (disabled) return "#E2E8F0"; 
     if (variant === "secondary") return colors.primarySoft;
     if (variant === "danger") return colors.danger;
+    if (variant === "text") return "transparent";
     return colors.primary;
   };
 
   const getTextColor = () => {
-    if (disabled) return "#94A3B8"; // Darker gray text when disabled
-    if (variant === "secondary") return colors.primary;
+    if (disabled) return "#94A3B8"; 
+    if (variant === "secondary" || variant === "text") return colors.primary;
     return "#FFFFFF";
   };
 
@@ -48,17 +51,17 @@ export const Button: React.FC<Props> = ({
       style={[
         {
           backgroundColor: getBgColor(),
-          height: 56, // Enforced fixed height
-          width: "100%", // Enforced full width
+          height: variant === "text" ? undefined : 56, 
+          width: variant === "text" ? undefined : "100%", 
           borderRadius: radius.md,
           alignItems: "center",
           justifyContent: "center",
           flexDirection: "row",
-          // Shadows for depth
-          elevation: disabled ? 0 : 3,
+          paddingHorizontal: variant === "text" ? 0 : spacing.md,
+          elevation: disabled || variant === "text" ? 0 : 3,
           shadowColor: "#000",
           shadowOffset: { width: 0, height: 2 },
-          shadowOpacity: disabled ? 0 : 0.1,
+          shadowOpacity: disabled || variant === "text" ? 0 : 0.1,
           shadowRadius: 4,
         },
         style,
@@ -68,19 +71,31 @@ export const Button: React.FC<Props> = ({
         <ActivityIndicator color={getTextColor()} />
       ) : (
         <>
-          {icon && (
+          {/* Render icon on the LEFT */}
+          {icon && iconPosition === "left" && (
             <MaterialIcons
               name={icon}
               size={18}
               color={getTextColor()}
-              style={{ marginRight: 6 }}
+              style={{ marginRight: 8 }}
             />
           )}
+          
           <Text
             style={{ color: getTextColor(), fontWeight: "800", fontSize: 16 }}
           >
             {label}
           </Text>
+
+          {/* Render icon on the RIGHT */}
+          {icon && iconPosition === "right" && (
+            <MaterialIcons
+              name={icon}
+              size={18}
+              color={getTextColor()}
+              style={{ marginLeft: 8 }}
+            />
+          )}
         </>
       )}
     </TouchableOpacity>

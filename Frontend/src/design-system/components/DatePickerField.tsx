@@ -15,7 +15,7 @@ type Props = {
 };
 
 export const DatePickerField: React.FC<Props> = ({
-  label, value, onChange, placeholder = 'YYYY-MM-DD', error, maximumDate, minimumDate
+  label, value, onChange, placeholder = 'DD-MM-YYYY', error, maximumDate, minimumDate
 }) => {
   const [show, setShow] = useState(false);
   const dateValue = value ? new Date(value) : (maximumDate || new Date()); // Default to maxDate if provided so the spinner starts at a valid year
