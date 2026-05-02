@@ -454,7 +454,7 @@ export const DashboardScreen = ({ navigation }: any) => {
             <Leaf size={24} color={colors.primary} />
           </View>
           <View>
-            <Text style={{ fontSize: 16, fontWeight: "900", color: colors.text }}>{t("Namaste,")} {user?.name}</Text>
+            <Text style={{ fontSize: 16, fontWeight: "900", color: colors.text }}>{t("Hello,")} {user?.name}</Text>
             <Text style={{ color: colors.textMuted, fontSize: 12, fontWeight: "600" }}>{t("Manage your network")}</Text>
           </View>
         </View>
