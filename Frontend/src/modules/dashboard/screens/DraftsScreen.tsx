@@ -12,7 +12,7 @@ export const DraftsScreen = ({ navigation }: any) => {
   const { t } = useTranslation();
   const drafts = useDraftStore((state) => state.drafts);
   const removeDraft = useDraftStore((state) => state.removeDraft);
-  
+
   const [searchQuery, setSearchQuery] = useState("");
   const [sortOrder, setSortOrder] = useState<"newest" | "oldest">("newest");
   const [refreshing, setRefreshing] = useState(false);
@@ -39,7 +39,11 @@ export const DraftsScreen = ({ navigation }: any) => {
   const processedDrafts = useMemo(() => {
     let result = [...drafts];
     if (searchQuery.trim()) {
-      result = result.filter(d => (d.data?.shopName || "").toLowerCase().includes(searchQuery.toLowerCase()));
+      result = result.filter(d => {
+        // 🚀 FIX: Search by Shop Name OR Farmer Name based on the type
+        const nameToSearch = d.type === 'DEALER' ? d.data?.shopName : d.data?.fullName;
+        return (nameToSearch || "").toLowerCase().includes(searchQuery.toLowerCase());
+      });
     }
     result.sort((a, b) => {
       const timeA = parseInt(a.id);
@@ -77,7 +81,7 @@ export const DraftsScreen = ({ navigation }: any) => {
 
   return (
     <SimpleScreenTemplate title={t('Saved Drafts')} onBack={() => navigation.goBack()} noScroll>
-      
+             
       {/* Search and Sort Header */}
       <View style={{ flexDirection: "row", marginBottom: spacing.md, gap: spacing.sm }}>
         <View style={{ flex: 1, flexDirection: "row", alignItems: "center", backgroundColor: colors.surface, borderRadius: radius.md, borderWidth: 1, borderColor: colors.border, paddingHorizontal: spacing.md, height: 48 }}>
@@ -122,21 +126,42 @@ export const DraftsScreen = ({ navigation }: any) => {
         renderItem={({ item }) => (
           <View style={{ backgroundColor: colors.surface, padding: spacing.lg, borderRadius: radius.lg, marginBottom: spacing.md, borderWidth: 1, borderColor: colors.border, ...shadows.soft }}>
             <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-              <View style={{ width: 48, height: 48, borderRadius: 14, backgroundColor: '#FEF3C7', alignItems: 'center', justifyContent: 'center', marginRight: spacing.md }}>
-                <MaterialIcons name="edit-document" size={24} color={colors.warning} />
+              <View style={{ width: 48, height: 48, borderRadius: 14, backgroundColor: item.type === 'DEALER' ? '#FEF3C7' : '#E0E7FF', alignItems: 'center', justifyContent: 'center', marginRight: spacing.md }}>
+                <MaterialIcons name={item.type === 'DEALER' ? "storefront" : "agriculture"} size={24} color={item.type === 'DEALER' ? colors.warning : '#4F46E5'} />
               </View>
               <View style={{ flex: 1 }}>
-                <Text style={{ fontSize: 16, fontWeight: '800', color: colors.text }}>{item.data?.shopName || t('Incomplete Dealer')}</Text>
-                <Text style={{ fontSize: 13, color: colors.textMuted, marginTop: 4, fontWeight: '600' }}>
-                  {t('Saved on')}: {new Date(parseInt(item.id)).toLocaleDateString()}
+                {/* 🚀 FIX: Display the correct name based on type */}
+                <Text style={{ fontSize: 16, fontWeight: '800', color: colors.text }}>
+                  {item.type === 'DEALER' ? (item.data?.shopName || t('Incomplete Dealer')) : (item.data?.fullName || t('Incomplete Farmer'))}
                 </Text>
+                
+                <View style={{flexDirection: 'row', alignItems: 'center', marginTop: 4}}>
+                  <View style={{ backgroundColor: '#F1F5F9', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, marginRight: 6 }}>
+                    <Text style={{ fontSize: 10, fontWeight: '800', color: colors.textMuted }}>{item.type}</Text>
+                  </View>
+                  <Text style={{ fontSize: 12, color: colors.textMuted, fontWeight: '600' }}>
+                    {new Date(parseInt(item.id)).toLocaleDateString()}
+                  </Text>
+                </View>
               </View>
               <Pressable onPress={() => handleDelete(item.id)} style={{ padding: spacing.sm, backgroundColor: '#FEE2E2', borderRadius: radius.sm }}>
                 <MaterialIcons name="delete-outline" size={20} color={colors.danger} />
               </Pressable>
             </View>
+
             <View style={{ height: 1, backgroundColor: colors.border, marginVertical: spacing.md }} />
-            <Pressable onPress={() => navigation.navigate('DealerOnboarding', { draftData: item.data, draftId: item.id })} style={{ flexDirection: 'row', justifyContent: 'center', alignItems: 'center', paddingVertical: spacing.xs }}>
+            
+            {/* 🚀 FIX: Route to the correct screen based on draft type */}
+            <Pressable 
+              onPress={() => {
+                if (item.type === 'DEALER') {
+                  navigation.navigate('DealerOnboarding', { draftData: item.data, draftId: item.id });
+                } else if (item.type === 'FARMER') {
+                  navigation.navigate('FarmerOnboarding', { draftData: item.data, draftId: item.id });
+                }
+              }} 
+              style={{ flexDirection: 'row', justifyContent: 'center', alignItems: 'center', paddingVertical: spacing.xs }}
+            >
               <Text style={{ color: colors.primary, fontWeight: '800', fontSize: 14, marginRight: 4 }}>{t('Resume Onboarding')}</Text>
               <MaterialIcons name="arrow-forward" size={18} color={colors.primary} />
             </Pressable>

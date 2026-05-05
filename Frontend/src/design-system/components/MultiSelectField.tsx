@@ -58,7 +58,8 @@ export const MultiSelectField: React.FC<Props> = ({
           )}
           <MaterialIcons name="keyboard-arrow-down" size={24} color={colors.textMuted} style={{ marginLeft: 8 }} />
         </Pressable>
-        {error && <Text style={{ color: colors.danger, marginTop: 4, fontSize: 12, fontWeight: '600' }}>{error}</Text>}
+        {/* SAFELY RENDERED */}
+        {error ? <Text style={{ color: colors.danger, marginTop: 4, fontSize: 12, fontWeight: '600' }}>{error}</Text> : null}
       </View>
 
       <Modal visible={isOpen} transparent animationType="slide" onRequestClose={() => setIsOpen(false)}>
@@ -71,12 +72,12 @@ export const MultiSelectField: React.FC<Props> = ({
                 <Pressable onPress={() => setIsOpen(false)}><MaterialIcons name="close" size={24} color={colors.textMuted} /></Pressable>
               </View>
               
-              {searchable && (
+              {searchable ? (
                 <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#F1F5F9', borderRadius: radius.md, paddingHorizontal: spacing.md, height: 48, marginBottom: spacing.md }}>
                   <MaterialIcons name="search" size={20} color={colors.textMuted} style={{ marginRight: spacing.sm }} />
                   <TextInput value={searchQuery} onChangeText={setSearchQuery} placeholder="Search..." style={{ flex: 1, fontSize: 15, color: colors.text }} placeholderTextColor={colors.textMuted} />
                 </View>
-              )}
+              ) : null}
 
               <FlatList
                 data={filteredOptions}
@@ -88,7 +89,7 @@ export const MultiSelectField: React.FC<Props> = ({
                     <Pressable onPress={() => toggleSelect(item)} style={{ paddingVertical: spacing.md, borderBottomWidth: 1, borderBottomColor: colors.border, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
                       <Text style={{ fontSize: 16, fontWeight: isSelected ? '800' : '500', color: isSelected ? colors.primary : colors.text }}>{item}</Text>
                       <View style={{ width: 24, height: 24, borderRadius: 6, borderWidth: 2, borderColor: isSelected ? colors.primary : colors.border, backgroundColor: isSelected ? colors.primary : 'transparent', alignItems: 'center', justifyContent: 'center' }}>
-                        {isSelected && <MaterialIcons name="check" size={16} color="#FFF" />}
+                        {isSelected ? <MaterialIcons name="check" size={16} color="#FFF" /> : null}
                       </View>
                     </Pressable>
                   );

@@ -24,7 +24,9 @@ export const TextArea: React.FC<Props> = ({ label, placeholder, value, onChangeT
           style={{ minHeight, color: colors.text, fontSize: 16, fontWeight: '500', padding: 0 }}
         />
       </View>
-      {error && <Text style={{ color: colors.danger, marginTop: 4, fontSize: 12, fontWeight: '600' }}>{error}</Text>}
+      
+      {/* SAFELY rendered with ternary operator */}
+      {error ? <Text style={{ color: colors.danger, marginTop: 4, fontSize: 12, fontWeight: '600' }}>{error}</Text> : null}
     </View>
   );
 };

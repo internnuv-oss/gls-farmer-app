@@ -42,7 +42,7 @@ export const SelectField: React.FC<Props> = ({
             borderRadius: radius.lg, backgroundColor: colors.surface, height: 56, paddingHorizontal: spacing.lg,
           }}
         >
-          {iconName && <MaterialIcons name={iconName} size={20} color={colors.textMuted} style={{ marginRight: spacing.sm }} />}
+          {iconName ? <MaterialIcons name={iconName} size={20} color={colors.textMuted} style={{ marginRight: spacing.sm }} /> : null}
           <Text style={{ flex: 1, color: value ? colors.text : '#94A3B8', fontSize: 16, fontWeight: value ? '600' : '500' }}>
             {value || placeholder}
           </Text>
@@ -61,12 +61,12 @@ export const SelectField: React.FC<Props> = ({
                 <Pressable onPress={() => setIsOpen(false)}><MaterialIcons name="close" size={24} color={colors.textMuted} /></Pressable>
               </View>
               
-              {searchable && (
+              {searchable ? (
                 <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#F1F5F9', borderRadius: radius.md, paddingHorizontal: spacing.md, height: 48, marginBottom: spacing.md }}>
                   <MaterialIcons name="search" size={20} color={colors.textMuted} style={{ marginRight: spacing.sm }} />
                   <TextInput autoFocus value={searchQuery} onChangeText={setSearchQuery} placeholder="Search..." style={{ flex: 1, fontSize: 15, color: colors.text }} placeholderTextColor={colors.textMuted} />
                 </View>
-              )}
+              ) : null}
 
               <FlatList
                 data={filteredOptions}
@@ -75,7 +75,7 @@ export const SelectField: React.FC<Props> = ({
                 renderItem={({ item }) => (
                   <Pressable onPress={() => handleSelect(item)} style={{ paddingVertical: spacing.md, borderBottomWidth: 1, borderBottomColor: colors.border, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
                     <Text style={{ fontSize: 16, fontWeight: item === value ? '800' : '500', color: item === value ? colors.primary : colors.text }}>{item}</Text>
-                    {item === value && <MaterialIcons name="check" size={20} color={colors.primary} />}
+                    {item === value ? <MaterialIcons name="check" size={20} color={colors.primary} /> : null}
                   </Pressable>
                 )}
                 ListEmptyComponent={<Text style={{ color: colors.textMuted, textAlign: 'center', marginTop: spacing.xl }}>No options found</Text>}

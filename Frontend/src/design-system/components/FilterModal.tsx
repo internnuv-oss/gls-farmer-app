@@ -14,6 +14,9 @@ export type FilterState = {
   willingDemoFarmers: string[];
   region: string[];
   scale: string[];
+  farmerCrops: string[]; // <-- NEW
+  farmerSoil: string[];  // <-- NEW
+  farmerWater: string[]; // <-- NEW
 };
 
 export const defaultFilters: FilterState = {
@@ -24,7 +27,10 @@ export const defaultFilters: FilterState = {
   proposedStatus: [],
   willingDemoFarmers: [],
   region: [],
-  scale: []
+  scale: [],
+  farmerCrops: [], // <-- NEW
+  farmerSoil: [],  // <-- NEW
+  farmerWater: []  // <-- NEW
 };
 
 type FilterModalProps = {
@@ -129,13 +135,21 @@ export const FilterModal: React.FC<FilterModalProps> = ({ visible, entityType, c
 
             <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: spacing.xl }}>
               
-              {/* --- SORTING (Radio/Single Select Style) --- */}
+              {/* --- DYNAMIC SORTING --- */}
               <View style={styles.sectionBlock}>
                 <Text style={styles.sectionLabel}>Sort {entityType}</Text>
                 {[
                   { label: "Newest First", value: "latest" },
-                  { label: "Highest Score", value: "score_high" },
-                  { label: "Lowest Score", value: "score_low" }
+                  // Dealer Specific Sorting
+                  ...(entityType === "Dealers" ? [
+                    { label: "Highest Score", value: "score_high" },
+                    { label: "Lowest Score", value: "score_low" }
+                  ] : []),
+                  // Farmer Specific Sorting
+                  ...(entityType === "Farmers" ? [
+                    { label: "Largest Land Holding", value: "land_high" },
+                    { label: "Smallest Land Holding", value: "land_low" }
+                  ] : [])
                 ].map(opt => (
                   <Pressable key={opt.value} onPress={() => handleSortUpdate(opt.value)} style={styles.radioRow}>
                     <View style={[styles.radio, localFilters.sortBy === opt.value && styles.radioActive]}>
@@ -221,16 +235,56 @@ export const FilterModal: React.FC<FilterModalProps> = ({ visible, entityType, c
 
               {/* --- FARMER FILTERS --- */}
               {entityType === "Farmers" && (
-                <FilterAccordionGroup 
-                  title="Farm Scale" 
-                  selectedValues={localFilters.scale} 
-                  onToggleItem={(val) => toggleFilter('scale', val)}
-                  options={[
-                    { label: "Marginal (< 2 Acres)", value: "Marginal" },
-                    { label: "Small (2-5 Acres)", value: "Small" },
-                    { label: "Large (> 5 Acres)", value: "Large" }
-                  ]} 
-                />
+                <>
+                  <FilterAccordionGroup 
+                    title="Farm Scale" 
+                    selectedValues={localFilters.scale} 
+                    onToggleItem={(val) => toggleFilter('scale', val)}
+                    options={[
+                      { label: "Marginal (< 2 Acres)", value: "Marginal" },
+                      { label: "Small (2-5 Acres)", value: "Small" },
+                      { label: "Large (> 5 Acres)", value: "Large" }
+                    ]} 
+                  />
+                  <FilterAccordionGroup 
+                    title="Major Crops" 
+                    selectedValues={localFilters.farmerCrops} 
+                    onToggleItem={(val) => toggleFilter('farmerCrops', val)}
+                    options={[
+                      { label: "Cotton", value: "Cotton" },
+                      { label: "Groundnut", value: "Groundnut" },
+                      { label: "Sugarcane", value: "Sugarcane" },
+                      { label: "Wheat", value: "Wheat" },
+                      { label: "Bajra", value: "Bajra" },
+                      { label: "Maize", value: "Maize" },
+                      { label: "Castor", value: "Castor" },
+                      { label: "Soybean", value: "Soybean" }
+                    ]} 
+                  />
+                  <FilterAccordionGroup 
+                    title="Soil Type" 
+                    selectedValues={localFilters.farmerSoil} 
+                    onToggleItem={(val) => toggleFilter('farmerSoil', val)}
+                    options={[
+                      { label: "Black", value: "Black" },
+                      { label: "Sandy", value: "Sandy" },
+                      { label: "Red", value: "Red" },
+                      { label: "Loamy", value: "Loamy" },
+                      { label: "Others", value: "Others" }
+                    ]} 
+                  />
+                  <FilterAccordionGroup 
+                    title="Water Source" 
+                    selectedValues={localFilters.farmerWater} 
+                    onToggleItem={(val) => toggleFilter('farmerWater', val)}
+                    options={[
+                      { label: "Canal", value: "Canal" },
+                      { label: "Borewell", value: "Borewell" },
+                      { label: "Rain", value: "Rain" },
+                      { label: "Others", value: "Others" }
+                    ]} 
+                  />
+                </>
               )}
 
             </ScrollView>

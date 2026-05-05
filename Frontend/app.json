@@ -8,9 +8,9 @@
     "userInterfaceStyle": "light",
     "newArchEnabled": true,
     "splash": {
-      "image": "./assets/splash-icon.png",
+      "image": "./assets/icon.png",
       "resizeMode": "contain",
-      "backgroundColor": "#ffffff"
+      "backgroundColor": "#F9F9F6"
     },
     "ios": {
       "supportsTablet": true
@@ -31,7 +31,7 @@
       "package": "com.intern_skilltelligent.fieldcommander"
     },
     "web": {
-      "favicon": "./assets/favicon.png"
+      "favicon": "./assets/icon-192x192.png"
     },
     "plugins": [
       "expo-localization",

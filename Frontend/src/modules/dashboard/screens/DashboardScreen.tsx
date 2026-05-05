@@ -13,6 +13,7 @@ import {
   Platform,
   RefreshControl,
   Linking,
+  Image,
 } from "react-native";
 import { useTranslation } from "react-i18next";
 import i18n from "../../../core/i18n";
@@ -21,7 +22,8 @@ import { MaterialIcons } from "@expo/vector-icons";
 import { useFocusEffect } from "@react-navigation/native";
 import { useDraftStore } from "../../../store/draftStore";
 import { useAuthStore } from "../../../store/authStore";
-import { fetchMyDealers } from "../services/dashboardService";
+import { fetchMyDealers, fetchMyFarmers } from "../services/dashboardService";
+
 import {
   FloatingActionMenu,
   Button,
@@ -77,10 +79,11 @@ export const DashboardScreen = ({ navigation }: any) => {
   const user = useAuthStore((state) => state.user);
 
   const [activeTab, setActiveTab] = useState(0); // 0 = Distributors
-  const [dealers, setDealers] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const pagerRef = useRef<FlatList>(null);
+  const [dealers, setDealers] = useState<any[]>([]);
+  const [farmers, setFarmers] = useState<any[]>([]); // 👈 ADD THIS
 
   const [page, setPage] = useState(0);
   const [hasMore, setHasMore] = useState(true);
@@ -94,18 +97,23 @@ export const DashboardScreen = ({ navigation }: any) => {
   const [filters, setFilters] = useState<FilterState>(defaultFilters);
 
   const loadData = async (pageNumber: number = 0, isRefresh = false) => {
-    if (!user?.id || loadingPageRef.current === pageNumber) return; // ✅ Guard against duplicate page calls
+    if (!user?.id || loadingPageRef.current === pageNumber) return; 
     
-    loadingPageRef.current = pageNumber; // ✅ Mark this page as loading
-
+    loadingPageRef.current = pageNumber; 
     if (isRefresh) setRefreshing(true);
     else if (pageNumber === 0) setLoading(true);
     else setLoadingMore(true);
 
     try {
-      const PAGE_LIMIT = 5; 
-      const data = await fetchMyDealers(user.id, pageNumber, PAGE_LIMIT);
-      const mapped = data.map((d: any) => ({
+      const PAGE_LIMIT = 5;
+      
+      // Fetch both Dealers and Farmers at the same time
+      const [dealersData, farmersData] = await Promise.all([
+        fetchMyDealers(user.id, pageNumber, PAGE_LIMIT),
+        fetchMyFarmers(user.id, pageNumber, PAGE_LIMIT)
+      ]);
+
+      const mappedDealers = dealersData.map((d: any) => ({
         id: d.id,
         name: d.primary_shop_name || d.shop_name,
         type: "Dealer",
@@ -115,19 +123,33 @@ export const DashboardScreen = ({ navigation }: any) => {
         raw: d,
       }));
 
+      const mappedFarmers = farmersData.map((f: any) => ({
+        id: f.id,
+        name: f.full_name,
+        type: "Farmer",
+        city: f.personal_details?.city || f.village,
+        state: f.personal_details?.state || "N/A",
+        score: 0, // Farmers don't use the 0-100 scoring system right now
+        raw: f,
+      }));
+
       if (pageNumber === 0) {
-        setDealers(mapped);
+        setDealers(mappedDealers);
+        setFarmers(mappedFarmers);
       } else {
         setDealers(prev => {
-          // ✅ FIX: DE-DUPLICATION LOGIC
-          // Only add items whose IDs are not already in the list
           const existingIds = new Set(prev.map(item => item.id));
-          const uniqueNewItems = mapped.filter(item => !existingIds.has(item.id));
+          const uniqueNewItems = mappedDealers.filter(item => !existingIds.has(item.id));
+          return [...prev, ...uniqueNewItems];
+        });
+        setFarmers(prev => {
+          const existingIds = new Set(prev.map(item => item.id));
+          const uniqueNewItems = mappedFarmers.filter(item => !existingIds.has(item.id));
           return [...prev, ...uniqueNewItems];
         });
       }
 
-      setHasMore(data.length === PAGE_LIMIT);
+      setHasMore(dealersData.length === PAGE_LIMIT || farmersData.length === PAGE_LIMIT);
       setPage(pageNumber);
     } catch (e) {
       console.error(e);
@@ -135,10 +157,9 @@ export const DashboardScreen = ({ navigation }: any) => {
       setLoading(false);
       setRefreshing(false);
       setLoadingMore(false);
-      loadingPageRef.current = null; // ✅ Reset after completion
+      loadingPageRef.current = null; 
     }
   };
-
   // Fixed: Removed activeTab from dependency array so it doesn't refetch/reset on swipe
   useFocusEffect(
     useCallback(() => {
@@ -206,7 +227,76 @@ export const DashboardScreen = ({ navigation }: any) => {
 
   const isFilterActive = JSON.stringify(filters) !== JSON.stringify(defaultFilters);
 
-  // Define Tabs
+  const processedFarmers = useMemo(() => {
+    let result = [...farmers];
+    
+    // 1. Search Query
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase();
+      result = result.filter(
+        (f) =>
+          (f.name || "").toLowerCase().includes(query) ||
+          (f.city || "").toLowerCase().includes(query) ||
+          (f.state || "").toLowerCase().includes(query) ||
+          (f.raw?.village || "").toLowerCase().includes(query) ||
+          (f.raw?.mobile || "").includes(query) ||
+          (f.raw?.personal_details?.fatherName || "").toLowerCase().includes(query)
+      );
+    }
+
+    // 2. Scale Filter
+    if (filters.scale.length > 0) {
+      result = result.filter((f) => {
+        const land = parseFloat(f.raw?.farm_details?.totalLand || "0");
+        let scale = "Large";
+        if (land < 2) scale = "Marginal";
+        else if (land >= 2 && land <= 5) scale = "Small";
+        return filters.scale.includes(scale);
+      });
+    }
+
+    // 3. Crops Filter (Intersection Check)
+    if (filters.farmerCrops.length > 0) {
+      result = result.filter((f) => {
+        const crops = f.raw?.farm_details?.majorCrops || [];
+        // Keep farmer if they grow ANY of the selected crops
+        return filters.farmerCrops.some((c) => crops.includes(c)); 
+      });
+    }
+
+    // 4. Soil Type Filter
+    if (filters.farmerSoil.length > 0) {
+      const PREDEFINED_SOILS = ["Black", "Sandy", "Red", "Loamy"];
+      result = result.filter((f) => {
+        const soils = f.raw?.farm_details?.soilType || [];
+        return filters.farmerSoil.some((s) => {
+          if (s === "Others") return soils.some((soil: string) => !PREDEFINED_SOILS.includes(soil));
+          return soils.includes(s);
+        });
+      });
+    }
+
+    // 5. Water Source Filter
+    if (filters.farmerWater.length > 0) {
+      const PREDEFINED_WATER = ["Canal", "Borewell", "Rain"];
+      result = result.filter((f) => {
+        const waters = f.raw?.farm_details?.waterSource || [];
+        return filters.farmerWater.some((w) => {
+          if (w === "Others") return waters.some((water: string) => !PREDEFINED_WATER.includes(water));
+          return waters.includes(w);
+        });
+      });
+    }
+
+    // 6. Sorting
+    result.sort((a, b) => {
+      if (filters.sortBy === "land_high") return parseFloat(b.raw?.farm_details?.totalLand || "0") - parseFloat(a.raw?.farm_details?.totalLand || "0");
+      if (filters.sortBy === "land_low") return parseFloat(a.raw?.farm_details?.totalLand || "0") - parseFloat(b.raw?.farm_details?.totalLand || "0");
+      return 0; // "latest" fallback
+    });
+
+    return result;
+  }, [farmers, searchQuery, filters]);// Define Tabs
   const tabPages = [
     {
       key: "Distributors",
@@ -228,7 +318,7 @@ export const DashboardScreen = ({ navigation }: any) => {
     },
     {
       key: "Farmers",
-      data: [], // Farmers will show an empty state until integrated
+      data: processedFarmers, // Farmers will show an empty state until integrated
       emptyMsg: "Connect with farmers and manage their profiles efficiently here.",
       icon: "agriculture",
       actionId: "farmer",
@@ -292,7 +382,8 @@ export const DashboardScreen = ({ navigation }: any) => {
           overflow: "hidden",
         }}
       >
-        <View style={{ width: 6, position: "absolute", left: 0, top: 0, bottom: 0, backgroundColor: getScoreColor(item.score) }} />
+        {/* UPDATE: Use green for farmers, dynamic score color for dealers */}
+        <View style={{ width: 6, position: "absolute", left: 0, top: 0, bottom: 0, backgroundColor: item.type === 'Dealer' ? getScoreColor(item.score) : colors.success }} />
         <View style={{ padding: spacing.lg, paddingLeft: spacing.xl }}>
           
           <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start" }}>
@@ -309,7 +400,8 @@ export const DashboardScreen = ({ navigation }: any) => {
                   </Text>
                 </View>
                 
-                {gps?.lat && gps?.lng && (
+                {/* Dealer specific Map link */}
+                {item.type === 'Dealer' && gps?.lat && gps?.lng && (
                   <Pressable 
                     onPress={() => Linking.openURL(`https://maps.google.com/?q=${gps.lat},${gps.lng}`)}
                     style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#EFF6FF', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, borderWidth: 1, borderColor: '#BFDBFE' }}
@@ -344,7 +436,12 @@ export const DashboardScreen = ({ navigation }: any) => {
                     <Pressable
                       onPress={() => {
                         setMenuVisible(false);
-                        navigation.navigate("DealerOnboarding", { editData: item.raw });
+                        // UPDATE: Route to FarmerOnboarding if the entity is a Farmer
+                        if (item.type === 'Farmer') {
+                          navigation.navigate("FarmerOnboarding", { editData: item.raw });
+                        } else {
+                          navigation.navigate("DealerOnboarding", { editData: item.raw });
+                        }
                       }}
                       style={{ flexDirection: "row", alignItems: "center", padding: spacing.md }}
                     >
@@ -358,34 +455,39 @@ export const DashboardScreen = ({ navigation }: any) => {
           </View>
 
           <View style={{ 
-            marginTop: spacing.md, 
-            backgroundColor: '#F8FAFC', 
-            padding: spacing.md, 
-            borderRadius: radius.md, 
-            borderWidth: 1, 
-            borderColor: colors.border 
-          }}>
+             marginTop: spacing.md,
+             backgroundColor: '#F8FAFC',
+             padding: spacing.md,
+             borderRadius: radius.md,
+             borderWidth: 1,
+             borderColor: colors.border 
+           }}>
             <View style={{ flexDirection: 'row', gap: spacing.sm, marginBottom: 10 }}>
               <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
                 <MaterialIcons name="person" size={16} color={colors.primary} />
                 <Text style={{ fontSize: 13, color: colors.text, marginLeft: 6, fontWeight: '600' }} numberOfLines={1}>
-                  {item.raw.contact_person || 'N/A'}
+                  {item.type === 'Dealer' ? (item.raw.contact_person || 'N/A') : (item.raw.personal_details?.fatherName || 'N/A')}
                 </Text>
               </View>
               
               <Pressable 
-                onPress={() => item.raw.contact_mobile && Linking.openURL(`tel:${item.raw.contact_mobile}`)}
+                onPress={() => {
+                   const phone = item.type === 'Dealer' ? item.raw.contact_mobile : item.raw.mobile;
+                   if(phone) Linking.openURL(`tel:${phone}`);
+                }}
                 style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}
               >
-                <MaterialIcons name="phone" size={16} color={item.raw.contact_mobile ? colors.primary : colors.textMuted} />
+                <MaterialIcons name="phone" size={16} color={(item.type === 'Dealer' ? item.raw.contact_mobile : item.raw.mobile) ? colors.primary : colors.textMuted} />
                 <Text style={{ 
-                  fontSize: 13, 
-                  color: item.raw.contact_mobile ? colors.primary : colors.text, 
-                  marginLeft: 6, 
-                  fontWeight: '700', 
-                  textDecorationLine: item.raw.contact_mobile ? 'underline' : 'none' 
-                }}>
-                  {item.raw.contact_mobile ? `+91 ${item.raw.contact_mobile}` : 'N/A'}
+                   fontSize: 13, 
+                   color: (item.type === 'Dealer' ? item.raw.contact_mobile : item.raw.mobile) ? colors.primary : colors.text, 
+                   marginLeft: 6, 
+                   fontWeight: '700', 
+                   textDecorationLine: (item.type === 'Dealer' ? item.raw.contact_mobile : item.raw.mobile) ? 'underline' : 'none' 
+                 }}>
+                  {item.type === 'Dealer' 
+                    ? (item.raw.contact_mobile ? `+91 ${item.raw.contact_mobile}` : 'N/A')
+                    : (item.raw.mobile ? `+91 ${item.raw.mobile}` : 'N/A')}
                 </Text>
               </Pressable>
             </View>
@@ -393,19 +495,23 @@ export const DashboardScreen = ({ navigation }: any) => {
             <View style={{ flexDirection: 'row', gap: spacing.sm }}>
               <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
                 <MaterialIcons name="business" size={16} color={colors.primary} />
-                <Text style={{ fontSize: 13, color: colors.text, marginLeft: 6, fontWeight: '600' }} numberOfLines={1}>{item.raw.firm_type || 'N/A'}</Text>
+                <Text style={{ fontSize: 13, color: colors.text, marginLeft: 6, fontWeight: '600' }} numberOfLines={1}>
+                  {item.type === 'Dealer' ? (item.raw.firm_type || 'N/A') : `Crops: ${(item.raw.farm_details?.majorCrops || []).join(', ') || 'N/A'}`}
+                </Text>
               </View>
               <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
                 <MaterialIcons name="event" size={16} color={colors.primary} />
-                <Text style={{ fontSize: 13, color: colors.text, marginLeft: 6, fontWeight: '600' }}>Est: {item.raw.est_year || 'N/A'}</Text>
+                <Text style={{ fontSize: 13, color: colors.text, marginLeft: 6, fontWeight: '600' }}>
+                  {item.type === 'Dealer' ? `Est: ${item.raw.est_year || 'N/A'}` : `Land: ${item.raw.farm_details?.totalLand || 0} Ac`}
+                </Text>
               </View>
             </View>
           </View>
 
           <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "flex-end", marginTop: spacing.lg }}>
             <View style={{ flexDirection: "row", gap: spacing.sm }}>
-              <View style={{ backgroundColor: colors.primarySoft, paddingHorizontal: 10, paddingVertical: 4, borderRadius: radius.pill }}>
-                <Text style={{ color: colors.primary, fontSize: 12, fontWeight: "700" }}>{item.type}</Text>
+              <View style={{ backgroundColor: item.type === 'Dealer' ? '#FEF3C7' : '#E0E7FF', paddingHorizontal: 10, paddingVertical: 4, borderRadius: radius.pill }}>
+                <Text style={{ color: item.type === 'Dealer' ? colors.warning : '#4F46E5', fontSize: 12, fontWeight: "700" }}>{item.type}</Text>
               </View>
               <View style={{ backgroundColor: item.raw.status === 'SUBMITTED' ? '#DCFCE7' : '#F1F5F9', paddingHorizontal: 10, paddingVertical: 4, borderRadius: radius.pill }}>
                 <Text style={{ color: item.raw.status === 'SUBMITTED' ? '#166534' : colors.textMuted, fontSize: 12, fontWeight: "700" }}>
@@ -414,12 +520,15 @@ export const DashboardScreen = ({ navigation }: any) => {
               </View>
             </View>
 
-            <View style={{ alignItems: "flex-end" }}>
-              <Text style={{ fontSize: 10, color: colors.textMuted, fontWeight: "800", letterSpacing: 0.5, marginBottom: 2 }}>{t("SCORE")}</Text>
-              <View style={{ flexDirection: "row", alignItems: "baseline" }}>
-                <Text style={{ fontSize: 20, fontWeight: "900", color: getScoreColor(item.score) }}>{item.score}</Text>
+            {/* UPDATE: Hide SCORE for Farmers */}
+            {item.type === 'Dealer' && (
+              <View style={{ alignItems: "flex-end" }}>
+                <Text style={{ fontSize: 10, color: colors.textMuted, fontWeight: "800", letterSpacing: 0.5, marginBottom: 2 }}>{t("SCORE")}</Text>
+                <View style={{ flexDirection: "row", alignItems: "baseline" }}>
+                  <Text style={{ fontSize: 20, fontWeight: "900", color: getScoreColor(item.score) }}>{item.score}</Text>
+                </View>
               </View>
-            </View>
+            )}
           </View>
 
           <View style={{ height: 1, backgroundColor: colors.border, marginVertical: spacing.md }} />
@@ -450,14 +559,18 @@ export const DashboardScreen = ({ navigation }: any) => {
         }}
       >
         <View style={{ flexDirection: "row", alignItems: "center" }}>
-          <View style={{ backgroundColor: colors.primarySoft, padding: 8, borderRadius: 12, marginRight: spacing.sm }}>
-            <Leaf size={24} color={colors.primary} />
-          </View>
-          <View>
-            <Text style={{ fontSize: 16, fontWeight: "900", color: colors.text }}>{t("Hello,")} {user?.name}</Text>
-            <Text style={{ color: colors.textMuted, fontSize: 12, fontWeight: "600" }}>{t("Manage your network")}</Text>
-          </View>
-        </View>
+  <View style={{ padding: 4, borderRadius: 12, marginRight: spacing.sm }}>
+    {/* REPLACED LEAF WITH YOUR COMPANY LOGO */}
+    <Image 
+      source={require('../../../../assets/company-logo.jpeg')} 
+      style={{ width: 140, height: 40, resizeMode: 'contain', borderRadius: 8 }} 
+    />
+  </View>
+  {/* <View>
+    <Text style={{ fontSize: 16, fontWeight: "900", color: colors.text }}>{t("Hello,")} {user?.name}</Text>
+    <Text style={{ color: colors.textMuted, fontSize: 12, fontWeight: "600" }}>{t("Manage your network")}</Text>
+  </View> */}
+</View>
 
         <Pressable onPress={() => navigation.navigate("DraftsScreen")} style={{ padding: 8, position: "relative" }}>
           <MaterialIcons name="file-present" size={28} color={colors.textMuted} />
@@ -597,6 +710,8 @@ export const DashboardScreen = ({ navigation }: any) => {
                         actionIcon={item.actionIcon}
                         onAction={() => {
                           if (item.actionId === "dealer") navigation.navigate("DealerOnboarding");
+                          else if (item.actionId === "farmer") navigation.navigate("FarmerOnboarding");
+                          else if (item.actionId === "distributor") navigation.navigate("DistributorOnboarding");
                           else navigation.navigate("ComingSoonScreen");
                         }}
                       />
@@ -616,6 +731,8 @@ export const DashboardScreen = ({ navigation }: any) => {
         ]}
         onActionPress={(id) => {
           if (id === "dealer") navigation.navigate("DealerOnboarding");
+          else if (id === "farmer") navigation.navigate("FarmerOnboarding");
+          else if (id === "distributor") navigation.navigate("DistributorOnboarding");
           else navigation.navigate("ComingSoonScreen");
         }}
       />

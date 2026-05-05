@@ -10,6 +10,21 @@ export async function fetchOnboardedCount() {
   return count ?? 0;
 }
 
+export const fetchMyFarmers = async (userId: string, page: number = 0, limit: number = 5) => {
+  const from = page * limit;
+  const to = from + limit - 1;
+  const { data, error } = await supabase
+    .from('farmers')
+    .select('*')
+    .eq('se_id', userId)
+    .order('created_at', { ascending: false })
+    .range(from, to);
+
+  if (error) throw error;
+  if (!data) return [];
+  return data;
+};
+
 export const fetchMyDealers = async (userId: string, page: number = 0, limit: number = 5) => { // Updated limit to 5
   const from = page * limit;
   const to = from + limit - 1;

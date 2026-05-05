@@ -26,7 +26,6 @@ export function useDealerOnboarding(navigation: any, route: any) {
   const addDraft = useDraftStore((s) => s.addDraft);
   const updateDraft = useDraftStore((s) => s.updateDraft);
   const removeDraft = useDraftStore((s) => s.removeDraft);
-
   const editData = route?.params?.editData; 
   const draftData = route?.params?.draftData;
   const draftId = route?.params?.draftId;
@@ -39,16 +38,18 @@ export function useDealerOnboarding(navigation: any, route: any) {
 
 
   const autoSave = () => {
-    const currentValues = form.getValues();
-    if (!currentValues.shopName) return;
-    if (editData) return; // Don't auto-save if we are editing a SUBMITTED profile
+    // 🚀 FIX: Get the current form data
+    const currentValues = form.getValues(); 
+
+    // 🚀 FIX: Check 'shopName' (matching your schema's type)
+    if (!currentValues || !currentValues.shopName) return; 
 
     if (draftIdRef.current) {
       updateDraft(draftIdRef.current, currentValues);
     } else {
-      const newId = Date.now().toString();
+      // 🚀 FIX: Pass 'DEALER' in all caps
+      const newId = addDraft(currentValues, 'DEALER'); 
       draftIdRef.current = newId;
-      addDraft(currentValues, newId);
     }
   };
 

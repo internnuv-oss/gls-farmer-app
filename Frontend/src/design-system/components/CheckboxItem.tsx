@@ -29,7 +29,8 @@ export const CheckboxItem: React.FC<Props> = ({ label, checked, onChange }) => {
           alignItems: 'center', justifyContent: 'center', marginRight: spacing.md,
         }}
       >
-        {checked && <MaterialIcons name="check" size={16} color="#FFF" />}
+        {/* SAFELY RENDERED */}
+        {checked ? <MaterialIcons name="check" size={16} color="#FFF" /> : null}
       </View>
       <Text style={{ flex: 1, fontSize: 14, color: colors.text, fontWeight: '600' }}>
         {label}
