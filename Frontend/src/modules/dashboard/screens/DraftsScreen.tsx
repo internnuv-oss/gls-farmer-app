@@ -1,5 +1,5 @@
 import React, { useMemo, useState, useEffect } from 'react';
-import { View, Text, FlatList, Pressable, Alert, TextInput, RefreshControl, ActivityIndicator } from 'react-native';
+import { View, Text, FlatList, Pressable, TextInput, RefreshControl, ActivityIndicator } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useDraftStore } from '../../../store/draftStore';
@@ -17,12 +17,11 @@ export const DraftsScreen = ({ navigation }: any) => {
   const [sortOrder, setSortOrder] = useState<"newest" | "oldest">("newest");
   const [refreshing, setRefreshing] = useState(false);
 
-  // --- NEW: Client-Side Pagination State ---
+  // Client-Side Pagination State
   const [page, setPage] = useState(1);
   const [loadingMore, setLoadingMore] = useState(false);
-  const PAGE_LIMIT = 5; // Number of drafts to load per scroll
+  const PAGE_LIMIT = 5;
 
-  // Reset pagination if the user searches or sorts
   useEffect(() => {
     setPage(1);
   }, [searchQuery, sortOrder]);
@@ -30,7 +29,7 @@ export const DraftsScreen = ({ navigation }: any) => {
   const onRefresh = () => {
     setRefreshing(true);
     setTimeout(() => {
-      setPage(1); // Reset to page 1 on pull-to-refresh
+      setPage(1); 
       setRefreshing(false);
     }, 600);
   };
@@ -40,8 +39,10 @@ export const DraftsScreen = ({ navigation }: any) => {
     let result = [...drafts];
     if (searchQuery.trim()) {
       result = result.filter(d => {
-        // 🚀 FIX: Search by Shop Name OR Farmer Name based on the type
-        const nameToSearch = d.type === 'DEALER' ? d.data?.shopName : d.data?.fullName;
+        // 🚀 UPGRADED: Added Distributor firmName to the search logic
+        const nameToSearch = d.type === 'DEALER' ? d.data?.shopName : 
+                             d.type === 'DISTRIBUTOR' ? d.data?.firmName : 
+                             d.data?.fullName;
         return (nameToSearch || "").toLowerCase().includes(searchQuery.toLowerCase());
       });
     }
@@ -60,11 +61,9 @@ export const DraftsScreen = ({ navigation }: any) => {
 
   const hasMore = displayedDrafts.length < processedDrafts.length;
 
-  // 3. Load more function for the FlatList
   const handleLoadMore = () => {
     if (hasMore && !loadingMore) {
       setLoadingMore(true);
-      // Simulate a tiny network delay so it feels like the Dashboard UX
       setTimeout(() => {
         setPage(prev => prev + 1);
         setLoadingMore(false);
@@ -100,8 +99,6 @@ export const DraftsScreen = ({ navigation }: any) => {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingBottom: spacing['2xl'] }}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[colors.primary]} tintColor={colors.primary} />}
-        
-        // --- NEW: Pagination Props ---
         onEndReached={handleLoadMore}
         onEndReachedThreshold={0.5}
         ListFooterComponent={() => (
@@ -111,7 +108,6 @@ export const DraftsScreen = ({ navigation }: any) => {
             </View>
           ) : null
         )}
-
         ListEmptyComponent={
           <View style={{ alignItems: 'center', marginTop: 80 }}>
             <View style={{ width: 80, height: 80, borderRadius: 40, backgroundColor: '#F1F5F9', alignItems: 'center', justifyContent: 'center', marginBottom: spacing.md }}>
@@ -123,50 +119,65 @@ export const DraftsScreen = ({ navigation }: any) => {
             </Text>
           </View>
         }
-        renderItem={({ item }) => (
-          <View style={{ backgroundColor: colors.surface, padding: spacing.lg, borderRadius: radius.lg, marginBottom: spacing.md, borderWidth: 1, borderColor: colors.border, ...shadows.soft }}>
-            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-              <View style={{ width: 48, height: 48, borderRadius: 14, backgroundColor: item.type === 'DEALER' ? '#FEF3C7' : '#E0E7FF', alignItems: 'center', justifyContent: 'center', marginRight: spacing.md }}>
-                <MaterialIcons name={item.type === 'DEALER' ? "storefront" : "agriculture"} size={24} color={item.type === 'DEALER' ? colors.warning : '#4F46E5'} />
-              </View>
-              <View style={{ flex: 1 }}>
-                {/* 🚀 FIX: Display the correct name based on type */}
-                <Text style={{ fontSize: 16, fontWeight: '800', color: colors.text }}>
-                  {item.type === 'DEALER' ? (item.data?.shopName || t('Incomplete Dealer')) : (item.data?.fullName || t('Incomplete Farmer'))}
-                </Text>
-                
-                <View style={{flexDirection: 'row', alignItems: 'center', marginTop: 4}}>
-                  <View style={{ backgroundColor: '#F1F5F9', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, marginRight: 6 }}>
-                    <Text style={{ fontSize: 10, fontWeight: '800', color: colors.textMuted }}>{item.type}</Text>
-                  </View>
-                  <Text style={{ fontSize: 12, color: colors.textMuted, fontWeight: '600' }}>
-                    {new Date(parseInt(item.id)).toLocaleDateString()}
-                  </Text>
+        renderItem={({ item }) => {
+          // 🚀 UPGRADED: Dynamic styles based on all 3 entity types
+          const isDealer = item.type === 'DEALER';
+          const isDistributor = item.type === 'DISTRIBUTOR';
+
+          const iconBg = isDealer ? '#FEF3C7' : isDistributor ? '#FFEDD5' : '#E0E7FF';
+          const iconColor = isDealer ? colors.warning : isDistributor ? colors.secondary : '#4F46E5';
+          const iconName = isDealer ? 'storefront' : isDistributor ? 'domain' : 'agriculture';
+
+          const displayName = isDealer ? (item.data?.shopName || t('Incomplete Dealer')) :
+                              isDistributor ? (item.data?.firmName || t('Incomplete Distributor')) : 
+                              (item.data?.fullName || t('Incomplete Farmer'));
+
+          return (
+            <View style={{ backgroundColor: colors.surface, padding: spacing.lg, borderRadius: radius.lg, marginBottom: spacing.md, borderWidth: 1, borderColor: colors.border, ...shadows.soft }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                <View style={{ width: 48, height: 48, borderRadius: 14, backgroundColor: iconBg, alignItems: 'center', justifyContent: 'center', marginRight: spacing.md }}>
+                  <MaterialIcons name={iconName} size={24} color={iconColor} />
                 </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={{ fontSize: 16, fontWeight: '800', color: colors.text }}>
+                    {displayName}
+                  </Text>
+                  
+                  <View style={{flexDirection: 'row', alignItems: 'center', marginTop: 4}}>
+                    <View style={{ backgroundColor: '#F1F5F9', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, marginRight: 6 }}>
+                      <Text style={{ fontSize: 10, fontWeight: '800', color: colors.textMuted }}>{item.type}</Text>
+                    </View>
+                    <Text style={{ fontSize: 12, color: colors.textMuted, fontWeight: '600' }}>
+                      {new Date(parseInt(item.id)).toLocaleDateString()}
+                    </Text>
+                  </View>
+                </View>
+                <Pressable onPress={() => handleDelete(item.id)} style={{ padding: spacing.sm, backgroundColor: '#FEE2E2', borderRadius: radius.sm }}>
+                  <MaterialIcons name="delete-outline" size={20} color={colors.danger} />
+                </Pressable>
               </View>
-              <Pressable onPress={() => handleDelete(item.id)} style={{ padding: spacing.sm, backgroundColor: '#FEE2E2', borderRadius: radius.sm }}>
-                <MaterialIcons name="delete-outline" size={20} color={colors.danger} />
+
+              <View style={{ height: 1, backgroundColor: colors.border, marginVertical: spacing.md }} />
+              
+              <Pressable 
+                onPress={() => {
+                  // 🚀 UPGRADED: Added navigation routing for Distributor Onboarding
+                  if (item.type === 'DEALER') {
+                    navigation.navigate('DealerOnboarding', { draftData: item.data, draftId: item.id });
+                  } else if (item.type === 'FARMER') {
+                    navigation.navigate('FarmerOnboarding', { draftData: item.data, draftId: item.id });
+                  } else if (item.type === 'DISTRIBUTOR') {
+                    navigation.navigate('DistributorOnboarding', { draftData: item.data, draftId: item.id });
+                  }
+                }} 
+                style={{ flexDirection: 'row', justifyContent: 'center', alignItems: 'center', paddingVertical: spacing.xs }}
+              >
+                <Text style={{ color: colors.primary, fontWeight: '800', fontSize: 14, marginRight: 4 }}>{t('Resume Onboarding')}</Text>
+                <MaterialIcons name="arrow-forward" size={18} color={colors.primary} />
               </Pressable>
             </View>
-
-            <View style={{ height: 1, backgroundColor: colors.border, marginVertical: spacing.md }} />
-            
-            {/* 🚀 FIX: Route to the correct screen based on draft type */}
-            <Pressable 
-              onPress={() => {
-                if (item.type === 'DEALER') {
-                  navigation.navigate('DealerOnboarding', { draftData: item.data, draftId: item.id });
-                } else if (item.type === 'FARMER') {
-                  navigation.navigate('FarmerOnboarding', { draftData: item.data, draftId: item.id });
-                }
-              }} 
-              style={{ flexDirection: 'row', justifyContent: 'center', alignItems: 'center', paddingVertical: spacing.xs }}
-            >
-              <Text style={{ color: colors.primary, fontWeight: '800', fontSize: 14, marginRight: 4 }}>{t('Resume Onboarding')}</Text>
-              <MaterialIcons name="arrow-forward" size={18} color={colors.primary} />
-            </Pressable>
-          </View>
-        )}
+          );
+        }}
       />
     </SimpleScreenTemplate>
   );

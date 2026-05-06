@@ -14,9 +14,12 @@ export type FilterState = {
   willingDemoFarmers: string[];
   region: string[];
   scale: string[];
-  farmerCrops: string[]; // <-- NEW
-  farmerSoil: string[];  // <-- NEW
-  farmerWater: string[]; // <-- NEW
+  farmerCrops: string[]; 
+  farmerSoil: string[];  
+  farmerWater: string[];
+  distributorBand: string[];
+  distributorStatus: string[];
+  distributorColdChain: string[]; 
 };
 
 export const defaultFilters: FilterState = {
@@ -28,9 +31,12 @@ export const defaultFilters: FilterState = {
   willingDemoFarmers: [],
   region: [],
   scale: [],
-  farmerCrops: [], // <-- NEW
-  farmerSoil: [],  // <-- NEW
-  farmerWater: []  // <-- NEW
+  farmerCrops: [], 
+  farmerSoil: [],  
+  farmerWater: [] ,
+  distributorBand: [],
+  distributorStatus: [],
+  distributorColdChain: [], 
 };
 
 type FilterModalProps = {
@@ -140,8 +146,8 @@ export const FilterModal: React.FC<FilterModalProps> = ({ visible, entityType, c
                 <Text style={styles.sectionLabel}>Sort {entityType}</Text>
                 {[
                   { label: "Newest First", value: "latest" },
-                  // Dealer Specific Sorting
-                  ...(entityType === "Dealers" ? [
+                  // 🚀 UPDATED: Score sorting now applies to BOTH Dealers and Distributors
+                  ...(entityType === "Dealers" || entityType === "Distributors" ? [
                     { label: "Highest Score", value: "score_high" },
                     { label: "Lowest Score", value: "score_low" }
                   ] : []),
@@ -218,19 +224,39 @@ export const FilterModal: React.FC<FilterModalProps> = ({ visible, entityType, c
                 </>
               )}
 
-              {/* --- DISTRIBUTOR FILTERS --- */}
+              {/* --- 🚀 DISTRIBUTOR FILTERS --- */}
               {entityType === "Distributors" && (
-                <FilterAccordionGroup 
-                  title="Region" 
-                  selectedValues={localFilters.region} 
-                  onToggleItem={(val) => toggleFilter('region', val)}
-                  options={[
-                    { label: "North", value: "North" },
-                    { label: "South", value: "South" },
-                    { label: "East", value: "East" },
-                    { label: "West", value: "West" }
-                  ]} 
-                />
+                <>
+                  <FilterAccordionGroup 
+                    title="Score Grade" 
+                    selectedValues={localFilters.distributorBand} 
+                    onToggleItem={(val) => toggleFilter('distributorBand', val)}
+                    options={[
+                      { label: "Grade A+ (Platinum)", value: "Grade A+" },
+                      { label: "Grade A (Strategic)", value: "Grade A" },
+                      { label: "Grade B (Operational)", value: "Grade B" },
+                      { label: "Grade C (High Risk)", value: "Grade C" }
+                    ]} 
+                  />
+                  <FilterAccordionGroup 
+                    title="Proposed Status" 
+                    selectedValues={localFilters.distributorStatus} 
+                    onToggleItem={(val) => toggleFilter('distributorStatus', val)}
+                    options={[
+                      { label: "Authorised Distributor", value: "Authorised Distributor" },
+                      { label: "Exclusive Focus Area", value: "Exclusive Focus Area" }
+                    ]} 
+                  />
+                  <FilterAccordionGroup 
+                    title="Cold Chain Facility" 
+                    selectedValues={localFilters.distributorColdChain} 
+                    onToggleItem={(val) => toggleFilter('distributorColdChain', val)}
+                    options={[
+                      { label: "Yes", value: "Yes" },
+                      { label: "No", value: "No" }
+                    ]} 
+                  />
+                </>
               )}
 
               {/* --- FARMER FILTERS --- */}
