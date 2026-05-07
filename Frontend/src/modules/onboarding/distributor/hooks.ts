@@ -7,6 +7,7 @@ import * as ImagePicker from "expo-image-picker";
 import * as ImageManipulator from 'expo-image-manipulator';
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
+import * as Location from 'expo-location'; // 🚀 ADDED: Location tracking
 import { documentDirectory, copyAsync } from 'expo-file-system/legacy';
 
 import { requestMediaPermission, requestCameraPermission } from "../../../core/permissions";
@@ -31,12 +32,6 @@ export function useDistributorOnboarding(navigation: any, route: any) {
   const [uploading, setUploading] = useState<Record<string, boolean>>({});
   const [showSuccess, setShowSuccess] = useState(false);
   const draftIdRef = useRef(draftId);
-
-  // 🚀 THE FIX: We use a ref to track success silently so it doesn't trigger cleanup loops!
-  const showSuccessRef = useRef(false);
-  useEffect(() => {
-    showSuccessRef.current = showSuccess;
-  }, [showSuccess]);
 
   const normalizedDraft = useMemo(() => {
     const sourceData = editData ? editData.raw_data : draftData;
@@ -67,6 +62,7 @@ export function useDistributorOnboarding(navigation: any, route: any) {
       bankAccounts: [{ accountName: '', accountNumber: '', bankIfsc: '', bankNameBranch: '' }],
       topDealers: [{ name: '', address: '', contact: '', turnover: '', products: '', farmersServed: '', bioExperience: '' }],
       glsCommitments: [], complianceChecklist: [], documents: {},
+      storageLocations: {}, // 🚀 ADDED: Safe container for GPS coordinates
       anxTerritories: [{ state: '', district: '', taluka: '', villages: [], cultivableArea: '', majorCrops: [] }],
       anxPrincipalSuppliers: [{ name: '', share: '' }],
       anxChemicalProducts: [],
@@ -97,18 +93,14 @@ export function useDistributorOnboarding(navigation: any, route: any) {
     }
   };
 
-  // 🚀 THE FIX: Changed dependency array to [] so the cleanup function only runs on UNMOUNT!
   useEffect(() => {
     const sub = AppState.addEventListener("change", state => {
       if (state === "inactive" || state === "background") {
-        if (!showSuccessRef.current) autoSave();
+        if (!showSuccess) autoSave();
       }
     });
-    return () => { 
-      sub.remove(); 
-      if (!showSuccessRef.current) autoSave(); 
-    };
-  }, []); // <--- Empty dependency array is the crucial fix here!
+    return () => { sub.remove(); if (!showSuccess) autoSave(); };
+  }, [showSuccess]);
 
   const saveDraft = () => {
     autoSave();
@@ -141,7 +133,9 @@ export function useDistributorOnboarding(navigation: any, route: any) {
       const photoDocs = ['storage_exterior', 'storage_interior'];
       const complianceDocs = (values.complianceChecklist || []).map((item: string) => item.replace(/[^a-zA-Z0-9]/g, '_').toLowerCase());
       const allRequired = [...coreDocs, ...photoDocs, ...complianceDocs];
-      return allRequired.every(key => { const doc = values.documents?.[key]; return Array.isArray(doc) ? doc.length > 0 : !!doc; });
+      
+      // 🚀 EXTENDED: Ensure the exterior storage photo was captured (which guarantees GPS was pulled)
+      return allRequired.every(key => { const doc = values.documents?.[key]; return Array.isArray(doc) ? doc.length > 0 : !!doc; }) && !!(values as any).storageLocations?.['storage_exterior'];
     }
     if (step === 8) {
       const validTerritories = values.anxTerritories?.length > 0 && values.anxTerritories.every(t => t.state && t.district && t.taluka && Array.isArray(t.villages) && t.villages.length > 0 && t.cultivableArea && Array.isArray(t.majorCrops) && t.majorCrops.length > 0);
@@ -209,6 +203,21 @@ export function useDistributorOnboarding(navigation: any, route: any) {
     }
     
     setUploading(prev => ({ ...prev, [key]: true }));
+
+    // 🚀 NEW: GPS Location Tracking for Storage Photos
+    let location: any = null;
+    const requiresGPS = ['storage_exterior', 'storage_interior'].includes(key);
+    
+    if (requiresGPS) {
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== 'granted') { 
+        useAlertStore.getState().showAlert("GPS Required", "GPS location is required when capturing storage facility photos."); 
+        setUploading(prev => ({ ...prev, [key]: false }));
+        return; 
+      }
+      location = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+    }
+
     try {
       let finalUri = uri;
       const isCameraOrImage = type === 'camera' || type === 'image';
@@ -225,6 +234,16 @@ export function useDistributorOnboarding(navigation: any, route: any) {
       } else {
         form.setValue('documents', { ...currentDocs, [key]: url }, { shouldValidate: true });
       }
+
+      // 🚀 NEW: Save GPS Coordinates into the form payload
+      if (location) {
+        const currentLocs = (form.getValues() as any).storageLocations || {};
+        form.setValue('storageLocations' as any, { 
+          ...currentLocs, 
+          [key]: { lat: location.coords.latitude, lng: location.coords.longitude } 
+        }, { shouldValidate: true });
+      }
+
     } catch(e) {
       useAlertStore.getState().showAlert("Error", "Upload failed.");
     } finally {
@@ -314,6 +333,16 @@ export function useDistributorOnboarding(navigation: any, route: any) {
                 <tr><th>Owner Name</th><td>${data.ownerName || '-'}</td></tr>
                 <tr><th>Contact Person</th><td>${data.contactPerson} (${data.contactDesignation})</td></tr>
                 <tr><th>Registered Address</th><td>${data.address || '-'}<br><span style="color:#64748B; font-size:12px;">${data.taluka || '-'}, ${data.city || '-'}, ${data.state || '-'} - ${data.pincode}</span></td></tr>
+                
+                <tr>
+                  <th>Facility GPS Coordinates</th>
+                  <td>
+                    ${(data as any).storageLocations?.['storage_exterior'] 
+                      ? `<a href="https://maps.google.com/?q=$${(data as any).storageLocations['storage_exterior'].lat},${(data as any).storageLocations['storage_exterior'].lng}" style="color: #2563EB; font-weight: 800; text-decoration: underline;">📍 View on Map</a><br><span style="font-size: 11px; color: #64748B;">Lat: ${(data as any).storageLocations['storage_exterior'].lat.toFixed(5)}, Lng: ${(data as any).storageLocations['storage_exterior'].lng.toFixed(5)}</span>`
+                      : '<span class="empty-text">Not Captured</span>'}
+                  </td>
+                </tr>
+
                 <tr><th>Contact Numbers</th><td>${data.contactMobile ? `+91 ${data.contactMobile}` : '-'}</td></tr>
                 <tr><th>Email</th><td>${data.email || '-'}</td></tr>
                 <tr><th>Firm Type & Est. Year</th><td>${data.firmType || '-'} / ${data.estYear || '-'}</td></tr>

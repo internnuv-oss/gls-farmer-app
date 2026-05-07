@@ -1,44 +1,52 @@
-import { z } from 'zod';
+import { z } from "zod";
 
 export const farmerOnboardingSchema = z.object({
-  // Personal
-  fullName: z.string().min(2, "Full Name is required"),
-  fatherName: z.string().min(2, "Father's/Husband's Name is required"),
-  mobile: z.string().regex(/^\d{10}$/, "Must be exactly 10 digits"),
-  // 🚀 Added strict validation for alternate mobile if the user enters one
-  alternateMobile: z.string().optional().refine(val => !val || /^\d{10}$/.test(val), {
-    message: "Must be exactly 10 digits if provided"
-  }),
+  // 1. Personal Details
+  fullName: z.string().min(2, "Full name is required"),
+  fatherName: z.string().min(2, "Father's name is required"),
+  mobile: z.string().regex(/^\d{10}$/, "Invalid mobile number"),
+  alternateMobile: z.string().optional(),
   state: z.string().min(2, "State is required"),
   city: z.string().min(2, "District is required"),
   taluka: z.string().min(2, "Taluka is required"),
   village: z.string().min(2, "Village is required"),
 
-  // Farm Details
-  // Farm Details
-  totalLand: z.string().min(1, "Total land holding is required"),
+  // 2. Farm Details
+  landUnit: z.string().optional(), // 🚀 NEW
+  totalLand: z.string().min(1, "Total land is required"),
   irrigatedLand: z.string().optional(),
   rainFedLand: z.string().optional(),
   majorCrops: z.array(z.string()).min(1, "Select at least one major crop"),
-  
-  // 🚀 UPDATED: soilType is now an array
   soilType: z.array(z.string()).min(1, "Select at least one soil type"),
-  otherSoilType: z.string().optional(),     
-  
+  otherSoilType: z.string().optional(),
   waterSource: z.array(z.string()).min(1, "Select at least one water source"),
   otherWaterSource: z.string().optional(),
+  
+  // 🚀 NEW OPTIONAL FARM DETAILS
+  irrigationType: z.string().optional(),
+  isIntercropping: z.string().optional(),
+  sideTrees: z.array(z.object({
+    type: z.string().optional(),
+    quantity: z.string().optional()
+  })).optional(),
+  cattles: z.array(z.object({
+    type: z.string().optional(),
+    quantity: z.string().optional()
+  })).optional(),
 
-  // History & Link
+  // 3. History & Linking
   lastCropGrown: z.string().optional(),
   yield: z.string().optional(),
   majorProblems: z.array(z.string()).optional(),
-  otherProblem: z.string().optional(), // 🚀 ADDED
-  dealerId: z.string().min(1, "Linking to a Dealer is required"),
+  otherProblem: z.string().optional(),
+  dealerId: z.string().optional(), // 🚀 Dealer is now optional
 
-  // Agreement
-  agreementAccepted: z.boolean().refine(v => v === true, "Must accept agreement"),
-  farmerSignature: z.string().min(10, "Farmer signature required"),
-  seSignature: z.string().min(10, "SE signature required"),
+  // 4. Signatures
+  agreementAccepted: z.boolean().refine((val) => val === true, {
+    message: "You must accept the terms & conditions",
+  }),
+  farmerSignature: z.string().min(5, "Farmer signature is required"),
+  seSignature: z.string().min(5, "Sales Executive signature is required"),
 });
 
 export type FarmerOnboardingValues = z.infer<typeof farmerOnboardingSchema>;

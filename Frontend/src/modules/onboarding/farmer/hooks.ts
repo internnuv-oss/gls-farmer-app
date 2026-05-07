@@ -50,11 +50,16 @@ export function mapFarmerDbToForm(db: any): FarmerOnboardingValues {
     otherSoilType: otherSoil || "",
     waterSource: knownWater,
     otherWaterSource: otherWater || "",
+    landUnit: db.farm_details?.landUnit || "Acres", // 🚀 NEW
+    irrigationType: db.farm_details?.irrigationType || "", // 🚀 NEW
+    isIntercropping: db.farm_details?.isIntercropping || undefined, // 🚀 NEW
+    sideTrees: db.farm_details?.sideTrees || [], // 🚀 NEW
+    cattles: db.farm_details?.cattles || [], // 🚀 NEW
     lastCropGrown: db.history_details?.lastCropGrown || "",
     yield: db.history_details?.yield || "",
     majorProblems: knownProb,
     otherProblem: otherProb || "",
-    dealerId: db.dealer_id || "",
+    dealerId: db.dealer_id || "", 
     agreementAccepted: true,
     farmerSignature: db.farmer_signature || "",
     seSignature: db.se_signature || ""
@@ -70,7 +75,7 @@ export function useFarmerOnboarding(navigation: any, route: any) {
   const draftId = route?.params?.draftId;
 
   const [step, setStep] = useState(1);
-  const [jumpBackTo, setJumpBackTo] = useState<number | null>(null); // 🚀 ADDED jumpBackTo
+  const [jumpBackTo, setJumpBackTo] = useState<number | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
   const [dealers, setDealers] = useState<{label: string, value: string}[]>([]);
@@ -81,7 +86,7 @@ export function useFarmerOnboarding(navigation: any, route: any) {
   useEffect(() => { showSuccessRef.current = showSuccess; }, [showSuccess]);
 
   const defaultValues = editData ? mapFarmerDbToForm(editData) : (draftData || {
-    majorCrops: [], soilType: [], waterSource: [], majorProblems: [], agreementAccepted: false
+    majorCrops: [], soilType: [], waterSource: [], majorProblems: [], sideTrees: [], cattles: [], landUnit: 'Acres', agreementAccepted: false
   });
 
   const form = useForm<FarmerOnboardingValues>({
@@ -126,18 +131,19 @@ export function useFarmerOnboarding(navigation: any, route: any) {
         return baseValid;
     }
     if (step === 3) {
-      const baseValid = !!values.dealerId;
+      // 🚀 FIXED: Dealer is now optional, just check problems
       if (values.majorProblems?.includes('Others') && !values.otherProblem) return false; 
-      return baseValid;
+      return true;
     }
     if (step === 4) return !!(values.agreementAccepted && values.farmerSignature && values.seSignature);
-    if (step === 5) return true; // Review step
+    if (step === 5) return true; 
     return true; 
   }, [step, values]);
 
   const generateHTML = () => {
     const data = form.getValues();
     const dateStr = new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' });
+    const unit = data.landUnit || 'Acres'; // 🚀 Dynamic Unit
 
     const renderSignature = (sigData?: string) => {
       if (!sigData) return '<span style="color:red">No Signature</span>';
@@ -188,7 +194,9 @@ export function useFarmerOnboarding(navigation: any, route: any) {
         </table>
         <div class="section-title">2. Farm Details</div>
         <table>
-          <tr><th>Total Land</th><td>${data.totalLand || '0'} Acres</td></tr>
+          <tr><th>Total Land</th><td>${data.totalLand || '0'} ${unit}</td></tr>
+          <tr><th>Irrigated Land</th><td>${data.irrigatedLand || '0'} ${unit}</td></tr>
+          <tr><th>Rain-Fed Land</th><td>${data.rainFedLand || '0'} ${unit}</td></tr>
           <tr><th>Major Crops</th><td>${data.majorCrops?.join(', ') || '-'}</td></tr>
           <tr><th>Soil Type</th><td>${data.soilType?.map(s => s === 'Others' ? data.otherSoilType : s).join(', ') || '-'}</td></tr>
           <tr><th>Water Source</th><td>${data.waterSource?.map(w => w === 'Others' ? data.otherWaterSource : w).join(', ') || '-'}</td></tr>
@@ -234,12 +242,24 @@ export function useFarmerOnboarding(navigation: any, route: any) {
     try {
       const dbPayload = {
         se_id: user.id,
-        dealer_id: data.dealerId,
+        dealer_id: data.dealerId || null, // 🚀 Save as null if optional
         full_name: data.fullName,
         mobile: data.mobile,
         village: data.village,
         personal_details: { fatherName: data.fatherName, alternateMobile: data.alternateMobile, state: data.state, city: data.city, taluka: data.taluka },
-        farm_details: { totalLand: data.totalLand, irrigatedLand: data.irrigatedLand, rainFedLand: data.rainFedLand, majorCrops: data.majorCrops, soilType: data.soilType.map(st => st === 'Others' ? data.otherSoilType : st), waterSource: data.waterSource.map(ws => ws === 'Others' ? data.otherWaterSource : ws) },
+        farm_details: { 
+          totalLand: data.totalLand, 
+          irrigatedLand: data.irrigatedLand, 
+          rainFedLand: data.rainFedLand, 
+          majorCrops: data.majorCrops, 
+          soilType: data.soilType.map(st => st === 'Others' ? data.otherSoilType : st), 
+          waterSource: data.waterSource.map(ws => ws === 'Others' ? data.otherWaterSource : ws),
+          landUnit: data.landUnit || 'Acres', // 🚀 NEW
+          irrigationType: data.irrigationType, // 🚀 NEW
+          isIntercropping: data.isIntercropping, // 🚀 NEW
+          sideTrees: data.sideTrees, // 🚀 NEW
+          cattles: data.cattles // 🚀 NEW
+        },
         history_details: { lastCropGrown: data.lastCropGrown, yield: data.yield, majorProblems: data.majorProblems?.map(p => p === 'Others' ? data.otherProblem : p) || [] },
         farmer_signature: data.farmerSignature,
         se_signature: data.seSignature,
@@ -264,7 +284,10 @@ export function useFarmerOnboarding(navigation: any, route: any) {
       
       await supabase.from('farmers').update({ pdf_url: pdfUrl }).eq('id', insertedId);
 
-      if (draftIdRef.current) removeDraft(draftIdRef.current);
+      if (draftIdRef.current) {
+        removeDraft(draftIdRef.current);
+        draftIdRef.current = undefined; 
+      }
       setShowSuccess(true);
     } catch (error: any) {
       useAlertStore.getState().showAlert("Submission Failed", error.message);

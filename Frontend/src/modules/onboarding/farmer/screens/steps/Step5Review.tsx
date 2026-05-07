@@ -27,10 +27,13 @@ export const Step5Review = ({ form, setStep, setJumpBackTo, dealers, t }: Props)
     </Pressable>
   );
 
-  const getDealerName = (id: string) => {
+  const getDealerName = (id?: string) => {
+    if (!id) return t("None Linked");
     const dealer = dealers.find(d => d.value === id);
     return dealer ? dealer.label : id;
   };
+  
+  const unit = watch('landUnit') || 'Acres';
 
   return (
     <View>
@@ -58,9 +61,9 @@ export const Step5Review = ({ form, setStep, setJumpBackTo, dealers, t }: Props)
            <Text style={{ fontSize: 16, fontWeight: '800', color: colors.primary }}>2. {t("Farm Details")}</Text>
            {renderEditBtn(2)}
         </View>
-        <Text style={{ color: colors.textMuted, marginBottom: 4 }}>{t("Total Land")}: <Text style={{ color: colors.text, fontWeight: '700' }}>{watch('totalLand')} {t("Acres")}</Text></Text>
-        <Text style={{ color: colors.textMuted, marginBottom: 4 }}>{t("Irrigated Land")}: <Text style={{ color: colors.text }}>{watch('irrigatedLand') || 0} {t("Acres")}</Text></Text>
-        <Text style={{ color: colors.textMuted, marginBottom: 4 }}>{t("Rain-Fed Land")}: <Text style={{ color: colors.text }}>{watch('rainFedLand') || 0} {t("Acres")}</Text></Text>
+        <Text style={{ color: colors.textMuted, marginBottom: 4 }}>{t("Total Land")}: <Text style={{ color: colors.text, fontWeight: '700' }}>{watch('totalLand')} {t(unit)}</Text></Text>
+        <Text style={{ color: colors.textMuted, marginBottom: 4 }}>{t("Irrigated Land")}: <Text style={{ color: colors.text }}>{watch('irrigatedLand') || 0} {t(unit)}</Text></Text>
+        <Text style={{ color: colors.textMuted, marginBottom: 4 }}>{t("Rain-Fed Land")}: <Text style={{ color: colors.text }}>{watch('rainFedLand') || 0} {t(unit)}</Text></Text>
         <Text style={{ color: colors.textMuted, marginBottom: 8, marginTop: 8 }}>{t("Major Crops")}: <Text style={{ color: colors.text }}>{watch('majorCrops')?.join(', ') || t("None")}</Text></Text>
         <Text style={{ color: colors.textMuted, marginBottom: 4 }}>{t("Soil Type")}: <Text style={{ color: colors.text }}>{watch('soilType')?.map(s => s === 'Others' ? watch('otherSoilType') : s).join(', ') || t("None")}</Text></Text>
         <Text style={{ color: colors.textMuted, marginBottom: 4 }}>{t("Water Source")}: <Text style={{ color: colors.text }}>{watch('waterSource')?.map(w => w === 'Others' ? watch('otherWaterSource') : w).join(', ') || t("None")}</Text></Text>

@@ -16,6 +16,9 @@ interface Props {
 export const Step7Documents = ({ form, uploading, handleUpload, t }: Props) => {
   const { watch, setValue } = form;
 
+  // Safely extract the GPS locations we saved in the hook
+  const storageLocations = (watch() as any).storageLocations || {};
+
   // Documents explicitly listed as mandatory in the PDF
   const coreDocuments = [
     { key: 'gst_certificate', label: 'GST Registration Certificate' },
@@ -53,19 +56,21 @@ export const Step7Documents = ({ form, uploading, handleUpload, t }: Props) => {
         </View>
       ))}
 
-      {/* --- INFRASTRUCTURE PHOTOS --- */}
+      {/* --- INFRASTRUCTURE PHOTOS (WITH GPS) --- */}
       <Text style={{ fontWeight: '800', color: colors.primary, marginBottom: spacing.sm, marginTop: spacing.lg }}>{t("Infrastructure Photos")}</Text>
       <Text style={{ color: colors.textMuted, fontSize: 12, marginBottom: spacing.md }}>
-        {t("Capture clear photos of the distributor's main storage and cold-chain facilities.")}
+        {t("Capture clear photos of the distributor's main storage and cold-chain facilities. GPS location is required.")}
       </Text>
 
       {photoRequirements.map((photo) => {
          const rawDocValue = watch('documents')?.[photo.key];
          const docsArray = Array.isArray(rawDocValue) ? rawDocValue : (rawDocValue ? [rawDocValue] : []);
+         const hasGPS = !!storageLocations[photo.key];
          
          return (
            <View key={photo.key} style={{ backgroundColor: colors.surface, padding: spacing.md, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.border, marginBottom: spacing.md, ...shadows.soft }}>
              <Text style={{ fontWeight: '700', fontSize: 14, marginBottom: 8 }}>{t(photo.label)} *</Text>
+             
              {docsArray.map((docUrl, index) => (
                <View key={index} style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: colors.primarySoft, padding: 12, borderRadius: radius.md, marginBottom: 8 }}>
                  <MaterialIcons name="check-circle" size={28} color={colors.primary} />
@@ -76,8 +81,15 @@ export const Step7Documents = ({ form, uploading, handleUpload, t }: Props) => {
                   onPress={() => { 
                     const d = {...watch('documents')}; 
                     const newArray = docsArray.filter((_, i) => i !== index); 
-                    if (newArray.length > 0) d[photo.key] = newArray; 
-                    else delete d[photo.key]; 
+                    if (newArray.length > 0) {
+                        d[photo.key] = newArray; 
+                    } else {
+                        delete d[photo.key];
+                        // If deleting the last photo, clear the GPS too
+                        const locs = {...storageLocations};
+                        delete locs[photo.key];
+                        setValue('storageLocations' as any, locs, { shouldValidate: true });
+                    }
                     setValue('documents', d, { shouldValidate: true }); 
                   }} 
                   style={{ padding: 8 }}>
@@ -85,13 +97,29 @@ export const Step7Documents = ({ form, uploading, handleUpload, t }: Props) => {
                  </Pressable>
                </View>
              ))}
+
+             {/* 🚀 THE GPS BADGE UI */}
+             {hasGPS && docsArray.length > 0 && (
+               <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12, backgroundColor: '#EFF6FF', paddingHorizontal: 10, paddingVertical: 6, borderRadius: radius.pill, alignSelf: 'flex-start', borderWidth: 1, borderColor: '#BFDBFE' }}>
+                 <MaterialIcons name="location-on" size={14} color="#2563EB" style={{ marginRight: 4 }} />
+                 <Text style={{ fontSize: 11, color: '#2563EB', fontWeight: '800' }}>{t("LOCATION CAPTURED")}</Text>
+               </View>
+             )}
+             
+             {/* Fallback warning if they somehow uploaded a photo without GPS */}
+             {!hasGPS && docsArray.length > 0 && (
+               <Text style={{ fontSize: 11, color: colors.warning, fontWeight: '700', marginBottom: 12 }}>
+                 ⚠️ {t("GPS missing. Please capture again using Camera.")}
+               </Text>
+             )}
+
              <Pressable 
               onPress={() => handleUpload(photo.key, 'camera')} 
               style={{ flexDirection: 'row', alignItems: 'center', padding: 14, borderWidth: 1.5, borderStyle: 'dashed', borderColor: colors.primary, borderRadius: radius.md, backgroundColor: '#F8FAFC' }}>
                {uploading[photo.key] ? <ActivityIndicator size="small" color={colors.primary} /> : <MaterialIcons name={docsArray.length > 0 ? "add-a-photo" : "camera-alt"} size={28} color={colors.primary} />}
                <View style={{ flex: 1, marginLeft: 12 }}>
                  <Text style={{ color: colors.primary, fontWeight: '800', fontSize: 14 }}>
-                   {docsArray.length > 0 ? t("Capture Another Image") : t("Capture Image")}
+                   {docsArray.length > 0 ? t("Capture Another Image") : t("Capture Image (Requires GPS)")}
                  </Text>
                </View>
              </Pressable>
@@ -100,7 +128,6 @@ export const Step7Documents = ({ form, uploading, handleUpload, t }: Props) => {
       })}
 
       {/* --- COMPLIANCE DOCUMENTS --- */}
-      {/* SAFE RENDER */}
       {(watch('complianceChecklist')?.length || 0) > 0 ? (
         <View>
           <Text style={{ fontWeight: '800', color: colors.primary, marginBottom: spacing.sm, marginTop: spacing.lg }}>{t("Compliance Documents")}</Text>

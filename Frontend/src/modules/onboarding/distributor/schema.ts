@@ -87,6 +87,8 @@ redFlags: z.string().optional(), audioRedFlags: z.string().optional(),
 
   // ---> STEP 6: Media URLs <---
   documents: z.record(z.string(), z.any()).optional(),
+  storageLocations: z.record(z.string(), z.any()).optional(),
+  
 
   // ---> STEP 7: Annexures (A, C, E, F, G) <---
 // ---> STEP 8: Annexures (A, C, E, F, G) <---

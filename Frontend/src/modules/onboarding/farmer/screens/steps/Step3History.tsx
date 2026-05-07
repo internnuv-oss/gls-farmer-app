@@ -6,7 +6,7 @@ import { colors, spacing } from '../../../../../design-system/tokens';
 
 const PROBLEMS = ["Low Yield", "Pest/Disease", "Soil Fertility", "Others"];
 // 🚀 Dropdown list for previous crops
-const CROP_LIST = ["Cotton", "Groundnut", "Sugarcane", "Wheat", "Bajra", "Maize", "Castor", "Soybean", "Rice", "Mustard"];
+const CROP_LIST = ["Paddy", "Bajra", "Jowar", "Maize", "Other Cereals", "Tur", "Moong", "Math", "Udid", "Other pulses", "Groundnut", "Sesamum", "Castor", "Soyabean", "Other Oilseeds", "Cotton", "Tobacco", "Guar", "Vegetable", "Fodder", "Irri. Wheat", "Unirri. Wheat", "Gram", "Mustard", "Sugarcane", "Cumin", "Coriander", "Garlic", "Sawa", "Isabgul", "Fennel", "Onion", "Potato"];
 
 // 🚀 Mock list for dealers if the actual network is empty
 const MOCK_DEALERS = [
