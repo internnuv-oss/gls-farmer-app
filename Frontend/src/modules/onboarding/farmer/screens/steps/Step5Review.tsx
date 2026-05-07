@@ -67,6 +67,11 @@ export const Step5Review = ({ form, setStep, setJumpBackTo, dealers, t }: Props)
         <Text style={{ color: colors.textMuted, marginBottom: 8, marginTop: 8 }}>{t("Major Crops")}: <Text style={{ color: colors.text }}>{watch('majorCrops')?.join(', ') || t("None")}</Text></Text>
         <Text style={{ color: colors.textMuted, marginBottom: 4 }}>{t("Soil Type")}: <Text style={{ color: colors.text }}>{watch('soilType')?.map(s => s === 'Others' ? watch('otherSoilType') : s).join(', ') || t("None")}</Text></Text>
         <Text style={{ color: colors.textMuted, marginBottom: 4 }}>{t("Water Source")}: <Text style={{ color: colors.text }}>{watch('waterSource')?.map(w => w === 'Others' ? watch('otherWaterSource') : w).join(', ') || t("None")}</Text></Text>
+        
+        {/* 🚀 Render New Fields */}
+        <Text style={{ color: colors.textMuted, marginBottom: 4, marginTop: 8 }}>{t("Irrigation Types")}: <Text style={{ color: colors.text }}>{watch('irrigationType')?.join(', ') || t("None")}</Text></Text>
+        <Text style={{ color: colors.textMuted, marginBottom: 4 }}>{t("Farm Equipments")}: <Text style={{ color: colors.text }}>{watch('farmEquipments')?.map(e => e === 'Others' ? watch('otherFarmEquipment') : e).join(', ') || t("None")}</Text></Text>
+        <Text style={{ color: colors.textMuted, marginBottom: 4 }}>{t("Biofertilizer Knowledge")}: <Text style={{ color: colors.text }}>{watch('biofertilizer') || t("None")}</Text></Text>
       </View>
 
       {/* 3. History & Linking */}

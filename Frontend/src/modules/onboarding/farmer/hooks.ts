@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect, useRef } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Alert, AppState, Platform } from "react-native";
+import { AppState, Platform } from "react-native";
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
 import { documentDirectory, copyAsync } from 'expo-file-system/legacy';
@@ -14,7 +14,8 @@ import { farmerOnboardingSchema, FarmerOnboardingValues } from "./schema";
 import { useAlertStore } from "../../../store/alertStore";
 
 const PREDEFINED_SOILS = ["Black", "Sandy", "Red", "Loamy"];
-const PREDEFINED_WATER = ["Canal", "Borewell", "Rain"];
+const PREDEFINED_WATER = ["Canal", "Borewell", "Rain", "Tube-well" ,"Well", "Tank", "Pond","River"];
+const PREDEFINED_EQUIPMENTS = ["Mini Tractor", "Tractor", "Cultivation Equipments"]; // 🚀 NEW
 const PREDEFINED_PROBLEMS = ["Low Yield", "Pest/Disease", "Soil Fertility"];
 
 export function mapFarmerDbToForm(db: any): FarmerOnboardingValues {
@@ -27,6 +28,12 @@ export function mapFarmerDbToForm(db: any): FarmerOnboardingValues {
   const knownWater = dbWater.filter((w: string) => PREDEFINED_WATER.includes(w));
   const otherWater = dbWater.find((w: string) => !PREDEFINED_WATER.includes(w));
   if (otherWater) knownWater.push("Others");
+
+  // 🚀 Map Farm Equipments
+  const dbEquip = db.farm_details?.farmEquipments || [];
+  const knownEquip = dbEquip.filter((e: string) => PREDEFINED_EQUIPMENTS.includes(e));
+  const otherEquip = dbEquip.find((e: string) => !PREDEFINED_EQUIPMENTS.includes(e));
+  if (otherEquip) knownEquip.push("Others");
 
   const dbProb = db.history_details?.majorProblems || [];
   const knownProb = dbProb.filter((p: string) => PREDEFINED_PROBLEMS.includes(p));
@@ -50,11 +57,17 @@ export function mapFarmerDbToForm(db: any): FarmerOnboardingValues {
     otherSoilType: otherSoil || "",
     waterSource: knownWater,
     otherWaterSource: otherWater || "",
-    landUnit: db.farm_details?.landUnit || "Acres", // 🚀 NEW
-    irrigationType: db.farm_details?.irrigationType || "", // 🚀 NEW
-    isIntercropping: db.farm_details?.isIntercropping || undefined, // 🚀 NEW
-    sideTrees: db.farm_details?.sideTrees || [], // 🚀 NEW
-    cattles: db.farm_details?.cattles || [], // 🚀 NEW
+    landUnit: db.farm_details?.landUnit || "Acres",
+    
+    // 🚀 NEW FIELDS MAPPED
+    irrigationType: Array.isArray(db.farm_details?.irrigationType) ? db.farm_details.irrigationType : [],
+    farmEquipments: knownEquip,
+    otherFarmEquipment: otherEquip || "",
+    biofertilizer: db.farm_details?.biofertilizer || "",
+    isIntercropping: db.farm_details?.isIntercropping || undefined,
+    sideTrees: db.farm_details?.sideTrees || [],
+    cattles: db.farm_details?.cattles || [],
+    
     lastCropGrown: db.history_details?.lastCropGrown || "",
     yield: db.history_details?.yield || "",
     majorProblems: knownProb,
@@ -86,7 +99,9 @@ export function useFarmerOnboarding(navigation: any, route: any) {
   useEffect(() => { showSuccessRef.current = showSuccess; }, [showSuccess]);
 
   const defaultValues = editData ? mapFarmerDbToForm(editData) : (draftData || {
-    majorCrops: [], soilType: [], waterSource: [], majorProblems: [], sideTrees: [], cattles: [], landUnit: 'Acres', agreementAccepted: false
+    majorCrops: [], soilType: [], waterSource: [], majorProblems: [], 
+    sideTrees: [], cattles: [], irrigationType: [], farmEquipments: [], 
+    landUnit: 'Acres', agreementAccepted: false
   });
 
   const form = useForm<FarmerOnboardingValues>({
@@ -128,10 +143,10 @@ export function useFarmerOnboarding(navigation: any, route: any) {
         const baseValid = !!(values.totalLand && values.majorCrops?.length > 0 && values.soilType?.length > 0 && values.waterSource?.length > 0);
         if (values.soilType?.includes('Others') && !values.otherSoilType) return false;
         if (values.waterSource?.includes('Others') && !values.otherWaterSource) return false;
+        if (values.farmEquipments?.includes('Others') && !values.otherFarmEquipment) return false;
         return baseValid;
     }
     if (step === 3) {
-      // 🚀 FIXED: Dealer is now optional, just check problems
       if (values.majorProblems?.includes('Others') && !values.otherProblem) return false; 
       return true;
     }
@@ -143,7 +158,7 @@ export function useFarmerOnboarding(navigation: any, route: any) {
   const generateHTML = () => {
     const data = form.getValues();
     const dateStr = new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' });
-    const unit = data.landUnit || 'Acres'; // 🚀 Dynamic Unit
+    const unit = data.landUnit || 'Acres'; 
 
     const renderSignature = (sigData?: string) => {
       if (!sigData) return '<span style="color:red">No Signature</span>';
@@ -200,6 +215,9 @@ export function useFarmerOnboarding(navigation: any, route: any) {
           <tr><th>Major Crops</th><td>${data.majorCrops?.join(', ') || '-'}</td></tr>
           <tr><th>Soil Type</th><td>${data.soilType?.map(s => s === 'Others' ? data.otherSoilType : s).join(', ') || '-'}</td></tr>
           <tr><th>Water Source</th><td>${data.waterSource?.map(w => w === 'Others' ? data.otherWaterSource : w).join(', ') || '-'}</td></tr>
+          <tr><th>Irrigation Types</th><td>${data.irrigationType?.join(', ') || '-'}</td></tr>
+          <tr><th>Farm Equipments</th><td>${data.farmEquipments?.map(e => e === 'Others' ? data.otherFarmEquipment : e).join(', ') || '-'}</td></tr>
+          <tr><th>Biofertilizer</th><td>${data.biofertilizer || '-'}</td></tr>
         </table>
         <div class="signatures">
           <div class="sig-box">
@@ -242,7 +260,7 @@ export function useFarmerOnboarding(navigation: any, route: any) {
     try {
       const dbPayload = {
         se_id: user.id,
-        dealer_id: data.dealerId || null, // 🚀 Save as null if optional
+        dealer_id: data.dealerId || null, 
         full_name: data.fullName,
         mobile: data.mobile,
         village: data.village,
@@ -254,11 +272,15 @@ export function useFarmerOnboarding(navigation: any, route: any) {
           majorCrops: data.majorCrops, 
           soilType: data.soilType.map(st => st === 'Others' ? data.otherSoilType : st), 
           waterSource: data.waterSource.map(ws => ws === 'Others' ? data.otherWaterSource : ws),
-          landUnit: data.landUnit || 'Acres', // 🚀 NEW
-          irrigationType: data.irrigationType, // 🚀 NEW
-          isIntercropping: data.isIntercropping, // 🚀 NEW
-          sideTrees: data.sideTrees, // 🚀 NEW
-          cattles: data.cattles // 🚀 NEW
+          landUnit: data.landUnit || 'Acres', 
+          
+          // 🚀 SAVING THE NEW FIELDS 
+          irrigationType: data.irrigationType || [], 
+          farmEquipments: (data.farmEquipments || []).map(e => e === 'Others' ? data.otherFarmEquipment : e),
+          biofertilizer: data.biofertilizer,
+          isIntercropping: data.isIntercropping, 
+          sideTrees: data.sideTrees, 
+          cattles: data.cattles 
         },
         history_details: { lastCropGrown: data.lastCropGrown, yield: data.yield, majorProblems: data.majorProblems?.map(p => p === 'Others' ? data.otherProblem : p) || [] },
         farmer_signature: data.farmerSignature,

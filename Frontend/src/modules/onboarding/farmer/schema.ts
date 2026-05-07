@@ -12,7 +12,7 @@ export const farmerOnboardingSchema = z.object({
   village: z.string().min(2, "Village is required"),
 
   // 2. Farm Details
-  landUnit: z.string().optional(), // 🚀 NEW
+  landUnit: z.string().optional(),
   totalLand: z.string().min(1, "Total land is required"),
   irrigatedLand: z.string().optional(),
   rainFedLand: z.string().optional(),
@@ -22,9 +22,12 @@ export const farmerOnboardingSchema = z.object({
   waterSource: z.array(z.string()).min(1, "Select at least one water source"),
   otherWaterSource: z.string().optional(),
   
-  // 🚀 NEW OPTIONAL FARM DETAILS
-  irrigationType: z.string().optional(),
+  // 🚀 UPDATED & NEW OPTIONAL FARM DETAILS
+  irrigationType: z.array(z.string()).optional(), // Changed to array for multi-select
   isIntercropping: z.string().optional(),
+  farmEquipments: z.array(z.string()).optional(), // New
+  otherFarmEquipment: z.string().optional(), // New
+  biofertilizer: z.string().optional(), // New
   sideTrees: z.array(z.object({
     type: z.string().optional(),
     quantity: z.string().optional()
@@ -39,7 +42,7 @@ export const farmerOnboardingSchema = z.object({
   yield: z.string().optional(),
   majorProblems: z.array(z.string()).optional(),
   otherProblem: z.string().optional(),
-  dealerId: z.string().optional(), // 🚀 Dealer is now optional
+  dealerId: z.string().optional(), 
 
   // 4. Signatures
   agreementAccepted: z.boolean().refine((val) => val === true, {

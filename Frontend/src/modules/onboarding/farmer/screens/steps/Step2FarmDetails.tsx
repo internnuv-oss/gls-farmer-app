@@ -5,7 +5,7 @@ import { Input, MultiSelectField, SelectField } from '../../../../../design-syst
 import { MaterialIcons } from '@expo/vector-icons';
 import { colors, radius, spacing } from '../../../../../design-system/tokens';
 
-const WEST_INDIA_CROPS = ["Paddy", "Bajra", "Jowar", "Maize", "Other Cereals", "Tur", "Moong", "Math", "Udid", "Other pulses", "Groundnut", "Sesamum", "Castor", "Soyabean", "Other Oilseeds", "Cotton", "Tobacco", "Guar", "Vegetable", "Fodder", "Irri. Wheat", "Unirri. Wheat", "Gram", "Mustard", "Sugarcane", "Cumin", "Coriander", "Garlic", "Sawa", "Isabgul", "Fennel", "Onion", "Potato"];
+const WEST_INDIA_CROPS = ["Cotton", "Groundnut", "Sugarcane", "Wheat", "Bajra", "Maize", "Castor", "Soybean"];
 const SOIL_TYPES = ["Black", "Sandy", "Red", "Loamy", "Others"];
 const WATER_SOURCES = ["Canal", "Borewell", "Rain", "Tube-well" ,"Well", "Tank", "Pond","River","Others"];
 
@@ -14,15 +14,20 @@ const TREE_TYPES = ["Mango", "Neem", "Teak", "Coconut", "Lemon", "Papaya", "Othe
 const CATTLE_TYPES = ["Cow", "Buffalo", "Ox / Bull", "Goat / Sheep", "Poultry", "Others"];
 const LAND_UNITS = ["Acres", "Bigha"];
 
+// 🚀 NEW CONSTANTS
+const FARM_EQUIPMENTS = ["Mini Tractor", "Tractor", "Cultivation Equipments", "Others"];
+const BIOFERTILIZER_OPTS = ["Don't Know", "He knows", "Using"];
+
 export const Step2FarmDetails = ({ control, errors, t, watch }: any) => {
   const selectedSoilType = watch('soilType') || [];
   const selectedWaterSource = watch('waterSource') || [];
+  const selectedEquipments = watch('farmEquipments') || [];
+  const landUnit = watch('landUnit') || 'Acres';
 
   return (
     <View>
       <Text style={{ fontSize: 20, fontWeight: '800', marginBottom: spacing.lg }}>{t("Farm Details")}</Text>
 
-      {/* 🚀 Total Land Row */}
       <View style={{ flexDirection: 'row', gap: spacing.sm, alignItems: 'flex-start' }}>
         <View style={{ flex: 2 }}>
           <Controller control={control} name="totalLand" render={({field}) => (
@@ -36,11 +41,10 @@ export const Step2FarmDetails = ({ control, errors, t, watch }: any) => {
         </View>
       </View>
       
-      {/* 🚀 Irrigated Land Row */}
       <View style={{ flexDirection: 'row', gap: spacing.sm, alignItems: 'flex-start' }}>
         <View style={{ flex: 2 }}>
           <Controller control={control} name="irrigatedLand" render={({field}) => (
-            <Input label={t("Irrigated Land (Optional)")} value={field.value} onChangeText={field.onChange} keyboardType="numeric" />
+            <Input label={t("Irrigated Land ")} value={field.value} onChangeText={field.onChange} keyboardType="numeric" />
           )} />
         </View>
         <View style={{ flex: 1 }}>
@@ -50,11 +54,10 @@ export const Step2FarmDetails = ({ control, errors, t, watch }: any) => {
         </View>
       </View>
 
-      {/* 🚀 Rain-fed Land Row */}
       <View style={{ flexDirection: 'row', gap: spacing.sm, alignItems: 'flex-start' }}>
         <View style={{ flex: 2 }}>
           <Controller control={control} name="rainFedLand" render={({field}) => (
-            <Input label={t("Rain-fed Land (Optional)")} value={field.value} onChangeText={field.onChange} keyboardType="numeric" />
+            <Input label={t("Rain-fed Land ")} value={field.value} onChangeText={field.onChange} keyboardType="numeric" />
           )} />
         </View>
         <View style={{ flex: 1 }}>
@@ -83,12 +86,30 @@ export const Step2FarmDetails = ({ control, errors, t, watch }: any) => {
 
       <View style={{ height: 1, backgroundColor: colors.border, marginVertical: spacing.md }} />
 
+      {/* 🚀 Changed to MultiSelectField */}
       <Controller control={control} name="irrigationType" render={({field}) => (
-        <SelectField label={t("Irrigation Type (Optional)")} options={IRRIGATION_TYPES} value={field.value} onChange={field.onChange} />
+        <MultiSelectField label={t("Irrigation Types ")} options={IRRIGATION_TYPES} value={field.value} onChange={field.onChange} />
+      )} />
+
+      {/* 🚀 Added MultiSelect for Farm Equipments */}
+      <Controller control={control} name="farmEquipments" render={({field}) => (
+        <MultiSelectField label={t("Farm Equipments ")} options={FARM_EQUIPMENTS} value={field.value} onChange={field.onChange} />
+      )} />
+
+      {/* Conditional input if 'Others' is selected in Farm Equipments */}
+      {selectedEquipments.includes('Others') && (
+        <Controller control={control} name="otherFarmEquipment" render={({field}) => (
+          <Input label={t("Specify Other Equipment *")} value={field.value} onChangeText={field.onChange} error={errors.otherFarmEquipment?.message} />
+        )} />
+      )}
+
+      {/* 🚀 Added Biofertilizer Select */}
+      <Controller control={control} name="biofertilizer" render={({field}) => (
+        <SelectField label={t("Biofertilizer Usage/Knowledge ")} options={BIOFERTILIZER_OPTS} value={field.value} onChange={field.onChange} />
       )} />
 
       <View style={{ marginBottom: spacing.lg }}>
-        <Text style={{ color: colors.textMuted, fontWeight: '700', marginBottom: 8, fontSize: 13 }}>{t("Are you doing intercropping? (Optional)")}</Text>
+        <Text style={{ color: colors.textMuted, fontWeight: '700', marginBottom: 8, fontSize: 13 }}>{t("Are you doing intercropping? ")}</Text>
         <Controller control={control} name="isIntercropping" render={({field}) => (
           <View style={{ flexDirection: 'row', gap: spacing.sm }}>
             {['Yes', 'No'].map(opt => (
@@ -106,7 +127,7 @@ export const Step2FarmDetails = ({ control, errors, t, watch }: any) => {
 
       <View style={{ height: 1, backgroundColor: colors.border, marginBottom: spacing.md }} />
 
-      <Text style={{ fontSize: 16, fontWeight: '800', color: colors.primary, marginBottom: spacing.sm }}>{t("Side Trees (Optional)")}</Text>
+      <Text style={{ fontSize: 16, fontWeight: '800', color: colors.primary, marginBottom: spacing.sm }}>{t("Side Trees ")}</Text>
       <Controller control={control} name="sideTrees" render={({ field }) => {
         const trees = field.value?.length > 0 ? field.value : [{ type: '', quantity: '' }];
         return (
@@ -148,7 +169,7 @@ export const Step2FarmDetails = ({ control, errors, t, watch }: any) => {
         );
       }} />
 
-      <Text style={{ fontSize: 16, fontWeight: '800', color: colors.primary, marginBottom: spacing.sm }}>{t("Cattles / Livestock (Optional)")}</Text>
+      <Text style={{ fontSize: 16, fontWeight: '800', color: colors.primary, marginBottom: spacing.sm }}>{t("Cattles / Livestock ")}</Text>
       <Controller control={control} name="cattles" render={({ field }) => {
         const cattleList = field.value?.length > 0 ? field.value : [{ type: '', quantity: '' }];
         return (
