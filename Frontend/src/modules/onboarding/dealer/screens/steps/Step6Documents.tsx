@@ -39,7 +39,7 @@ export const Step6Documents = ({ form, uploading, handleUpload }: Props) => {
          
          return (
            <View key={photo.key} style={{ backgroundColor: colors.surface, padding: spacing.md, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.border, marginBottom: spacing.md, ...shadows.soft }}>
-             <Text style={{ fontWeight: '700', fontSize: 14, marginBottom: 8 }}>{photo.label} {!photo.optional && '*'}{photo.optional && <Text style={{ color: colors.textMuted, fontSize: 12, fontWeight: '500' }}> (Optional)</Text>}</Text>
+             <Text style={{ fontWeight: '700', fontSize: 14, marginBottom: 8 }}>{photo.label} {!photo.optional && '*'}{photo.optional && <Text style={{ color: colors.textMuted, fontSize: 12, fontWeight: '500' }}> </Text>}</Text>
              {docsArray.map((docUrl, index) => (
                <View key={index} style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: colors.primarySoft, padding: 12, borderRadius: radius.md, marginBottom: 8 }}>
                  <MaterialIcons name="check-circle" size={28} color={colors.primary} />
@@ -106,7 +106,7 @@ export const Step6Documents = ({ form, uploading, handleUpload }: Props) => {
 
       <Text style={{ fontWeight: '700', color: colors.textMuted, marginBottom: spacing.sm, marginTop: spacing.lg }}>Additional Files</Text>
       <View style={{ marginBottom: spacing.md }}>
-        <Text style={{ fontWeight: '700', fontSize: 14, marginBottom: 8, color: colors.text }}>Farmer Customers List (Optional)</Text>
+        <Text style={{ fontWeight: '700', fontSize: 14, marginBottom: 8, color: colors.text }}>Farmer Customers List </Text>
         <UploadTile value={watch('documents')?.['farmer_list']} loading={uploading['farmer_list']} onUpload={(source) => handleUpload('farmer_list', source)} onClear={() => { const d = {...watch('documents')}; delete d['farmer_list']; setValue('documents', d); }} />
       </View>
     </View>

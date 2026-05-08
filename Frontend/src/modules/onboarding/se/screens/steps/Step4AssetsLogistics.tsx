@@ -24,7 +24,7 @@ export const Step4AssetsLogistics = ({ form }: { form: any }) => {
       {/* Schema says optional, so no star */}
       <Controller control={control} name="companyAssets" render={({field}) => <MultiSelectField label={t("Company Assets Issued")} options={['Laptop', 'Mobile Phone', 'SIM Card', 'Tablet', 'Data Card']} value={field.value || []} onChange={field.onChange} placeholder={t("Select assets")} />} />  
       
-      <Controller control={control} name="fuelAllowance" render={({field}) => <Input label={t("Fuel Allowance Limit (Optional)")} value={field.value} onChangeText={field.onChange} keyboardType="numeric" prefix="₹" suffix="/km" placeholder={t("3.5")} />} />
+      <Controller control={control} name="fuelAllowance" render={({field}) => <Input label={t("Fuel Allowance Limit ")} value={field.value} onChangeText={field.onChange} keyboardType="numeric" prefix="₹" suffix="/km" placeholder={t("3.5")} />} />
     </View>
   );
 };

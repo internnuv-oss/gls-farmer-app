@@ -5,7 +5,7 @@ import { Input, SelectField, MultiSelectField } from '../../../../../design-syst
 import { MaterialIcons } from '@expo/vector-icons';
 import { colors, radius, spacing, shadows } from '../../../../../design-system/tokens';
 
-const PAST_CROPS = ["Cotton", "Groundnut", "Sugarcane", "Wheat", "Bajra", "Maize", "Castor", "Soybean", "Others"];
+const PAST_CROPS = ["Paddy", "Bajra", "Jowar", "Maize", "Other Cereals", "Tur", "Moong", "Math", "Udid", "Other pulses", "Groundnut", "Sesamum", "Castor", "Soyabean", "Other Oilseeds", "Cotton", "Tobacco", "Guar", "Vegetable", "Fodder", "Irri. Wheat", "Unirri. Wheat", "Gram", "Mustard", "Sugarcane", "Cumin", "Coriander", "Garlic", "Sawa", "Isabgul", "Fennel", "Onion", "Potato"];
 const LAND_UNITS = ["Acres", "Bigha"];
 const YIELD_UNITS = ["Quintals", "Tonnes", "Kg"];
 const INPUTS_USED = ["DAP", "Urea", "NPK", "SSP", "MOP", "Compost", "Others"];
@@ -48,7 +48,7 @@ export const Step3History = ({ control, t, dealers }: any) => {
                 </View>
 
                 {/* 🚀 CHANGED: Input Used is now MultiSelectField */}
-                <MultiSelectField label={t("Inputs Used (Optional)")} options={INPUTS_USED} value={crop.inputUsed || []} onChange={(val: string[]) => { const newArr = [...crops]; newArr[index].inputUsed = val; field.onChange(newArr); }} />
+                <MultiSelectField label={t("Inputs Used ")} options={INPUTS_USED} value={crop.inputUsed || []} onChange={(val: string[]) => { const newArr = [...crops]; newArr[index].inputUsed = val; field.onChange(newArr); }} />
                 
                 {(crop.inputUsed || []).includes('Others') && (
                   <Input label={t("Specify Other Input")} placeholder="e.g., Special Fertilizer" value={crop.otherInputUsed} onChangeText={(val: string) => { const newArr = [...crops]; newArr[index].otherInputUsed = val; field.onChange(newArr); }} />
@@ -56,14 +56,14 @@ export const Step3History = ({ control, t, dealers }: any) => {
 
                 <View style={{ flexDirection: 'row', gap: spacing.sm }}>
                   <View style={{ flex: 2 }}>
-                    <Input label={t("Yield Obtained (Optional)")} keyboardType="numeric" value={crop.yield} onChangeText={(val: string) => { const newArr = [...crops]; newArr[index].yield = val; field.onChange(newArr); }} />
+                    <Input label={t("Yield Obtained ")} keyboardType="numeric" value={crop.yield} onChangeText={(val: string) => { const newArr = [...crops]; newArr[index].yield = val; field.onChange(newArr); }} />
                   </View>
                   <View style={{ flex: 1 }}>
                     <SelectField label={t("Unit")} options={YIELD_UNITS} value={crop.yieldUnit || 'Quintals'} onChange={(val: string) => { const newArr = [...crops]; newArr[index].yieldUnit = val; field.onChange(newArr); }} />
                   </View>
                 </View>
 
-                <Input label={t("Problems Faced (Optional)")} placeholder="e.g., Pests, Low Rain" value={crop.problemsFaced} onChangeText={(val: string) => { const newArr = [...crops]; newArr[index].problemsFaced = val; field.onChange(newArr); }} />
+                <Input label={t("Problems Faced ")} placeholder="e.g., Pests, Low Rain" value={crop.problemsFaced} onChangeText={(val: string) => { const newArr = [...crops]; newArr[index].problemsFaced = val; field.onChange(newArr); }} />
               </View>
             ))}
             
@@ -76,7 +76,7 @@ export const Step3History = ({ control, t, dealers }: any) => {
       }} />
 
       <View style={{ height: 1, backgroundColor: colors.border, marginBottom: spacing.md }} />
-      <Text style={{ fontSize: 16, fontWeight: '800', color: colors.primary, marginBottom: spacing.sm }}>{t("Dealer Linkage (Optional)")}</Text>
+      <Text style={{ fontSize: 16, fontWeight: '800', color: colors.primary, marginBottom: spacing.sm }}>{t("Dealer Linkage ")}</Text>
       <Controller control={control} name="dealerId" render={({field}) => <SelectField label={t("Linked Dealer")} options={dealers} value={field.value} onChange={field.onChange} />} />
     </View>
   );

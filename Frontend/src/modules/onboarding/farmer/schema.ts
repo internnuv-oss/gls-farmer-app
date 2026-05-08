@@ -11,6 +11,8 @@ export const farmerOnboardingSchema = z.object({
   city: z.string().min(2, "District is required"),
   taluka: z.string().min(2, "Taluka is required"),
   village: z.string().min(2, "Village is required"),
+  // 🚀 NEW: Pincode Validation (Optional, but if typed, must be 6 digits)
+  pincode: z.string().regex(/^\d{6}$/, "Invalid Pincode").or(z.literal('')).optional(),
 
   // 2. Farm Details
   landUnit: z.string().optional(),
@@ -42,7 +44,7 @@ export const farmerOnboardingSchema = z.object({
     cropName: z.string().optional(),
     area: z.string().optional(),
     areaUnit: z.string().optional(),
-    inputUsed: z.array(z.string()).optional(), // 🚀 CHANGED TO ARRAY
+    inputUsed: z.array(z.string()).optional(), 
     otherInputUsed: z.string().optional(),
     yield: z.string().optional(),
     yieldUnit: z.string().optional(),

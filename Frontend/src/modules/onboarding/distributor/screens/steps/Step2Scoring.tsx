@@ -161,7 +161,7 @@ export const Step2Scoring = ({ form, scoreData, uploading = {}, handleAudioUploa
             <Controller 
               control={control} 
               name={aspect.rem as any} 
-              render={({field}) => <TextArea label={t("Remarks (Optional Text)")} value={field.value} onChangeText={field.onChange} minHeight={60} placeholder={t("Type evaluation notes here...")} />} 
+              render={({field}) => <TextArea label={t("Remarks")} value={field.value} onChangeText={field.onChange} minHeight={60} placeholder={t("Type evaluation notes here...")} />} 
             />
             
             {/* Audio Recorder for each specific aspect */}

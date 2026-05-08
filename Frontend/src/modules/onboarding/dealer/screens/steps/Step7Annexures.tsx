@@ -87,7 +87,7 @@ export const Step7Annexures = ({
       <View style={{ backgroundColor: colors.surface, padding: spacing.md, borderRadius: radius.md, borderWidth: 1, borderColor: colors.border, marginBottom: spacing.md }}>
         <Text style={{ fontWeight: '800', fontSize: 16, marginBottom: spacing.sm, color: colors.primary }}>Annexure D: Bank & Credit References</Text>
         <Controller control={control} name="seHasCreditReferences" render={({field}) => (
-          <RadioGroup label="Add supplier references? (Optional)" options={['Yes', 'No']} value={field.value} onChange={(val) => { field.onChange(val); if (val === 'No') setValue('seCreditReferences', []); else setValue('seCreditReferences', [{name: '', contact: '', behavior: '', behaviorAudio: ''}]); }} />
+          <RadioGroup label="Add supplier references? " options={['Yes', 'No']} value={field.value} onChange={(val) => { field.onChange(val); if (val === 'No') setValue('seCreditReferences', []); else setValue('seCreditReferences', [{name: '', contact: '', behavior: '', behaviorAudio: ''}]); }} />
         )} />
         
         {watch('seHasCreditReferences') === 'Yes' && (
@@ -100,7 +100,7 @@ export const Step7Annexures = ({
                 </View>
                 <Input label="Supplier Name *" value={ref.name} placeholder="e.g. Ramesh Agro" onChangeText={(val) => { const refs = [...(watch('seCreditReferences') || [])]; refs[index].name = val; setValue('seCreditReferences', refs, {shouldValidate: true}); }} />
                 <Input label="Contact Number *" value={ref.contact} placeholder="9876543210" prefix="+91" maxLength={10} keyboardType="phone-pad" onChangeText={(val) => { const refs = [...(watch('seCreditReferences') || [])]; refs[index].contact = val; setValue('seCreditReferences', refs, {shouldValidate: true}); }} />
-                <Text style={{ fontWeight: '700', fontSize: 12, marginBottom: 4, marginTop: 8 }}>Last 12-month payment behavior (Optional)</Text>
+                <Text style={{ fontWeight: '700', fontSize: 12, marginBottom: 4, marginTop: 8 }}>Last 12-month payment behavior </Text>
                 <TextArea label="Behavior Notes" placeholder="Type behavior here..." value={ref.behavior} onChangeText={(val) => { const refs = [...(watch('seCreditReferences') || [])]; refs[index].behavior = val; setValue('seCreditReferences', refs, {shouldValidate: true}); }} />
                 <Text style={{ textAlign: 'center', marginVertical: 4, color: colors.textMuted, fontWeight: '800' }}>OR</Text>
                 <AudioRecorder value={ref.behaviorAudio} loading={uploading[`seCreditReferences.${index}.behaviorAudio`]} onRecord={(uri) => handleAudioUpload(`seCreditReferences.${index}.behaviorAudio`, uri)} onClear={() => { const refs = [...(watch('seCreditReferences') || [])]; refs[index].behaviorAudio = ''; setValue('seCreditReferences', refs, {shouldValidate: true}); }} />
@@ -115,9 +115,9 @@ export const Step7Annexures = ({
 
       <View style={{ backgroundColor: colors.surface, padding: spacing.md, borderRadius: radius.md, borderWidth: 1, borderColor: colors.border, marginBottom: spacing.md }}>
         <Text style={{ fontWeight: '800', fontSize: 16, marginBottom: spacing.sm, color: colors.primary }}>Annexure E & F: Sales & Expansion</Text>
-        <Controller control={control} name="seWillShareSales" render={({field}) => <CheckboxItem label="Dealer confirms they will share monthly GLS sales breakup (dealer-wise, crop-wise) (Optional)" checked={field.value || false} onChange={field.onChange} />} />
+        <Controller control={control} name="seWillShareSales" render={({field}) => <CheckboxItem label="Dealer confirms they will share monthly GLS sales breakup (dealer-wise, crop-wise) " checked={field.value || false} onChange={field.onChange} />} />
         <View style={{ marginTop: spacing.md }}>
-          <Text style={{ fontWeight: '700', fontSize: 12, marginBottom: 4 }}>Future Expansion Plan (2-year growth vision) (Optional)</Text>
+          <Text style={{ fontWeight: '700', fontSize: 12, marginBottom: 4 }}>Future Expansion Plan (2-year growth vision) </Text>
           <Controller control={control} name="seGrowthVision" render={({field}) => <TextArea label="Vision Notes" placeholder="Type vision here..." value={field.value} onChangeText={field.onChange} />} />
           <Text style={{ textAlign: 'center', marginVertical: 8, color: colors.textMuted, fontWeight: '800' }}>OR</Text>
           <Controller control={control} name="seGrowthVisionAudio" render={({field}) => (

@@ -28,7 +28,7 @@ export const Step3Financial = ({ form }: { form: any }) => {
       
       <Controller control={control} name="bankIfsc" render={({field}) => <Input label={t("IFSC / Swift Code *")} value={field.value} onChangeText={(val) => field.onChange(val.toUpperCase())} maxLength={11} placeholder={t("e.g. HDFC0001234")} error={form.formState.errors.bankIfsc?.message} />} />
       
-      <Controller control={control} name="pfPensionNumber" render={({field}) => <Input label={t("PF / Pension Number (Optional)")} value={field.value} onChangeText={field.onChange} placeholder={t("e.g. GJ/VAD/1234567/000/1234567")} />} />
+      <Controller control={control} name="pfPensionNumber" render={({field}) => <Input label={t("PF / Pension Number ")} value={field.value} onChangeText={field.onChange} placeholder={t("e.g. GJ/VAD/1234567/000/1234567")} />} />
     </View>
   );
 };

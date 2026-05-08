@@ -102,7 +102,7 @@ export const Step4Dealers = ({ form, uploading, handleUpload, t }: Props) => {
               {/* Optional Analytical Fields */}
               <View style={{ backgroundColor: '#F8FAFC', padding: spacing.md, borderRadius: radius.md, borderWidth: 1, borderColor: '#E2E8F0', marginTop: spacing.xs }}>
                 <Text style={{ fontWeight: '800', color: colors.textMuted, marginBottom: spacing.md, fontSize: 12, textTransform: 'uppercase' }}>
-                  {t("Performance Metrics (Optional)")}
+                  {t("Performance Metrics")}
                 </Text>
                 
                 <Controller 

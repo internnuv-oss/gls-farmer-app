@@ -5,7 +5,7 @@ import { Input, MultiSelectField, SelectField } from '../../../../../design-syst
 import { MaterialIcons } from '@expo/vector-icons';
 import { colors, radius, spacing } from '../../../../../design-system/tokens';
 
-const WEST_INDIA_CROPS = ["Cotton", "Groundnut", "Sugarcane", "Wheat", "Bajra", "Maize", "Castor", "Soybean"];
+const WEST_INDIA_CROPS = ["Paddy", "Bajra", "Jowar", "Maize", "Other Cereals", "Tur", "Moong", "Math", "Udid", "Other pulses", "Groundnut", "Sesamum", "Castor", "Soyabean", "Other Oilseeds", "Cotton", "Tobacco", "Guar", "Vegetable", "Fodder", "Irri. Wheat", "Unirri. Wheat", "Gram", "Mustard", "Sugarcane", "Cumin", "Coriander", "Garlic", "Sawa", "Isabgul", "Fennel", "Onion", "Potato"];
 const SOIL_TYPES = ["Black", "Sandy", "Red", "Loamy", "Others"];
 const WATER_SOURCES = ["Canal", "Borewell", "Rain", "Tube-well" ,"Well", "Tank", "Pond","River","Others"];
 

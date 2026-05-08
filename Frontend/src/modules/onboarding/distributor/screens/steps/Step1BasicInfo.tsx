@@ -78,7 +78,7 @@ export const Step1BasicInfo = ({ form, t }: Props) => {
       </View>
       
       <Controller control={control} name="contactMobile" render={({field}) => <Input label={t("Phone / Mobile / WhatsApp *")} value={field.value} onChangeText={field.onChange} prefix="+91" keyboardType="phone-pad" maxLength={10} placeholder="9876543210" error={form.formState.errors.contactMobile?.message} />} />
-      <Controller control={control} name="email" render={({field}) => <Input label={t("Email (Optional)")} value={field.value} onChangeText={(val) => field.onChange(val.toLowerCase())} keyboardType="email-address" autoCapitalize="none" placeholder={t("e.g. contact@rameshagro.com")} error={form.formState.errors.email?.message} />} />
+      <Controller control={control} name="email" render={({field}) => <Input label={t("Email")} value={field.value} onChangeText={(val) => field.onChange(val.toLowerCase())} keyboardType="email-address" autoCapitalize="none" placeholder={t("e.g. contact@rameshagro.com")} error={form.formState.errors.email?.message} />} />
       
       {/* GROUP: Registered Address */}
       <View style={{ backgroundColor: '#F8FAFC', padding: spacing.md, borderRadius: radius.md, borderWidth: 1, borderColor: colors.border, marginBottom: spacing.md }}>

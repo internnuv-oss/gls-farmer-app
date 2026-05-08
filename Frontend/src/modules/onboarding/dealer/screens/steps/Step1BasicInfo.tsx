@@ -63,7 +63,7 @@ export const Step1BasicInfo = ({ form, cities, talukas, villages, loadingLoc }: 
       <Controller control={control} name="owners.0.name" render={({field}) => <Input label="Contact Person *" value={field.value} onChangeText={field.onChange} placeholder="e.g. Ramesh Patel" error={form.formState.errors.owners?.[0]?.name?.message} />} />
       
       <Controller control={control} name="contactMobile" render={({field}) => <Input label="Mobile Number *" value={field.value} onChangeText={field.onChange} prefix="+91" keyboardType="phone-pad" maxLength={10} placeholder="9876543210" error={form.formState.errors.contactMobile?.message} />} />
-      <Controller control={control} name="landlineNumber" render={({field}) => <Input label="Landline Number (Optional)" value={field.value} onChangeText={field.onChange} keyboardType="phone-pad" placeholder="e.g. 0265-243210" error={form.formState.errors.landlineNumber?.message} />} />
+      <Controller control={control} name="landlineNumber" render={({field}) => <Input label="Landline Number " value={field.value} onChangeText={field.onChange} keyboardType="phone-pad" placeholder="e.g. 0265-243210" error={form.formState.errors.landlineNumber?.message} />} />
       
       <Controller control={control} name="state" render={({field}) => (
         <SelectField label="State *" value={field.value ?? ''} options={INDIAN_STATES} searchable onChange={(val) => { field.onChange(val); setValue('city', ''); setValue('taluka', ''); setValue('village', ''); }} error={form.formState.errors.state?.message} />
@@ -82,7 +82,7 @@ export const Step1BasicInfo = ({ form, cities, talukas, villages, loadingLoc }: 
       )} />
 
       <Controller control={control} name="address" render={({field}) => <TextArea label="Shop Address *" value={field.value} onChangeText={field.onChange} placeholder="Full postal address" error={form.formState.errors.address?.message} />} />
-      <Controller control={control} name="landmark" render={({field}) => <Input label="Landmark (Optional)" value={field.value} onChangeText={field.onChange} />} />
+      <Controller control={control} name="landmark" render={({field}) => <Input label="Landmark " value={field.value} onChangeText={field.onChange} />} />
       
       <Controller control={control} name="gstNumber" render={({field}) => <Input label="GST Number *" value={field.value} onChangeText={(val) => field.onChange(val.toUpperCase())} placeholder="eg. 22AAAAA0000A1Z5" maxLength={15} error={form.formState.errors.gstNumber?.message} />} />
       <Controller control={control} name="panNumber" render={({field}) => <Input label="PAN Number *" value={field.value} onChangeText={(val) => field.onChange(val.toUpperCase())} placeholder="eg. ABCDE1234F" maxLength={10} error={form.formState.errors.panNumber?.message} />} />

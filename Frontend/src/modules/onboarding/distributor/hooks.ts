@@ -108,47 +108,91 @@ export function useDistributorOnboarding(navigation: any, route: any) {
     navigation.goBack();
   };
 
-  const isNextEnabled = useMemo(() => {
-    if (step === 1) {
-        const mobileRegex = /^\d{10}$/;
-        const gstRegex = /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/;
-        const panRegex = /^[A-Z]{5}[0-9]{4}[A-Z]{1}$/;
-        const ifscRegex = /^[A-Z]{4}0[A-Z0-9]{6}$/;
-        const bankAccRegex = /^\d{9,18}$/;
-        const pincodeRegex = /^\d{6}$/;
-        const areBanksValid = values.bankAccounts?.every(b => b.accountName && b.bankNameBranch && bankAccRegex.test(b.accountNumber || '') && ifscRegex.test(b.bankIfsc || ''));
-        return !!(values.firmName && values.firmName.length >= 2 && values.ownerName && values.ownerName.length >= 2 && values.contactPerson && values.contactPerson.length >= 2 && mobileRegex.test(values.contactMobile || '') && values.state && values.city && values.taluka && pincodeRegex.test(values.pincode || '') && values.address && values.address.length >= 5 && gstRegex.test(values.gstNumber || '') && panRegex.test(values.panNumber || '') && values.estYear && values.firmType && areBanksValid);
-    }
-    if (step === 2) return true;
-    if (step === 3) return !!(values.appliedTerritory?.length > 0 && values.turnoverPotential && values.currentSuppliers?.length > 0 && values.currentSuppliers.every(s => s.length >= 2) && values.proposedStatus && values.demoFarmersCommitment && values.godownCapacity && values.coldChainFacility);
-    if (step === 4) {
-      const hasUploadedList = !!values.documents?.['dealer_network_list'];
-      const hasValidManualDealers = !!(values.topDealers?.length && values.topDealers.every(d => d.name && d.name.length >= 2 && d.address && d.address.length >= 2 && /^\d{10}$/.test(d.contact || '')));
-      return hasUploadedList || hasValidManualDealers;
-    }
-    if (step === 5) return Array.isArray(values.glsCommitments) && values.glsCommitments.length === DISTRIBUTOR_GLS_COMMITMENTS.length;
-    if (step === 6) return true; 
-    if (step === 7) {
-      const coreDocs = ['gst_certificate', 'pan_card', 'cancelled_cheque', 'trade_licence', 'itr_declaration', 'authorisation_letter'];
-      const photoDocs = ['storage_exterior', 'storage_interior'];
-      const complianceDocs = (values.complianceChecklist || []).map((item: string) => item.replace(/[^a-zA-Z0-9]/g, '_').toLowerCase());
-      const allRequired = [...coreDocs, ...photoDocs, ...complianceDocs];
+//   const isNextEnabled = useMemo(() => {
+//     if (step === 1) {
+//         const mobileRegex = /^\d{10}$/;
+//         const gstRegex = /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/;
+//         const panRegex = /^[A-Z]{5}[0-9]{4}[A-Z]{1}$/;
+//         const ifscRegex = /^[A-Z]{4}0[A-Z0-9]{6}$/;
+//         const bankAccRegex = /^\d{9,18}$/;
+//         const pincodeRegex = /^\d{6}$/;
+//         const areBanksValid = values.bankAccounts?.every(b => b.accountName && b.bankNameBranch && bankAccRegex.test(b.accountNumber || '') && ifscRegex.test(b.bankIfsc || ''));
+//         return !!(values.firmName && values.firmName.length >= 2 && values.ownerName && values.ownerName.length >= 2 && values.contactPerson && values.contactPerson.length >= 2 && mobileRegex.test(values.contactMobile || '') && values.state && values.city && values.taluka && pincodeRegex.test(values.pincode || '') && values.address && values.address.length >= 5 && gstRegex.test(values.gstNumber || '') && panRegex.test(values.panNumber || '') && values.estYear && values.firmType && areBanksValid);
+//     }
+//     if (step === 2) return true;
+//     if (step === 3) return !!(values.appliedTerritory?.length > 0 && values.turnoverPotential && values.currentSuppliers?.length > 0 && values.currentSuppliers.every(s => s.length >= 2) && values.proposedStatus && values.demoFarmersCommitment && values.godownCapacity && values.coldChainFacility);
+//     if (step === 4) {
+//       const hasUploadedList = !!values.documents?.['dealer_network_list'];
+//       const hasValidManualDealers = !!(values.topDealers?.length && values.topDealers.every(d => d.name && d.name.length >= 2 && d.address && d.address.length >= 2 && /^\d{10}$/.test(d.contact || '')));
+//       return hasUploadedList || hasValidManualDealers;
+//     }
+//     if (step === 5) return Array.isArray(values.glsCommitments) && values.glsCommitments.length === DISTRIBUTOR_GLS_COMMITMENTS.length;
+//     if (step === 6) return true; 
+//     if (step === 7) {
+//       const coreDocs = ['gst_certificate', 'pan_card', 'cancelled_cheque', 'trade_licence', 'itr_declaration', 'authorisation_letter'];
+//       const photoDocs = ['storage_exterior', 'storage_interior'];
+//       const complianceDocs = (values.complianceChecklist || []).map((item: string) => item.replace(/[^a-zA-Z0-9]/g, '_').toLowerCase());
+//       const allRequired = [...coreDocs, ...photoDocs, ...complianceDocs];
       
-      // 🚀 EXTENDED: Ensure the exterior storage photo was captured (which guarantees GPS was pulled)
-      return allRequired.every(key => { const doc = values.documents?.[key]; return Array.isArray(doc) ? doc.length > 0 : !!doc; }) && !!(values as any).storageLocations?.['storage_exterior'];
-    }
-    if (step === 8) {
-      const validTerritories = values.anxTerritories?.length > 0 && values.anxTerritories.every(t => t.state && t.district && t.taluka && Array.isArray(t.villages) && t.villages.length > 0 && t.cultivableArea && Array.isArray(t.majorCrops) && t.majorCrops.length > 0);
-      const validSuppliers = values.anxPrincipalSuppliers?.length > 0 && values.anxPrincipalSuppliers.every(s => s.name && s.share);
-      const validProducts = (values.anxChemicalProducts?.length || 0) > 0 && (values.anxBioProducts?.length || 0) > 0 && (values.anxOtherProducts?.length || 0) > 0;
-      const validRefs = values.anxSupplierRefs?.length > 0 && values.anxSupplierRefs.every(ref => ref.name && ref.name.length >= 2 && /^\d{10}$/.test(ref.contact || ''));
-      const hasVision = !!values.anxGrowthVision || !!values.anxGrowthVisionAudio;
-      const securityDepositVal = parseInt(values.securityDeposit || '0');
-      const hasPaymentProof = securityDepositVal === 0 || (securityDepositVal > 0 && (!!values.paymentProofText || !!values.documents?.['distributor_payment_proof']));
-      return !!(validTerritories && validSuppliers && validProducts && validRefs && hasVision && hasPaymentProof);
-    }
-    if (step === 9) return !!(values.agreementAccepted && values.distributorSignature && values.seSignature);
-    return true; 
+//       // 🚀 EXTENDED: Ensure the exterior storage photo was captured (which guarantees GPS was pulled)
+//       return allRequired.every(key => { const doc = values.documents?.[key]; return Array.isArray(doc) ? doc.length > 0 : !!doc; }) && !!(values as any).storageLocations?.['storage_exterior'];
+//     }
+//     if (step === 8) {
+//       const validTerritories = values.anxTerritories?.length > 0 && values.anxTerritories.every(t => t.state && t.district && t.taluka && Array.isArray(t.villages) && t.villages.length > 0 && t.cultivableArea && Array.isArray(t.majorCrops) && t.majorCrops.length > 0);
+//       const validSuppliers = values.anxPrincipalSuppliers?.length > 0 && values.anxPrincipalSuppliers.every(s => s.name && s.share);
+//       const validProducts = (values.anxChemicalProducts?.length || 0) > 0 && (values.anxBioProducts?.length || 0) > 0 && (values.anxOtherProducts?.length || 0) > 0;
+//       const validRefs = values.anxSupplierRefs?.length > 0 && values.anxSupplierRefs.every(ref => ref.name && ref.name.length >= 2 && /^\d{10}$/.test(ref.contact || ''));
+//       const hasVision = !!values.anxGrowthVision || !!values.anxGrowthVisionAudio;
+//       const securityDepositVal = parseInt(values.securityDeposit || '0');
+//       const hasPaymentProof = securityDepositVal === 0 || (securityDepositVal > 0 && (!!values.paymentProofText || !!values.documents?.['distributor_payment_proof']));
+//       return !!(validTerritories && validSuppliers && validProducts && validRefs && hasVision && hasPaymentProof);
+//     }
+//     if (step === 9) return !!(values.agreementAccepted && values.distributorSignature && values.seSignature);
+//     return true; 
+//   }, [step, values]);
+const isNextEnabled = useMemo(() => {
+    // 🚀 1. ALLOW FREE NAVIGATION: Free movement up to Step 9
+    if (step < 9) return true; 
+
+    // 🚀 2. FINAL SUBMISSION CHECK: Validate EVERYTHING on Step 9
+    const mobileRegex = /^\d{10}$/;
+    const gstRegex = /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/;
+    const panRegex = /^[A-Z]{5}[0-9]{4}[A-Z]{1}$/;
+    const ifscRegex = /^[A-Z]{4}0[A-Z0-9]{6}$/;
+    const bankAccRegex = /^\d{9,18}$/;
+    const pincodeRegex = /^\d{6}$/;
+
+    const areBanksValid = values.bankAccounts?.every(b => b.accountName && b.bankNameBranch && bankAccRegex.test(b.accountNumber || '') && ifscRegex.test(b.bankIfsc || ''));
+    
+    const isStep1Valid = !!(values.firmName && values.firmName.length >= 2 && values.ownerName && values.ownerName.length >= 2 && values.contactPerson && values.contactPerson.length >= 2 && mobileRegex.test(values.contactMobile || '') && values.state && values.city && values.taluka && pincodeRegex.test(values.pincode || '') && values.address && values.address.length >= 5 && gstRegex.test(values.gstNumber || '') && panRegex.test(values.panNumber || '') && values.estYear && values.firmType && areBanksValid);
+    
+    const isStep3Valid = !!(values.appliedTerritory?.length > 0 && values.turnoverPotential && values.currentSuppliers?.length > 0 && values.currentSuppliers.every(s => s.length >= 2) && values.proposedStatus && values.demoFarmersCommitment && values.godownCapacity && values.coldChainFacility);
+    
+    const hasUploadedList = !!values.documents?.['dealer_network_list'];
+    const hasValidManualDealers = !!(values.topDealers?.length && values.topDealers.every(d => d.name && d.name.length >= 2 && d.address && d.address.length >= 2 && /^\d{10}$/.test(d.contact || '')));
+    const isStep4Valid = hasUploadedList || hasValidManualDealers;
+
+    const isStep5Valid = Array.isArray(values.glsCommitments) && values.glsCommitments.length === 10; // DISTRIBUTOR_GLS_COMMITMENTS.length
+    
+    const coreDocs = ['gst_certificate', 'pan_card', 'cancelled_cheque', 'trade_licence', 'itr_declaration', 'authorisation_letter'];
+    const photoDocs = ['storage_exterior', 'storage_interior'];
+    const complianceDocs = (values.complianceChecklist || []).map((item: string) => item.replace(/[^a-zA-Z0-9]/g, '_').toLowerCase());
+    const allRequiredDocs = [...coreDocs, ...photoDocs, ...complianceDocs];
+    const isStep7Valid = allRequiredDocs.every(key => { const doc = values.documents?.[key]; return Array.isArray(doc) ? doc.length > 0 : !!doc; }) && !!(values as any).storageLocations?.['storage_exterior'];
+    
+    const validTerritories = values.anxTerritories?.length > 0 && values.anxTerritories.every(t => t.state && t.district && t.taluka && Array.isArray(t.villages) && t.villages.length > 0 && t.cultivableArea && Array.isArray(t.majorCrops) && t.majorCrops.length > 0);
+    const validSuppliers = values.anxPrincipalSuppliers?.length > 0 && values.anxPrincipalSuppliers.every(s => s.name && s.share);
+    const validProducts = (values.anxChemicalProducts?.length || 0) > 0 && (values.anxBioProducts?.length || 0) > 0 && (values.anxOtherProducts?.length || 0) > 0;
+    const validRefs = values.anxSupplierRefs?.length > 0 && values.anxSupplierRefs.every(ref => ref.name && ref.name.length >= 2 && /^\d{10}$/.test(ref.contact || ''));
+    const hasVision = !!values.anxGrowthVision || !!values.anxGrowthVisionAudio;
+    const securityDepositVal = parseInt(values.securityDeposit || '0');
+    const hasPaymentProof = securityDepositVal === 0 || (securityDepositVal > 0 && (!!values.paymentProofText || !!values.documents?.['distributor_payment_proof']));
+    
+    const isStep8Valid = !!(validTerritories && validSuppliers && validProducts && validRefs && hasVision && hasPaymentProof);
+    const isStep9Valid = !!(values.agreementAccepted && values.distributorSignature && values.seSignature);
+
+    // The Submit button will only be clickable if ALL of these are true
+    return isStep1Valid && isStep3Valid && isStep4Valid && isStep5Valid && isStep7Valid && isStep8Valid && isStep9Valid;
   }, [step, values]);
 
   const scoreData = useMemo(() => {

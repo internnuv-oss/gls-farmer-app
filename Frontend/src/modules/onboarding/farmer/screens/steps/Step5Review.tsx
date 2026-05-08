@@ -47,7 +47,10 @@ export const Step5Review = ({ form, setStep, setJumpBackTo, dealers, t }: Props)
         <Text style={{ color: colors.textMuted, marginBottom: 4 }}>{t("Full Name")}: <Text style={{ color: colors.text, fontWeight: '700' }}>{watch('fullName')}</Text></Text>
         <Text style={{ color: colors.textMuted, marginBottom: 4 }}>{t("Father's Name")}: <Text style={{ color: colors.text }}>{watch('fatherName')}</Text></Text>
         <Text style={{ color: colors.textMuted, marginBottom: 4 }}>{t("Mobile Number")}: <Text style={{ color: colors.text }}>+91 {watch('mobile')}</Text></Text>
-        <Text style={{ color: colors.textMuted, marginBottom: 4, marginTop: 8 }}>{t("Location")}: <Text style={{ color: colors.text }}>{watch('village')}, {watch('taluka')}, {watch('city')}, {watch('state')}</Text></Text>
+        {watch('alternateMobile') ? <Text style={{ color: colors.textMuted, marginBottom: 4 }}>{t("Alternate Mobile")}: <Text style={{ color: colors.text }}>+91 {watch('alternateMobile')}</Text></Text> : null}
+        
+        {/* 🚀 Location string safely includes the optional Pincode */}
+        <Text style={{ color: colors.textMuted, marginBottom: 4, marginTop: 8 }}>{t("Location")}: <Text style={{ color: colors.text }}>{watch('village')}, {watch('taluka')}, {watch('city')}, {watch('state')} {watch('pincode') ? `- ${watch('pincode')}` : ''}</Text></Text>
       </View>
 
       {/* 2. Farm Details */}

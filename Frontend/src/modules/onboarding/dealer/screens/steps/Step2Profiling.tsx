@@ -124,7 +124,7 @@ export const Step2Profiling = ({ form, scoreData, uploading, handleAudioUpload, 
                 </View>
               </View>
             </View>
-            <Controller control={control} name={aspect.rem as any} render={({field}) => <TextArea label="Remarks (Optional Text)" value={field.value} onChangeText={field.onChange} minHeight={60} placeholder="Type notes here..." />} />
+            <Controller control={control} name={aspect.rem as any} render={({field}) => <TextArea label="Remarks " value={field.value} onChangeText={field.onChange} minHeight={60} placeholder="Type notes here..." />} />
             <Controller control={control} name={aspect.aud as any} render={({field}) => (
               <AudioRecorder value={field.value} loading={uploading[aspect.aud]} onRecord={(uri) => handleAudioUpload(aspect.aud, uri)} onClear={() => { field.onChange(''); setValue(aspect.aud as any, ''); }} />
             )} />

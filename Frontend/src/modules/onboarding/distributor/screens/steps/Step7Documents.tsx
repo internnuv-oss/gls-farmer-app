@@ -159,7 +159,7 @@ export const Step7Documents = ({ form, uploading, handleUpload, t }: Props) => {
       {/* --- ADDITIONAL FILES --- */}
       <Text style={{ fontWeight: '800', color: colors.primary, marginBottom: spacing.sm, marginTop: spacing.lg }}>{t("Additional Files")}</Text>
       <View style={{ marginBottom: spacing.md }}>
-        <Text style={{ fontWeight: '700', fontSize: 14, marginBottom: 8, color: colors.text }}>{t("List of Current Dealers (Optional)")}</Text>
+        <Text style={{ fontWeight: '700', fontSize: 14, marginBottom: 8, color: colors.text }}>{t("List of Current Dealers ")}</Text>
         <UploadTile 
           value={watch('documents')?.['dealer_list']} 
           loading={uploading['dealer_list']} 

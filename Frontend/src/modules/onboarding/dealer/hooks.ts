@@ -142,143 +142,198 @@ export function useDealerOnboarding(navigation: any, route: any) {
   const { watch } = form;
   const values = watch();
 
+  // const isNextEnabled = useMemo(() => {
+  //   if (step === 1) {
+  //     // 1. Basic Regex Patterns (Matches schema.ts)
+  //     const mobileRegex = /^\d{10}$/;
+  //     const landlineRegex = /^[0-9]{3,5}[- ]?[0-9]{6,8}$/;
+  //     const gstRegex = /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/;
+  //     const panRegex = /^[A-Z]{5}[0-9]{4}[A-Z]{1}$/;
+  //     const ifscRegex = /^[A-Z]{4}0[A-Z0-9]{6}$/;
+  //     const bankAccRegex = /^\d{9,18}$/;
+
+  //     // 2. Validate Arrays (Owners and Bank Accounts)
+  //     const areOwnersValid = values.owners?.every(o => o.name && o.name.length >= 2);
+      
+  //     const areBanksValid = values.bankAccounts?.every(b => 
+  //       b.accountType && 
+  //       b.bankName && 
+  //       b.bankBranch && 
+  //       b.accountName && 
+  //       bankAccRegex.test(b.accountNumber || '') && 
+  //       ifscRegex.test(b.bankIfsc || '')
+  //     );
+
+  //     // 3. Optional Landline Check
+  //     const isLandlineValid = !values.landlineNumber || landlineRegex.test(values.landlineNumber);
+
+  //     // 4. Combined Validation
+  //     return !!(
+  //       values.shopName && values.shopName.length >= 2 &&
+  //       values.firmType &&
+  //       values.estYear && values.estYear.length === 4 &&
+  //       areOwnersValid &&
+  //       mobileRegex.test(values.contactMobile || '') &&
+  //       isLandlineValid &&
+  //       values.state && values.city && values.taluka && values.village &&
+  //       values.address && values.address.length >= 5 &&
+  //       gstRegex.test(values.gstNumber || '') &&
+  //       panRegex.test(values.panNumber || '') &&
+  //       areBanksValid
+  //     );
+  //   }
+  //   if (step === 2) return true; 
+  //   if (step === 3) {
+  //     // 1. Distributor Validation
+  //     const distValid = values.isLinkedToDistributor === 'No' || (
+  //       values.isLinkedToDistributor === 'Yes' && 
+  //       values.linkedDistributors?.[0]?.name && 
+  //       /^\d{10}$/.test(values.linkedDistributors?.[0]?.contact || '')
+  //     );
+
+  //     // 2. Additional Locations Validation
+  //     // If "Yes", at least one shop OR one godown must exist, and all provided must be valid.
+  //     const hasAtLeastOneLocation = (values.additionalShops?.length || 0) > 0 || (values.godowns?.length || 0) > 0;
+      
+  //     const additionalShopsValid = (values.additionalShops || []).every(s => 
+  //       s.shopName && s.estYear && s.state && s.city && s.taluka && s.village && s.address
+  //     );
+      
+  //     const godownsValid = (values.godowns || []).every(g => 
+  //       g.address && g.capacity && g.capacityUnit
+  //     );
+
+  //     const addLocValid = values.hasAdditionalLocations === 'No' || (
+  //       values.hasAdditionalLocations === 'Yes' && 
+  //       hasAtLeastOneLocation && 
+  //       additionalShopsValid && 
+  //       godownsValid
+  //     );
+
+  //     // 3. Demo Farmers Validation
+  //     // If "Yes", must either have an uploaded list OR at least one manual entry filled correctly.
+  //     const hasFarmerFile = !!values.documents?.['demo_farmers_list'];
+  //     const manualFarmersValid = (values.demoFarmers || []).some(f => 
+  //       f.name && f.contact && f.address
+  //     );
+
+  //     const demoFarmersValid = values.willingDemoFarmers === 'No' || (
+  //       values.willingDemoFarmers === 'Yes' && 
+  //       (hasFarmerFile || manualFarmersValid)
+  //     );
+
+  //     // 4. Combined Step 3 Check
+  //     return !!(
+  //       values.isLinkedToDistributor && 
+  //       distValid && 
+  //       values.hasAdditionalLocations &&
+  //       addLocValid && 
+  //       values.proposedStatus && 
+  //       values.willingDemoFarmers && 
+  //       demoFarmersValid
+  //     );
+  //   }
+  //   if (step === 4) return Array.isArray(values.glsCommitments) && values.glsCommitments.length === GLS_COMMITMENTS.length; 
+  //   if (step === 5) return true; 
+  //   if (step === 6) {
+  //     const requiredKeys = ['gst certificate / shop establishment license', 'pan card', 'cancelled cheque', 'shop_exterior', 'selfie_with_owner'];
+  //     const dynamicKeys = (values.complianceChecklist || []).map((item: string) => item.replace(/[^a-zA-Z0-9]/g, '_').toLowerCase());
+  //     const allRequired = [...requiredKeys, ...dynamicKeys];
+      
+  //     // UPDATED: Check for specific exterior GPS coordinates instead of a single object
+  //     return allRequired.every(key => { 
+  //       const doc = values.documents?.[key]; 
+  //       return Array.isArray(doc) ? doc.length > 0 : !!doc; 
+  //     }) && !!values.shopLocations?.['shop_exterior']; 
+  //   }
+    
+  //   // ---> NEW STEP 7 (SE ANNEXURE) VALIDATION <---
+  //   if (step === 7) {
+  //     const validCreditRefs = values.seHasCreditReferences !== 'Yes' || (
+  //       values.seHasCreditReferences === 'Yes' && 
+  //       values.seCreditReferences && values.seCreditReferences.length > 0 && 
+  //       values.seCreditReferences.every(ref => 
+  //         (ref.name?.length ?? 0) >= 2 && (ref.contact?.length ?? 0) === 10
+  //       )
+  //     );
+      
+  //     const validTerritories = values.seTerritories?.length > 0 && values.seTerritories.every(t => t.taluka && t.village?.length > 0 && t.cultivableArea && t.majorCrops?.length > 0);
+
+  //     // ---> NEW: Check if payment proof is valid <---
+  //     const securityDepositVal = parseInt(values.seSecurityDeposit || '0');
+  //     const hasPaymentProof = securityDepositVal === 0 || (
+  //       securityDepositVal > 0 && 
+  //       (!!values.sePaymentProofText || !!values.documents?.['se_payment_proof'])
+  //     );
+
+  //     return !!(
+  //       validTerritories && 
+  //       values.sePrincipalSuppliers?.length > 0 && 
+  //       values.seChemicalProducts?.length > 0 && 
+  //       values.seBioProducts?.length > 0 && 
+  //       values.seOtherProducts?.length > 0 && 
+  //       validCreditRefs &&
+  //       hasPaymentProof // <-- Block 'Next' button if false
+  //     );
+  //   }
+  //   if (step === 8) return !!(values.agreementAccepted && values.dealerSignature && values.seSignature);
+    
+  //   return true; // Step 9
+  // }, [step, values]);
   const isNextEnabled = useMemo(() => {
-    if (step === 1) {
-      // 1. Basic Regex Patterns (Matches schema.ts)
-      const mobileRegex = /^\d{10}$/;
-      const landlineRegex = /^[0-9]{3,5}[- ]?[0-9]{6,8}$/;
-      const gstRegex = /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/;
-      const panRegex = /^[A-Z]{5}[0-9]{4}[A-Z]{1}$/;
-      const ifscRegex = /^[A-Z]{4}0[A-Z0-9]{6}$/;
-      const bankAccRegex = /^\d{9,18}$/;
+    // 🚀 1. ALLOW FREE NAVIGATION: Always enable "Next" up to Step 8, so they can reach Step 9 (Review)
+    if (step < 9) return true; 
 
-      // 2. Validate Arrays (Owners and Bank Accounts)
-      const areOwnersValid = values.owners?.every(o => o.name && o.name.length >= 2);
-      
-      const areBanksValid = values.bankAccounts?.every(b => 
-        b.accountType && 
-        b.bankName && 
-        b.bankBranch && 
-        b.accountName && 
-        bankAccRegex.test(b.accountNumber || '') && 
-        ifscRegex.test(b.bankIfsc || '')
-      );
-
-      // 3. Optional Landline Check
-      const isLandlineValid = !values.landlineNumber || landlineRegex.test(values.landlineNumber);
-
-      // 4. Combined Validation
-      return !!(
-        values.shopName && values.shopName.length >= 2 &&
-        values.firmType &&
-        values.estYear && values.estYear.length === 4 &&
-        areOwnersValid &&
-        mobileRegex.test(values.contactMobile || '') &&
-        isLandlineValid &&
-        values.state && values.city && values.taluka && values.village &&
-        values.address && values.address.length >= 5 &&
-        gstRegex.test(values.gstNumber || '') &&
-        panRegex.test(values.panNumber || '') &&
-        areBanksValid
-      );
-    }
-    if (step === 2) return true; 
-    if (step === 3) {
-      // 1. Distributor Validation
-      const distValid = values.isLinkedToDistributor === 'No' || (
-        values.isLinkedToDistributor === 'Yes' && 
-        values.linkedDistributors?.[0]?.name && 
-        /^\d{10}$/.test(values.linkedDistributors?.[0]?.contact || '')
-      );
-
-      // 2. Additional Locations Validation
-      // If "Yes", at least one shop OR one godown must exist, and all provided must be valid.
-      const hasAtLeastOneLocation = (values.additionalShops?.length || 0) > 0 || (values.godowns?.length || 0) > 0;
-      
-      const additionalShopsValid = (values.additionalShops || []).every(s => 
-        s.shopName && s.estYear && s.state && s.city && s.taluka && s.village && s.address
-      );
-      
-      const godownsValid = (values.godowns || []).every(g => 
-        g.address && g.capacity && g.capacityUnit
-      );
-
-      const addLocValid = values.hasAdditionalLocations === 'No' || (
-        values.hasAdditionalLocations === 'Yes' && 
-        hasAtLeastOneLocation && 
-        additionalShopsValid && 
-        godownsValid
-      );
-
-      // 3. Demo Farmers Validation
-      // If "Yes", must either have an uploaded list OR at least one manual entry filled correctly.
-      const hasFarmerFile = !!values.documents?.['demo_farmers_list'];
-      const manualFarmersValid = (values.demoFarmers || []).some(f => 
-        f.name && f.contact && f.address
-      );
-
-      const demoFarmersValid = values.willingDemoFarmers === 'No' || (
-        values.willingDemoFarmers === 'Yes' && 
-        (hasFarmerFile || manualFarmersValid)
-      );
-
-      // 4. Combined Step 3 Check
-      return !!(
-        values.isLinkedToDistributor && 
-        distValid && 
-        values.hasAdditionalLocations &&
-        addLocValid && 
-        values.proposedStatus && 
-        values.willingDemoFarmers && 
-        demoFarmersValid
-      );
-    }
-    if (step === 4) return Array.isArray(values.glsCommitments) && values.glsCommitments.length === GLS_COMMITMENTS.length; 
-    if (step === 5) return true; 
-    if (step === 6) {
-      const requiredKeys = ['gst certificate / shop establishment license', 'pan card', 'cancelled cheque', 'shop_exterior', 'selfie_with_owner'];
-      const dynamicKeys = (values.complianceChecklist || []).map((item: string) => item.replace(/[^a-zA-Z0-9]/g, '_').toLowerCase());
-      const allRequired = [...requiredKeys, ...dynamicKeys];
-      
-      // UPDATED: Check for specific exterior GPS coordinates instead of a single object
-      return allRequired.every(key => { 
-        const doc = values.documents?.[key]; 
-        return Array.isArray(doc) ? doc.length > 0 : !!doc; 
-      }) && !!values.shopLocations?.['shop_exterior']; 
-    }
+    // 🚀 2. FINAL SUBMISSION CHECK: Validate EVERYTHING on Step 9 (Final Review)
     
-    // ---> NEW STEP 7 (SE ANNEXURE) VALIDATION <---
-    if (step === 7) {
-      const validCreditRefs = values.seHasCreditReferences !== 'Yes' || (
-        values.seHasCreditReferences === 'Yes' && 
-        values.seCreditReferences && values.seCreditReferences.length > 0 && 
-        values.seCreditReferences.every(ref => 
-          (ref.name?.length ?? 0) >= 2 && (ref.contact?.length ?? 0) === 10
-        )
-      );
-      
-      const validTerritories = values.seTerritories?.length > 0 && values.seTerritories.every(t => t.taluka && t.village?.length > 0 && t.cultivableArea && t.majorCrops?.length > 0);
+    // Step 1 Validation
+    const mobileRegex = /^\d{10}$/;
+    const landlineRegex = /^[0-9]{3,5}[- ]?[0-9]{6,8}$/;
+    const gstRegex = /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/;
+    const panRegex = /^[A-Z]{5}[0-9]{4}[A-Z]{1}$/;
+    const ifscRegex = /^[A-Z]{4}0[A-Z0-9]{6}$/;
+    const bankAccRegex = /^\d{9,18}$/;
 
-      // ---> NEW: Check if payment proof is valid <---
-      const securityDepositVal = parseInt(values.seSecurityDeposit || '0');
-      const hasPaymentProof = securityDepositVal === 0 || (
-        securityDepositVal > 0 && 
-        (!!values.sePaymentProofText || !!values.documents?.['se_payment_proof'])
-      );
+    const areOwnersValid = values.owners?.every(o => o.name && o.name.length >= 2);
+    const areBanksValid = values.bankAccounts?.every(b => b.accountType && b.bankName && b.bankBranch && b.accountName && bankAccRegex.test(b.accountNumber || '') && ifscRegex.test(b.bankIfsc || ''));
+    const isLandlineValid = !values.landlineNumber || landlineRegex.test(values.landlineNumber);
 
-      return !!(
-        validTerritories && 
-        values.sePrincipalSuppliers?.length > 0 && 
-        values.seChemicalProducts?.length > 0 && 
-        values.seBioProducts?.length > 0 && 
-        values.seOtherProducts?.length > 0 && 
-        validCreditRefs &&
-        hasPaymentProof // <-- Block 'Next' button if false
-      );
-    }
-    if (step === 8) return !!(values.agreementAccepted && values.dealerSignature && values.seSignature);
+    const isStep1Valid = !!(values.shopName && values.shopName.length >= 2 && values.firmType && values.estYear && values.estYear.length === 4 && areOwnersValid && mobileRegex.test(values.contactMobile || '') && isLandlineValid && values.state && values.city && values.taluka && values.village && values.address && values.address.length >= 5 && gstRegex.test(values.gstNumber || '') && panRegex.test(values.panNumber || '') && areBanksValid);
+
+    // Step 3 Validation
+    const distValid = values.isLinkedToDistributor === 'No' || (values.isLinkedToDistributor === 'Yes' && values.linkedDistributors?.[0]?.name && /^\d{10}$/.test(values.linkedDistributors?.[0]?.contact || ''));
+    const hasAtLeastOneLocation = (values.additionalShops?.length || 0) > 0 || (values.godowns?.length || 0) > 0;
+    const additionalShopsValid = (values.additionalShops || []).every(s => s.shopName && s.estYear && s.state && s.city && s.taluka && s.village && s.address);
+    const godownsValid = (values.godowns || []).every(g => g.address && g.capacity && g.capacityUnit);
+    const addLocValid = values.hasAdditionalLocations === 'No' || (values.hasAdditionalLocations === 'Yes' && hasAtLeastOneLocation && additionalShopsValid && godownsValid);
+    const hasFarmerFile = !!values.documents?.['demo_farmers_list'];
+    const manualFarmersValid = (values.demoFarmers || []).some(f => f.name && f.contact && f.address);
+    const demoFarmersValid = values.willingDemoFarmers === 'No' || (values.willingDemoFarmers === 'Yes' && (hasFarmerFile || manualFarmersValid));
     
-    return true; // Step 9
+    const isStep3Valid = !!(values.isLinkedToDistributor && distValid && values.hasAdditionalLocations && addLocValid && values.proposedStatus && values.willingDemoFarmers && demoFarmersValid);
+
+    // Step 4 Validation
+    const isStep4Valid = Array.isArray(values.glsCommitments) && values.glsCommitments.length === GLS_COMMITMENTS.length; 
+
+    // Step 6 Validation
+    const requiredKeys = ['gst certificate / shop establishment license', 'pan card', 'cancelled cheque', 'shop_exterior', 'selfie_with_owner'];
+    const dynamicKeys = (values.complianceChecklist || []).map((item: string) => item.replace(/[^a-zA-Z0-9]/g, '_').toLowerCase());
+    const allRequired = [...requiredKeys, ...dynamicKeys];
+    const isStep6Valid = allRequired.every(key => { const doc = values.documents?.[key]; return Array.isArray(doc) ? doc.length > 0 : !!doc; }) && !!values.shopLocations?.['shop_exterior']; 
+
+    // Step 7 Validation
+    const validCreditRefs = values.seHasCreditReferences !== 'Yes' || (values.seHasCreditReferences === 'Yes' && values.seCreditReferences && values.seCreditReferences.length > 0 && values.seCreditReferences.every(ref => (ref.name?.length ?? 0) >= 2 && (ref.contact?.length ?? 0) === 10));
+    const validTerritories = values.seTerritories?.length > 0 && values.seTerritories.every(t => t.taluka && t.village?.length > 0 && t.cultivableArea && t.majorCrops?.length > 0);
+    const securityDepositVal = parseInt(values.seSecurityDeposit || '0');
+    const hasPaymentProof = securityDepositVal === 0 || (securityDepositVal > 0 && (!!values.sePaymentProofText || !!values.documents?.['se_payment_proof']));
+    
+    const isStep7Valid = !!(validTerritories && values.sePrincipalSuppliers?.length > 0 && values.seChemicalProducts?.length > 0 && values.seBioProducts?.length > 0 && values.seOtherProducts?.length > 0 && validCreditRefs && hasPaymentProof);
+
+    // Step 8 (Agreements)
+    const isStep8Valid = !!(values.agreementAccepted && values.dealerSignature && values.seSignature);
+
+    // 🚀 Return TRUE only if all steps are perfectly validated!
+    return isStep1Valid && isStep3Valid && isStep4Valid && isStep6Valid && isStep7Valid && isStep8Valid;
   }, [step, values]);
 
   const scores = watch(['scoreFinancial', 'scoreReputation', 'scoreOperations', 'scoreFarmerNetwork', 'scoreTeam', 'scorePortfolio', 'scoreExperience', 'scoreGrowth']);

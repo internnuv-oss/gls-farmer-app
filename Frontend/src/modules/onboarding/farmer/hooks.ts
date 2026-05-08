@@ -109,7 +109,8 @@ export function useFarmerOnboarding(navigation: any, route: any) {
   useEffect(() => { showSuccessRef.current = showSuccess; }, [showSuccess]);
 
   const defaultValues = editData ? mapFarmerDbToForm(editData) : (draftData || {
-    profilePhoto: "",
+    profilePhoto: "",state: "Gujarat", // 🚀 DEFAULT TO GUJARAT
+    pincode: "",
     majorCrops: [], soilType: [], waterSource: [], sideTrees: [], cattles: [], irrigationType: [], farmEquipments: [], 
     pastCrops: [{ cropName: '', area: '', areaUnit: 'Acres', inputUsed: [], otherInputUsed: '', yield: '', yieldUnit: 'Quintals', problemsFaced: '' }],
     landUnit: 'Acres', agreementAccepted: false
@@ -167,19 +168,43 @@ export function useFarmerOnboarding(navigation: any, route: any) {
     }
   };
 
+  // const isNextEnabled = useMemo(() => {
+  //   if (step === 1) return !!(values.fullName && values.fatherName && values.mobile?.length === 10 && values.state && values.city && values.taluka && values.village);
+  //   if (step === 2) {
+  //       const baseValid = !!(values.totalLand && values.majorCrops?.length > 0 && values.soilType?.length > 0 && values.waterSource?.length > 0);
+  //       if (values.soilType?.includes('Others') && !values.otherSoilType) return false;
+  //       if (values.waterSource?.includes('Others') && !values.otherWaterSource) return false;
+  //       if (values.farmEquipments?.includes('Others') && !values.otherFarmEquipment) return false;
+  //       return baseValid;
+  //   }
+  //   if (step === 3) return true; 
+  //   if (step === 4) return !!(values.agreementAccepted && values.farmerSignature && values.seSignature);
+  //   if (step === 5) return true; 
+  //   return true; 
+  // }, [step, values]);
   const isNextEnabled = useMemo(() => {
-    if (step === 1) return !!(values.fullName && values.fatherName && values.mobile?.length === 10 && values.state && values.city && values.taluka && values.village);
-    if (step === 2) {
-        const baseValid = !!(values.totalLand && values.majorCrops?.length > 0 && values.soilType?.length > 0 && values.waterSource?.length > 0);
-        if (values.soilType?.includes('Others') && !values.otherSoilType) return false;
-        if (values.waterSource?.includes('Others') && !values.otherWaterSource) return false;
-        if (values.farmEquipments?.includes('Others') && !values.otherFarmEquipment) return false;
-        return baseValid;
-    }
-    if (step === 3) return true; 
-    if (step === 4) return !!(values.agreementAccepted && values.farmerSignature && values.seSignature);
-    if (step === 5) return true; 
-    return true; 
+    // 🚀 1. ALLOW FREE NAVIGATION: Always enable "Next" for intermediate steps
+    if (step < 5) return true; 
+
+    // 🚀 2. FINAL SUBMISSION CHECK: Validate EVERYTHING on the last step (Step 5)
+    const isStep1Valid = !!(values.fullName && values.fatherName && values.mobile?.length === 10 && values.state && values.city && values.taluka && values.village);
+    
+    const isStep2Valid = !!(values.totalLand && values.majorCrops?.length > 0 && values.soilType?.length > 0 && values.waterSource?.length > 0) &&
+                         !(values.soilType?.includes('Others') && !values.otherSoilType) &&
+                         !(values.waterSource?.includes('Others') && !values.otherWaterSource) &&
+                         !(values.farmEquipments?.includes('Others') && !values.otherFarmEquipment);
+                         
+    // 🚀 FIXED: Validating the new pastCrops array instead of the deleted majorProblems
+    const isStep3Valid = (values.pastCrops || []).every(crop => {
+       // If they select 'Others' for input used, they MUST type what it is
+       if ((crop.inputUsed || []).includes('Others') && !crop.otherInputUsed) return false;
+       return true;
+    });
+    
+    const isStep4Valid = !!(values.agreementAccepted && values.farmerSignature && values.seSignature);
+
+    // The "Submit Profile" button will only be clickable if ALL of these are true
+    return isStep1Valid && isStep2Valid && isStep3Valid && isStep4Valid; 
   }, [step, values]);
 
   const generateHTML = () => {
@@ -322,7 +347,9 @@ export function useFarmerOnboarding(navigation: any, route: any) {
           alternateMobile: data.alternateMobile, 
           state: data.state, 
           city: data.city, 
-          taluka: data.taluka 
+          taluka: data.taluka ,
+          pincode: data.pincode,
+          village: data.village,
         },
         farm_details: { 
           totalLand: data.totalLand, 

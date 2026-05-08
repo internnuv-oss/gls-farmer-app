@@ -62,7 +62,7 @@ export const Step5Documents = ({ form, uploading, handleUpload }: Step5Props) =>
       </View>
 
       <View style={{ marginBottom: spacing.md }}>
-        <Text style={{ fontWeight: '700', fontSize: 14, marginBottom: 8, color: colors.text }}>{t("Relieving Letter (Optional)")} </Text>
+        <Text style={{ fontWeight: '700', fontSize: 14, marginBottom: 8, color: colors.text }}>{t("Relieving Letter ")} </Text>
         <UploadTile 
           value={watch('documents')?.relievingLetter} 
           loading={uploading['relievingLetter']} 
