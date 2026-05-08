@@ -185,7 +185,8 @@ export const EntityProfileScreen = ({ navigation, route }: any) => {
     if (isFarmer) {
       navigation.navigate("FarmerOnboarding", { editData: raw });
     } else if (isDistributor) {
-      navigation.navigate("DistributorOnboarding", { draftData: distData, draftId: raw.id });
+      // 🚀 FIXED: Now passing editData exactly like the others to trigger UPDATE instead of INSERT
+      navigation.navigate("DistributorOnboarding", { editData: raw }); 
     } else {
       navigation.navigate("DealerOnboarding", { editData: raw });
     }
@@ -673,7 +674,8 @@ export const EntityProfileScreen = ({ navigation, route }: any) => {
                 <View key={index} style={{ backgroundColor: '#F8FAFC', padding: spacing.sm, borderRadius: radius.md, marginBottom: 8, borderWidth: 1, borderColor: '#E2E8F0' }}>
                   <Text style={{ fontWeight: '800', color: colors.primary }}>{crop.cropName || 'Unknown Crop'}</Text>
                   <Text style={{ fontSize: 12, color: colors.textMuted, marginTop: 4 }}>Area: {crop.area ? `${crop.area} ${crop.areaUnit || ''}` : 'N/A'}</Text>
-                  <Text style={{ fontSize: 12, color: colors.textMuted, marginTop: 2 }}>Input: {crop.inputUsed || 'N/A'}</Text>
+                  {/* 🚀 Safely join the inputUsed array */}
+                  <Text style={{ fontSize: 12, color: colors.textMuted, marginTop: 2 }}>Input: {Array.isArray(crop.inputUsed) ? crop.inputUsed.join(', ') : (crop.inputUsed || 'N/A')}</Text>
                   <Text style={{ fontSize: 12, color: colors.textMuted, marginTop: 2 }}>Yield: {crop.yield ? `${crop.yield} ${crop.yieldUnit || ''}` : 'N/A'}</Text>
                   <Text style={{ fontSize: 12, color: colors.danger, marginTop: 2 }}>Problems: {crop.problemsFaced || 'None'}</Text>
                 </View>

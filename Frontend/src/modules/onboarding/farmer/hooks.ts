@@ -19,7 +19,6 @@ import { useAlertStore } from "../../../store/alertStore";
 const PREDEFINED_SOILS = ["Black", "Sandy", "Red", "Loamy"];
 const PREDEFINED_WATER = ["Canal", "Borewell", "Rain", "Tube-well" ,"Well", "Tank", "Pond","River"];
 const PREDEFINED_EQUIPMENTS = ["Mini Tractor", "Tractor", "Cultivation Equipments"];
-// 🚀 NEW CONSTANT for mapping existing data to the dropdown
 const PREDEFINED_INPUTS = ["DAP", "Urea", "NPK", "SSP", "MOP", "Compost", "Others"];
 
 export function mapFarmerDbToForm(db: any): FarmerOnboardingValues {
@@ -65,18 +64,22 @@ export function mapFarmerDbToForm(db: any): FarmerOnboardingValues {
     sideTrees: db.farm_details?.sideTrees || [],
     cattles: db.farm_details?.cattles || [],
     
-    // 🚀 NEW MAPPING: Past Crops logic for Inputs & Units
     pastCrops: (db.history_details?.pastCrops || []).length > 0 
       ? db.history_details.pastCrops.map((c: any) => {
-          const isKnownInput = PREDEFINED_INPUTS.includes(c.inputUsed);
+          const dbInputs = Array.isArray(c.inputUsed) ? c.inputUsed : (c.inputUsed ? [c.inputUsed] : []);
+          const knownInputs = dbInputs.filter((i: string) => PREDEFINED_INPUTS.includes(i));
+          const otherInputs = dbInputs.filter((i: string) => !PREDEFINED_INPUTS.includes(i));
+          
+          if (otherInputs.length > 0) knownInputs.push("Others");
+
           return {
             ...c,
-            inputUsed: isKnownInput ? c.inputUsed : (c.inputUsed ? "Others" : ""),
-            otherInputUsed: !isKnownInput && c.inputUsed ? c.inputUsed : "",
+            inputUsed: knownInputs,
+            otherInputUsed: otherInputs.join(", "),
             yieldUnit: c.yieldUnit || "Quintals"
           };
         })
-      : [{ cropName: '', area: '', areaUnit: 'Acres', inputUsed: '', otherInputUsed: '', yield: '', yieldUnit: 'Quintals', problemsFaced: '' }],
+      : [{ cropName: '', area: '', areaUnit: 'Acres', inputUsed: [], otherInputUsed: '', yield: '', yieldUnit: 'Quintals', problemsFaced: '' }],
     
     dealerId: db.dealer_id || "", 
     agreementAccepted: true,
@@ -108,7 +111,7 @@ export function useFarmerOnboarding(navigation: any, route: any) {
   const defaultValues = editData ? mapFarmerDbToForm(editData) : (draftData || {
     profilePhoto: "",
     majorCrops: [], soilType: [], waterSource: [], sideTrees: [], cattles: [], irrigationType: [], farmEquipments: [], 
-    pastCrops: [{ cropName: '', area: '', areaUnit: 'Acres', inputUsed: '', otherInputUsed: '', yield: '', yieldUnit: 'Quintals', problemsFaced: '' }],
+    pastCrops: [{ cropName: '', area: '', areaUnit: 'Acres', inputUsed: [], otherInputUsed: '', yield: '', yieldUnit: 'Quintals', problemsFaced: '' }],
     landUnit: 'Acres', agreementAccepted: false
   });
 
@@ -247,11 +250,11 @@ export function useFarmerOnboarding(navigation: any, route: any) {
 
         <div class="section-title">3. History of Cultivation</div>
         <table>
-          <tr style="background-color: #F8FAFC; font-weight: 600;"><td>Crop Name</td><td>Area</td><td>Input Used</td><td>Yield</td><td>Problems Faced</td></tr>
+          <tr style="background-color: #F8FAFC; font-weight: 600;"><td>Crop Name</td><td>Area</td><td>Inputs Used</td><td>Yield</td><td>Problems Faced</td></tr>
           ${data.pastCrops?.map(c => `<tr>
             <td>${c.cropName || '-'}</td>
             <td>${c.area ? `${c.area} ${c.areaUnit || ''}` : '-'}</td>
-            <td>${c.inputUsed === 'Others' ? c.otherInputUsed : c.inputUsed || '-'}</td>
+            <td>${(c.inputUsed || []).map(i => i === 'Others' ? c.otherInputUsed : i).join(', ') || '-'}</td>
             <td>${c.yield ? `${c.yield} ${c.yieldUnit || ''}` : '-'}</td>
             <td>${c.problemsFaced || '-'}</td>
           </tr>`).join('') || '<tr><td colspan="5">No history recorded</td></tr>'}
@@ -272,6 +275,7 @@ export function useFarmerOnboarding(navigation: any, route: any) {
     `;
   };
 
+  // 🚀 ADDED BACK IN: The generatePDF function
   const generatePDF = async () => {
     const html = generateHTML();
     const rawName = form.getValues('fullName') ? form.getValues('fullName').replace(/[^a-zA-Z0-9]/g, '_') : 'Farmer';
@@ -296,12 +300,11 @@ export function useFarmerOnboarding(navigation: any, route: any) {
     setIsSubmitting(true);
     
     try {
-      // 🚀 Format pastCrops to combine "Others" back into the main inputUsed string
       const formattedPastCrops = (data.pastCrops || []).map(c => ({
         cropName: c.cropName,
         area: c.area,
         areaUnit: c.areaUnit,
-        inputUsed: c.inputUsed === 'Others' ? c.otherInputUsed : c.inputUsed,
+        inputUsed: (c.inputUsed || []).map(i => i === 'Others' ? c.otherInputUsed : i), 
         yield: c.yield,
         yieldUnit: c.yieldUnit,
         problemsFaced: c.problemsFaced
@@ -336,7 +339,7 @@ export function useFarmerOnboarding(navigation: any, route: any) {
           sideTrees: data.sideTrees, 
           cattles: data.cattles 
         },
-        history_details: { pastCrops: formattedPastCrops }, // 🚀 Save formatted array
+        history_details: { pastCrops: formattedPastCrops }, 
         farmer_signature: data.farmerSignature,
         se_signature: data.seSignature,
         status: 'SUBMITTED',

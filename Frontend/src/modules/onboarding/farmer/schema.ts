@@ -37,15 +37,15 @@ export const farmerOnboardingSchema = z.object({
     quantity: z.string().optional()
   })).optional(),
 
-  // 3. History & Linking (🚀 UPDATED FIELDS)
+  // 3. History & Linking
   pastCrops: z.array(z.object({
     cropName: z.string().optional(),
     area: z.string().optional(),
     areaUnit: z.string().optional(),
-    inputUsed: z.string().optional(), // Dropdown selection
-    otherInputUsed: z.string().optional(), // Text if "Others"
+    inputUsed: z.array(z.string()).optional(), // 🚀 CHANGED TO ARRAY
+    otherInputUsed: z.string().optional(),
     yield: z.string().optional(),
-    yieldUnit: z.string().optional(), // Yield unit
+    yieldUnit: z.string().optional(),
     problemsFaced: z.string().optional()
   })).optional(),
   dealerId: z.string().optional(), 
