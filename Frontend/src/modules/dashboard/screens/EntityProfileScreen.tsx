@@ -342,8 +342,12 @@ export const EntityProfileScreen = ({ navigation, route }: any) => {
         
         {/* --- HEADER BANNER --- */}
         <View style={{ backgroundColor: colors.surface, padding: spacing.xl, borderRadius: radius.lg, alignItems: 'center', marginBottom: spacing.lg, borderWidth: 1, borderColor: colors.border, ...shadows.soft }}>
-          <View style={{ width: 80, height: 80, borderRadius: 40, backgroundColor: colors.primarySoft, alignItems: 'center', justifyContent: 'center', marginBottom: spacing.md }}>
-            <MaterialIcons name={isDealer ? 'storefront' : isDistributor ? 'domain' : 'agriculture'} size={40} color={colors.primary} />
+          <View style={{ width: 90, height: 90, borderRadius: 45, backgroundColor: colors.primarySoft, alignItems: 'center', justifyContent: 'center', marginBottom: spacing.md, overflow: 'hidden', borderWidth: 2, borderColor: colors.primary }}>
+            {isFarmer && raw.personal_details?.profilePhoto ? (
+              <Image source={{ uri: raw.personal_details.profilePhoto }} style={{ width: '100%', height: '100%' }} />
+            ) : (
+              <MaterialIcons name={isDealer ? 'storefront' : isDistributor ? 'domain' : 'agriculture'} size={40} color={colors.primary} />
+            )}
           </View>
           <Text style={{ fontSize: 24, fontWeight: '900', color: colors.text, textAlign: 'center' }}>{entity.name}</Text>
 
@@ -664,10 +668,18 @@ export const EntityProfileScreen = ({ navigation, route }: any) => {
               <DetailRow label="Water Source" value={<PillList items={raw.farm_details?.waterSource || []} align="flex-end" />} />
             </SectionCard>
 
-            <SectionCard title="3. History & Dealer Info" icon="history">
-              <DetailRow label="Last Crop Grown" value={raw.history_details?.lastCropGrown} />
-              <DetailRow label="Previous Yield" value={raw.history_details?.yield ? `${raw.history_details.yield} Quintals/Acre` : ''} />
-              <DetailRow label="Major Problems" value={<PillList items={raw.history_details?.majorProblems || []} align="flex-end" />} />
+            <SectionCard title="3. History of Cultivation" icon="history">
+              {raw.history_details?.pastCrops?.length > 0 ? raw.history_details.pastCrops.map((crop: any, index: number) => (
+                <View key={index} style={{ backgroundColor: '#F8FAFC', padding: spacing.sm, borderRadius: radius.md, marginBottom: 8, borderWidth: 1, borderColor: '#E2E8F0' }}>
+                  <Text style={{ fontWeight: '800', color: colors.primary }}>{crop.cropName || 'Unknown Crop'}</Text>
+                  <Text style={{ fontSize: 12, color: colors.textMuted, marginTop: 4 }}>Area: {crop.area ? `${crop.area} ${crop.areaUnit || ''}` : 'N/A'}</Text>
+                  <Text style={{ fontSize: 12, color: colors.textMuted, marginTop: 2 }}>Input: {crop.inputUsed || 'N/A'}</Text>
+                  <Text style={{ fontSize: 12, color: colors.textMuted, marginTop: 2 }}>Yield: {crop.yield ? `${crop.yield} ${crop.yieldUnit || ''}` : 'N/A'}</Text>
+                  <Text style={{ fontSize: 12, color: colors.danger, marginTop: 2 }}>Problems: {crop.problemsFaced || 'None'}</Text>
+                </View>
+              )) : <Text style={{ color: colors.textMuted }}>No history recorded.</Text>}
+              
+              <View style={{ height: 1, backgroundColor: colors.border, marginVertical: spacing.md }} />
               <DetailRow label="Linked Dealer ID" value={raw.dealer_id} />
             </SectionCard>
           </>

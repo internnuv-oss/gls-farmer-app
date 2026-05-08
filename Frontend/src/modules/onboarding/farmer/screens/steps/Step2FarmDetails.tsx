@@ -105,7 +105,7 @@ export const Step2FarmDetails = ({ control, errors, t, watch }: any) => {
 
       {/* 🚀 Added Biofertilizer Select */}
       <Controller control={control} name="biofertilizer" render={({field}) => (
-        <SelectField label={t("Biofertilizer Usage/Knowledge ")} options={BIOFERTILIZER_OPTS} value={field.value} onChange={field.onChange} />
+        <SelectField label={t("Biological Products Knowledge ")} options={BIOFERTILIZER_OPTS} value={field.value} onChange={field.onChange} />
       )} />
 
       <View style={{ marginBottom: spacing.lg }}>

@@ -4,8 +4,11 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { AppState, Platform } from "react-native";
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
+import * as ImagePicker from "expo-image-picker";
+import * as ImageManipulator from 'expo-image-manipulator';
 import { documentDirectory, copyAsync } from 'expo-file-system/legacy';
 
+import { requestCameraPermission } from "../../../core/permissions";
 import { useAuthStore } from "../../../store/authStore";
 import { useDraftStore } from "../../../store/draftStore";
 import { supabase } from "../../../core/supabase"; 
@@ -15,8 +18,9 @@ import { useAlertStore } from "../../../store/alertStore";
 
 const PREDEFINED_SOILS = ["Black", "Sandy", "Red", "Loamy"];
 const PREDEFINED_WATER = ["Canal", "Borewell", "Rain", "Tube-well" ,"Well", "Tank", "Pond","River"];
-const PREDEFINED_EQUIPMENTS = ["Mini Tractor", "Tractor", "Cultivation Equipments"]; // 🚀 NEW
-const PREDEFINED_PROBLEMS = ["Low Yield", "Pest/Disease", "Soil Fertility"];
+const PREDEFINED_EQUIPMENTS = ["Mini Tractor", "Tractor", "Cultivation Equipments"];
+// 🚀 NEW CONSTANT for mapping existing data to the dropdown
+const PREDEFINED_INPUTS = ["DAP", "Urea", "NPK", "SSP", "MOP", "Compost", "Others"];
 
 export function mapFarmerDbToForm(db: any): FarmerOnboardingValues {
   const dbSoil = db.farm_details?.soilType || [];
@@ -29,18 +33,13 @@ export function mapFarmerDbToForm(db: any): FarmerOnboardingValues {
   const otherWater = dbWater.find((w: string) => !PREDEFINED_WATER.includes(w));
   if (otherWater) knownWater.push("Others");
 
-  // 🚀 Map Farm Equipments
   const dbEquip = db.farm_details?.farmEquipments || [];
   const knownEquip = dbEquip.filter((e: string) => PREDEFINED_EQUIPMENTS.includes(e));
   const otherEquip = dbEquip.find((e: string) => !PREDEFINED_EQUIPMENTS.includes(e));
   if (otherEquip) knownEquip.push("Others");
 
-  const dbProb = db.history_details?.majorProblems || [];
-  const knownProb = dbProb.filter((p: string) => PREDEFINED_PROBLEMS.includes(p));
-  const otherProb = dbProb.find((p: string) => !PREDEFINED_PROBLEMS.includes(p));
-  if (otherProb) knownProb.push("Others");
-
   return {
+    profilePhoto: db.personal_details?.profilePhoto || "", 
     fullName: db.full_name || "",
     fatherName: db.personal_details?.fatherName || "",
     mobile: db.mobile || "",
@@ -58,8 +57,6 @@ export function mapFarmerDbToForm(db: any): FarmerOnboardingValues {
     waterSource: knownWater,
     otherWaterSource: otherWater || "",
     landUnit: db.farm_details?.landUnit || "Acres",
-    
-    // 🚀 NEW FIELDS MAPPED
     irrigationType: Array.isArray(db.farm_details?.irrigationType) ? db.farm_details.irrigationType : [],
     farmEquipments: knownEquip,
     otherFarmEquipment: otherEquip || "",
@@ -68,10 +65,19 @@ export function mapFarmerDbToForm(db: any): FarmerOnboardingValues {
     sideTrees: db.farm_details?.sideTrees || [],
     cattles: db.farm_details?.cattles || [],
     
-    lastCropGrown: db.history_details?.lastCropGrown || "",
-    yield: db.history_details?.yield || "",
-    majorProblems: knownProb,
-    otherProblem: otherProb || "",
+    // 🚀 NEW MAPPING: Past Crops logic for Inputs & Units
+    pastCrops: (db.history_details?.pastCrops || []).length > 0 
+      ? db.history_details.pastCrops.map((c: any) => {
+          const isKnownInput = PREDEFINED_INPUTS.includes(c.inputUsed);
+          return {
+            ...c,
+            inputUsed: isKnownInput ? c.inputUsed : (c.inputUsed ? "Others" : ""),
+            otherInputUsed: !isKnownInput && c.inputUsed ? c.inputUsed : "",
+            yieldUnit: c.yieldUnit || "Quintals"
+          };
+        })
+      : [{ cropName: '', area: '', areaUnit: 'Acres', inputUsed: '', otherInputUsed: '', yield: '', yieldUnit: 'Quintals', problemsFaced: '' }],
+    
     dealerId: db.dealer_id || "", 
     agreementAccepted: true,
     farmerSignature: db.farmer_signature || "",
@@ -92,6 +98,7 @@ export function useFarmerOnboarding(navigation: any, route: any) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
   const [dealers, setDealers] = useState<{label: string, value: string}[]>([]);
+  const [uploading, setUploading] = useState<Record<string, boolean>>({}); 
   
   const draftIdRef = useRef<string | undefined>(draftId);
   const showSuccessRef = useRef(false);
@@ -99,8 +106,9 @@ export function useFarmerOnboarding(navigation: any, route: any) {
   useEffect(() => { showSuccessRef.current = showSuccess; }, [showSuccess]);
 
   const defaultValues = editData ? mapFarmerDbToForm(editData) : (draftData || {
-    majorCrops: [], soilType: [], waterSource: [], majorProblems: [], 
-    sideTrees: [], cattles: [], irrigationType: [], farmEquipments: [], 
+    profilePhoto: "",
+    majorCrops: [], soilType: [], waterSource: [], sideTrees: [], cattles: [], irrigationType: [], farmEquipments: [], 
+    pastCrops: [{ cropName: '', area: '', areaUnit: 'Acres', inputUsed: '', otherInputUsed: '', yield: '', yieldUnit: 'Quintals', problemsFaced: '' }],
     landUnit: 'Acres', agreementAccepted: false
   });
 
@@ -137,6 +145,25 @@ export function useFarmerOnboarding(navigation: any, route: any) {
 
   const saveDraft = () => { autoSave(); useAlertStore.getState().showAlert("Saved", "Farmer onboarding saved as draft."); navigation.goBack(); };
 
+  const handleUpload = async (key: string) => {
+    const perm = await requestCameraPermission();
+    if (!perm.granted) return useAlertStore.getState().showAlert("Permission Denied", perm.fallbackMessage);
+    
+    const result = await ImagePicker.launchCameraAsync({ quality: 0.7, allowsEditing: true, aspect: [1, 1] });
+    if (result.canceled) return;
+
+    setUploading(prev => ({ ...prev, [key]: true }));
+    try {
+      const manipResult = await ImageManipulator.manipulateAsync(result.assets[0].uri, [{ resize: { width: 500 } }], { compress: 0.6, format: ImageManipulator.SaveFormat.JPEG });
+      const url = await uploadFileToCloudinary(manipResult.uri, 'image');
+      form.setValue(key as any, url, { shouldValidate: true });
+    } catch (e) {
+      useAlertStore.getState().showAlert("Error", "Photo upload failed.");
+    } finally {
+      setUploading(prev => ({ ...prev, [key]: false }));
+    }
+  };
+
   const isNextEnabled = useMemo(() => {
     if (step === 1) return !!(values.fullName && values.fatherName && values.mobile?.length === 10 && values.state && values.city && values.taluka && values.village);
     if (step === 2) {
@@ -146,10 +173,7 @@ export function useFarmerOnboarding(navigation: any, route: any) {
         if (values.farmEquipments?.includes('Others') && !values.otherFarmEquipment) return false;
         return baseValid;
     }
-    if (step === 3) {
-      if (values.majorProblems?.includes('Others') && !values.otherProblem) return false; 
-      return true;
-    }
+    if (step === 3) return true; 
     if (step === 4) return !!(values.agreementAccepted && values.farmerSignature && values.seSignature);
     if (step === 5) return true; 
     return true; 
@@ -164,10 +188,7 @@ export function useFarmerOnboarding(navigation: any, route: any) {
       if (!sigData) return '<span style="color:red">No Signature</span>';
       try {
         const strokes = JSON.parse(sigData);
-        const toPath = (points: any[]) => {
-          if (points.length === 0) return '';
-          return `M ${points[0].x} ${points[0].y} ` + points.slice(1).map((p: any) => `L ${p.x} ${p.y}`).join(' ');
-        };
+        const toPath = (points: any[]) => `M ${points[0].x} ${points[0].y} ` + points.slice(1).map((p: any) => `L ${p.x} ${p.y}`).join(' ');
         const paths = strokes.map((pts: any[]) => `<path d="${toPath(pts)}" stroke="#16A34A" stroke-width="4" fill="none" stroke-linecap="round" stroke-linejoin="round" />`).join('');
         return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 250" style="width: 100%; max-width: 250px; height: 80px;">${paths}</svg>`;
       } catch (e) {
@@ -184,8 +205,9 @@ export function useFarmerOnboarding(navigation: any, route: any) {
           @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap');
           @page { margin: 20mm; size: A4; }
           body { font-family: 'Inter', Helvetica, Arial, sans-serif; color: #1E293B; margin: 0; padding: 0; line-height: 1.6; }
-          .header { border-bottom: 3px solid #16A34A; padding-bottom: 20px; margin-bottom: 30px; text-align: center; }
-          .header h1 { margin: 0; color: #16A34A; font-size: 32px; text-transform: uppercase; font-weight: 800; }
+          .header { border-bottom: 3px solid #16A34A; padding-bottom: 20px; margin-bottom: 30px; display: flex; justify-content: space-between; align-items: center; }
+          .header-text h1 { margin: 0; color: #16A34A; font-size: 32px; text-transform: uppercase; font-weight: 800; }
+          .profile-img { width: 100px; height: 100px; border-radius: 50%; object-fit: cover; border: 3px solid #16A34A; }
           .section-title { font-size: 18px; color: #16A34A; border-bottom: 2px solid #E2E8F0; padding-bottom: 8px; margin-bottom: 20px; text-transform: uppercase; font-weight: 800; }
           table { width: 100%; border-collapse: collapse; font-size: 14px; margin-bottom: 20px; }
           th, td { padding: 12px; text-align: left; border-bottom: 1px solid #E2E8F0; }
@@ -197,8 +219,11 @@ export function useFarmerOnboarding(navigation: any, route: any) {
       </head>
       <body>
         <div class="header">
-          <h1>Farmer Enrolment Dossier</h1>
-          <p>Enrolled on ${dateStr} • Added by ${user?.name || 'Sales Executive'}</p>
+          <div class="header-text">
+            <h1>Farmer Dossier</h1>
+            <p>Enrolled on ${dateStr} • Added by ${user?.name || 'SE'}</p>
+          </div>
+          ${data.profilePhoto ? `<img src="${data.profilePhoto}" class="profile-img" />` : ''}
         </div>
         <div class="section-title">1. Personal Details</div>
         <table>
@@ -219,6 +244,19 @@ export function useFarmerOnboarding(navigation: any, route: any) {
           <tr><th>Farm Equipments</th><td>${data.farmEquipments?.map(e => e === 'Others' ? data.otherFarmEquipment : e).join(', ') || '-'}</td></tr>
           <tr><th>Biofertilizer</th><td>${data.biofertilizer || '-'}</td></tr>
         </table>
+
+        <div class="section-title">3. History of Cultivation</div>
+        <table>
+          <tr style="background-color: #F8FAFC; font-weight: 600;"><td>Crop Name</td><td>Area</td><td>Input Used</td><td>Yield</td><td>Problems Faced</td></tr>
+          ${data.pastCrops?.map(c => `<tr>
+            <td>${c.cropName || '-'}</td>
+            <td>${c.area ? `${c.area} ${c.areaUnit || ''}` : '-'}</td>
+            <td>${c.inputUsed === 'Others' ? c.otherInputUsed : c.inputUsed || '-'}</td>
+            <td>${c.yield ? `${c.yield} ${c.yieldUnit || ''}` : '-'}</td>
+            <td>${c.problemsFaced || '-'}</td>
+          </tr>`).join('') || '<tr><td colspan="5">No history recorded</td></tr>'}
+        </table>
+
         <div class="signatures">
           <div class="sig-box">
             ${renderSignature(data.farmerSignature)}
@@ -258,13 +296,31 @@ export function useFarmerOnboarding(navigation: any, route: any) {
     setIsSubmitting(true);
     
     try {
+      // 🚀 Format pastCrops to combine "Others" back into the main inputUsed string
+      const formattedPastCrops = (data.pastCrops || []).map(c => ({
+        cropName: c.cropName,
+        area: c.area,
+        areaUnit: c.areaUnit,
+        inputUsed: c.inputUsed === 'Others' ? c.otherInputUsed : c.inputUsed,
+        yield: c.yield,
+        yieldUnit: c.yieldUnit,
+        problemsFaced: c.problemsFaced
+      }));
+
       const dbPayload = {
         se_id: user.id,
         dealer_id: data.dealerId || null, 
         full_name: data.fullName,
         mobile: data.mobile,
         village: data.village,
-        personal_details: { fatherName: data.fatherName, alternateMobile: data.alternateMobile, state: data.state, city: data.city, taluka: data.taluka },
+        personal_details: { 
+          profilePhoto: data.profilePhoto, 
+          fatherName: data.fatherName, 
+          alternateMobile: data.alternateMobile, 
+          state: data.state, 
+          city: data.city, 
+          taluka: data.taluka 
+        },
         farm_details: { 
           totalLand: data.totalLand, 
           irrigatedLand: data.irrigatedLand, 
@@ -273,8 +329,6 @@ export function useFarmerOnboarding(navigation: any, route: any) {
           soilType: data.soilType.map(st => st === 'Others' ? data.otherSoilType : st), 
           waterSource: data.waterSource.map(ws => ws === 'Others' ? data.otherWaterSource : ws),
           landUnit: data.landUnit || 'Acres', 
-          
-          // 🚀 SAVING THE NEW FIELDS 
           irrigationType: data.irrigationType || [], 
           farmEquipments: (data.farmEquipments || []).map(e => e === 'Others' ? data.otherFarmEquipment : e),
           biofertilizer: data.biofertilizer,
@@ -282,7 +336,7 @@ export function useFarmerOnboarding(navigation: any, route: any) {
           sideTrees: data.sideTrees, 
           cattles: data.cattles 
         },
-        history_details: { lastCropGrown: data.lastCropGrown, yield: data.yield, majorProblems: data.majorProblems?.map(p => p === 'Others' ? data.otherProblem : p) || [] },
+        history_details: { pastCrops: formattedPastCrops }, // 🚀 Save formatted array
         farmer_signature: data.farmerSignature,
         se_signature: data.seSignature,
         status: 'SUBMITTED',
@@ -306,10 +360,7 @@ export function useFarmerOnboarding(navigation: any, route: any) {
       
       await supabase.from('farmers').update({ pdf_url: pdfUrl }).eq('id', insertedId);
 
-      if (draftIdRef.current) {
-        removeDraft(draftIdRef.current);
-        draftIdRef.current = undefined; 
-      }
+      if (draftIdRef.current) removeDraft(draftIdRef.current);
       setShowSuccess(true);
     } catch (error: any) {
       useAlertStore.getState().showAlert("Submission Failed", error.message);
@@ -318,5 +369,5 @@ export function useFarmerOnboarding(navigation: any, route: any) {
     }
   });
 
-  return { form, step, setStep, jumpBackTo, setJumpBackTo, saveDraft, submit, isSubmitting, isNextEnabled, showSuccess, setShowSuccess, dealers, generatePDF, isEditing: !!editData };
+  return { form, step, setStep, jumpBackTo, setJumpBackTo, saveDraft, submit, isSubmitting, isNextEnabled, showSuccess, setShowSuccess, dealers, generatePDF, uploading, handleUpload, isEditing: !!editData };
 }

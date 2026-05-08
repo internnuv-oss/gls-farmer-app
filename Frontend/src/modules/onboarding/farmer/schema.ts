@@ -2,6 +2,7 @@ import { z } from "zod";
 
 export const farmerOnboardingSchema = z.object({
   // 1. Personal Details
+  profilePhoto: z.string().optional(),
   fullName: z.string().min(2, "Full name is required"),
   fatherName: z.string().min(2, "Father's name is required"),
   mobile: z.string().regex(/^\d{10}$/, "Invalid mobile number"),
@@ -22,12 +23,11 @@ export const farmerOnboardingSchema = z.object({
   waterSource: z.array(z.string()).min(1, "Select at least one water source"),
   otherWaterSource: z.string().optional(),
   
-  // 🚀 UPDATED & NEW OPTIONAL FARM DETAILS
-  irrigationType: z.array(z.string()).optional(), // Changed to array for multi-select
+  irrigationType: z.array(z.string()).optional(),
   isIntercropping: z.string().optional(),
-  farmEquipments: z.array(z.string()).optional(), // New
-  otherFarmEquipment: z.string().optional(), // New
-  biofertilizer: z.string().optional(), // New
+  farmEquipments: z.array(z.string()).optional(),
+  otherFarmEquipment: z.string().optional(),
+  biofertilizer: z.string().optional(),
   sideTrees: z.array(z.object({
     type: z.string().optional(),
     quantity: z.string().optional()
@@ -37,11 +37,17 @@ export const farmerOnboardingSchema = z.object({
     quantity: z.string().optional()
   })).optional(),
 
-  // 3. History & Linking
-  lastCropGrown: z.string().optional(),
-  yield: z.string().optional(),
-  majorProblems: z.array(z.string()).optional(),
-  otherProblem: z.string().optional(),
+  // 3. History & Linking (🚀 UPDATED FIELDS)
+  pastCrops: z.array(z.object({
+    cropName: z.string().optional(),
+    area: z.string().optional(),
+    areaUnit: z.string().optional(),
+    inputUsed: z.string().optional(), // Dropdown selection
+    otherInputUsed: z.string().optional(), // Text if "Others"
+    yield: z.string().optional(),
+    yieldUnit: z.string().optional(), // Yield unit
+    problemsFaced: z.string().optional()
+  })).optional(),
   dealerId: z.string().optional(), 
 
   // 4. Signatures

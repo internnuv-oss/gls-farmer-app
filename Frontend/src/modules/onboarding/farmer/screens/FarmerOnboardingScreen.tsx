@@ -6,12 +6,11 @@ import { Button } from '../../../../design-system/components';
 import { spacing } from '../../../../design-system/tokens';
 import { useFarmerOnboarding } from '../hooks';
 
-// Import Steps
 import { Step1PersonalDetails } from './steps/Step1PersonalDetails';
 import { Step2FarmDetails } from './steps/Step2FarmDetails';
 import { Step3History } from './steps/Step3History';
 import { Step4Signatures } from './steps/Step4Signatures';
-import { Step5Review } from './steps/Step5Review'; // 🚀 ADDED
+import { Step5Review } from './steps/Step5Review'; 
 
 export const FarmerOnboardingScreen = ({ navigation, route }: any) => {
   const { t } = useTranslation();
@@ -19,12 +18,11 @@ export const FarmerOnboardingScreen = ({ navigation, route }: any) => {
   const { 
     form, step, setStep, jumpBackTo, setJumpBackTo, saveDraft, submit, isSubmitting, 
     isNextEnabled, showSuccess, setShowSuccess, dealers, 
-    isEditing, generatePDF 
+    isEditing, generatePDF, uploading, handleUpload // 🚀 Extracting uploading & handleUpload
   } = useFarmerOnboarding(navigation, route);
   
   const { control, formState: { errors } ,watch, setValue} = form;
 
-  // Back Handler
   useEffect(() => {
     const handleBackPress = () => {
       if (jumpBackTo) {
@@ -39,7 +37,6 @@ export const FarmerOnboardingScreen = ({ navigation, route }: any) => {
     return () => sub.remove();
   }, [step, jumpBackTo]);
 
-  // 🚀 UPDATED: Unified Success Screen exactly like Dealer
   if (showSuccess) {
     return (
       <FeedbackScreenTemplate
@@ -99,11 +96,11 @@ export const FarmerOnboardingScreen = ({ navigation, route }: any) => {
         </View>
       }
     >
-      {step === 1 && <Step1PersonalDetails control={control} errors={errors} t={t} watch={watch} setValue={setValue} />}
+      {/* 🚀 Pass uploading and handleUpload down */}
+      {step === 1 && <Step1PersonalDetails control={control} errors={errors} t={t} watch={watch} setValue={setValue} uploading={uploading} handleUpload={handleUpload} />}
       {step === 2 && <Step2FarmDetails control={control} errors={errors} t={t} watch={watch} />}
       {step === 3 && <Step3History control={control} errors={errors} t={t} dealers={dealers} watch={watch} />}
       {step === 4 && <Step4Signatures control={control} t={t} />}
-      {/* 🚀 ADDED: The new review screen */}
       {step === 5 && <Step5Review form={form} setStep={setStep} setJumpBackTo={setJumpBackTo} dealers={dealers} t={t} />}
     </WizardFlowTemplate>
   );

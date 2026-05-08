@@ -68,21 +68,28 @@ export const Step5Review = ({ form, setStep, setJumpBackTo, dealers, t }: Props)
         <Text style={{ color: colors.textMuted, marginBottom: 4 }}>{t("Soil Type")}: <Text style={{ color: colors.text }}>{watch('soilType')?.map(s => s === 'Others' ? watch('otherSoilType') : s).join(', ') || t("None")}</Text></Text>
         <Text style={{ color: colors.textMuted, marginBottom: 4 }}>{t("Water Source")}: <Text style={{ color: colors.text }}>{watch('waterSource')?.map(w => w === 'Others' ? watch('otherWaterSource') : w).join(', ') || t("None")}</Text></Text>
         
-        {/* 🚀 Render New Fields */}
         <Text style={{ color: colors.textMuted, marginBottom: 4, marginTop: 8 }}>{t("Irrigation Types")}: <Text style={{ color: colors.text }}>{watch('irrigationType')?.join(', ') || t("None")}</Text></Text>
         <Text style={{ color: colors.textMuted, marginBottom: 4 }}>{t("Farm Equipments")}: <Text style={{ color: colors.text }}>{watch('farmEquipments')?.map(e => e === 'Others' ? watch('otherFarmEquipment') : e).join(', ') || t("None")}</Text></Text>
         <Text style={{ color: colors.textMuted, marginBottom: 4 }}>{t("Biofertilizer Knowledge")}: <Text style={{ color: colors.text }}>{watch('biofertilizer') || t("None")}</Text></Text>
       </View>
 
-      {/* 3. History & Linking */}
+      {/* 3. History & Linking (🚀 UPDATED FOR UNITS AND INPUTS) */}
       <View style={{ backgroundColor: colors.surface, padding: spacing.lg, borderRadius: radius.md, borderWidth: 1, borderColor: colors.border, marginBottom: spacing.md, ...shadows.soft }}>
         <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.sm }}>
            <Text style={{ fontSize: 16, fontWeight: '800', color: colors.primary }}>3. {t("History & Linking")}</Text>
            {renderEditBtn(3)}
         </View>
-        <Text style={{ color: colors.textMuted, marginBottom: 4 }}>{t("Last Crop Grown")}: <Text style={{ color: colors.text }}>{watch('lastCropGrown') || t("None")}</Text></Text>
-        <Text style={{ color: colors.textMuted, marginBottom: 4 }}>{t("Previous Yield")}: <Text style={{ color: colors.text }}>{watch('yield') ? `${watch('yield')} Quintals/Acre` : t("None")}</Text></Text>
-        <Text style={{ color: colors.textMuted, marginBottom: 8 }}>{t("Major Problems")}: <Text style={{ color: colors.danger, fontWeight: '600' }}>{watch('majorProblems')?.map(p => p === 'Others' ? watch('otherProblem') : p).join(', ') || t("None")}</Text></Text>
+
+        {watch('pastCrops')?.length ? watch('pastCrops')?.map((crop, i) => (
+          <View key={i} style={{ marginBottom: spacing.md, backgroundColor: '#F8FAFC', padding: spacing.sm, borderRadius: radius.sm, borderWidth: 1, borderColor: '#E2E8F0' }}>
+            <Text style={{ fontWeight: '800', color: colors.primary, marginBottom: 4 }}>{crop.cropName || t("Unknown Crop")}</Text>
+            <Text style={{ color: colors.textMuted, fontSize: 13, marginBottom: 2 }}>{t("Area")}: <Text style={{ color: colors.text }}>{crop.area ? `${crop.area} ${crop.areaUnit || ''}` : t("None")}</Text></Text>
+            <Text style={{ color: colors.textMuted, fontSize: 13, marginBottom: 2 }}>{t("Inputs Used")}: <Text style={{ color: colors.text }}>{crop.inputUsed === 'Others' ? crop.otherInputUsed : (crop.inputUsed || t("None"))}</Text></Text>
+            <Text style={{ color: colors.textMuted, fontSize: 13, marginBottom: 2 }}>{t("Yield")}: <Text style={{ color: colors.text }}>{crop.yield ? `${crop.yield} ${crop.yieldUnit || ''}` : t("None")}</Text></Text>
+            <Text style={{ color: colors.textMuted, fontSize: 13 }}>{t("Problems")}: <Text style={{ color: colors.danger }}>{crop.problemsFaced || t("None")}</Text></Text>
+          </View>
+        )) : <Text style={{ color: colors.textMuted, marginBottom: spacing.md }}>{t("No crop history recorded.")}</Text>}
+
         <Text style={{ color: colors.textMuted, marginBottom: 4, marginTop: 4 }}>{t("Linked Dealer")}: <Text style={{ color: colors.text, fontWeight: '700' }}>{getDealerName(watch('dealerId'))}</Text></Text>
       </View>
 
