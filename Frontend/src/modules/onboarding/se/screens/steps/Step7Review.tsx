@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, Pressable, Modal, Image, StyleSheet, Alert, ActivityIndicator, Platform, Linking } from 'react-native';
+import { View, Text, Pressable, Modal, Image, StyleSheet, ActivityIndicator, Platform } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { UseFormReturn } from 'react-hook-form';
 import * as FileSystem from 'expo-file-system/legacy';
@@ -11,39 +11,31 @@ import { SEOnboardingValues } from '../../../se/schema';
 import { useTranslation } from 'react-i18next';
 import { useAlertStore } from '../../../../../store/alertStore';
 
-interface Step6Props {
+interface Step7Props {
   form: UseFormReturn<SEOnboardingValues>;
   renderEditBtn: (step: number) => React.ReactNode;
 }
 
-export const Step6Review = ({ form, renderEditBtn }: Step6Props) => {
+export const Step7Review = ({ form, renderEditBtn }: Step7Props) => {
   const { watch } = form;
   const values = watch();
   const { t } = useTranslation();
   
   const [viewerUrl, setViewerUrl] = useState<string | null>(null);
-  const [downloadingDoc, setDownloadingDoc] = useState<string | null>(null); // 🚀 Tracks which file is downloading
+  const [downloadingDoc, setDownloadingDoc] = useState<string | null>(null);
 
-  // 🚀 SECURE NATIVE PDF OPENER
   const handleViewFile = async (url: string) => {
     if (url.toLowerCase().includes('.pdf') || url.includes('/raw/upload')) {
-      setDownloadingDoc(url); // Trigger loading spinner
+      setDownloadingDoc(url);
       try {
-        // 1. Download file to hidden local cache
         const fileName = `secure_document_${Date.now()}.pdf`;
         const fileUri = `${FileSystem.cacheDirectory}${fileName}`;
         const { uri } = await FileSystem.downloadAsync(url, fileUri);
         
         if (Platform.OS === 'android') {
-          // 2a. ANDROID: Open with explicit read permissions
           const contentUri = await FileSystem.getContentUriAsync(uri);
-          await IntentLauncher.startActivityAsync('android.intent.action.VIEW', {
-            data: contentUri,
-            flags: 1, // 🚀 This is the magic flag that grants READ permission!
-            type: 'application/pdf'
-          });
+          await IntentLauncher.startActivityAsync('android.intent.action.VIEW', { data: contentUri, flags: 1, type: 'application/pdf' });
         } else {
-          // 2b. IOS: Open in native QuickLook preview
           await Sharing.shareAsync(uri, { UTI: 'com.adobe.pdf', mimeType: 'application/pdf' });
         }
       } catch (error) {
@@ -52,7 +44,7 @@ export const Step6Review = ({ form, renderEditBtn }: Step6Props) => {
         setDownloadingDoc(null);
       }
     } else {
-      setViewerUrl(url); // Standard images still use the Custom App Modal
+      setViewerUrl(url); 
     }
   };
 
@@ -69,22 +61,14 @@ export const Step6Review = ({ form, renderEditBtn }: Step6Props) => {
            <Text style={{ fontSize: 16, fontWeight: '800', color: colors.primary }}>{t("1. Personal Details")}</Text>
            {renderEditBtn(1)}
         </View>
-        
         <Text style={{ color: colors.textMuted, marginBottom: 4 }}>{t("Full Name")}: <Text style={{ color: colors.text, fontWeight: '700' }}>{values.firstName} {values.lastName}</Text></Text>
         <Text style={{ color: colors.textMuted, marginBottom: 4 }}>{t("Date of Birth")}: <Text style={{ color: colors.text }}>{values.dob || t('N/A')}</Text></Text>
         <Text style={{ color: colors.textMuted, marginBottom: 4 }}>{t("Blood Group")}: <Text style={{ color: colors.text }}>{values.bloodGroup || t('N/A')}</Text></Text>
         <Text style={{ color: colors.textMuted, marginBottom: 4 }}>{t("Marital Status")}: <Text style={{ color: colors.text }}>{values.maritalStatus || t('N/A')}</Text></Text>
-        
-        {values.maritalStatus === 'Married' && (
-          <Text style={{ color: colors.textMuted, marginBottom: 4 }}>{t("Spouse")}: <Text style={{ color: colors.text }}>{values.spouseName} (+91 {values.spouseMobile})</Text></Text>
-        )}
-
+        {values.maritalStatus === 'Married' && <Text style={{ color: colors.textMuted, marginBottom: 4 }}>{t("Spouse")}: <Text style={{ color: colors.text }}>{values.spouseName} (+91 {values.spouseMobile})</Text></Text>}
         <Text style={{ color: colors.textMuted, marginBottom: 4, marginTop: 8 }}>{t("Mobile Number")}: <Text style={{ color: colors.text }}>+91 {values.mobileNumber || t('N/A')}</Text></Text>
         <Text style={{ color: colors.textMuted, marginBottom: 4 }}>{t("Emergency Contact")}: <Text style={{ color: colors.text }}>+91 {values.emergencyContact || t('N/A')}</Text></Text>
         <Text style={{ color: colors.textMuted, marginBottom: 4 }}>{t("Email ID")}: <Text style={{ color: colors.text }}>{values.emailId || t('N/A')}</Text></Text>
-
-        <Text style={{ color: colors.textMuted, marginBottom: 4, marginTop: 8 }}>{t("Permanent Address")}: <Text style={{ color: colors.text }}>{values.permanentAddress || t('N/A')} - {values.permanentPincode}</Text></Text>
-        <Text style={{ color: colors.textMuted, marginBottom: 4 }}>{t("Current Address")}: <Text style={{ color: colors.text }}>{values.sameAsPermanent ? t("Same as Permanent") : `${values.currentAddress || t('N/A')} - ${values.currentPincode || ''}`}</Text></Text>
       </View>
 
       {/* 2. Work Assignment */}
@@ -93,15 +77,10 @@ export const Step6Review = ({ form, renderEditBtn }: Step6Props) => {
            <Text style={{ fontSize: 16, fontWeight: '800', color: colors.primary }}>{t("2. Work Assignment")}</Text>
            {renderEditBtn(2)}
         </View>
-        
         <Text style={{ color: colors.textMuted, marginBottom: 4 }}>{t("Employee ID")}: <Text style={{ color: colors.text, fontWeight: '700' }}>{values.employeeId || t('N/A')}</Text></Text>
         <Text style={{ color: colors.textMuted, marginBottom: 4 }}>{t("Designation")}: <Text style={{ color: colors.text }}>{values.designation || t('N/A')}</Text></Text>
         <Text style={{ color: colors.textMuted, marginBottom: 4 }}>{t("Reporting To")}: <Text style={{ color: colors.text }}>{values.reportingTo || t('N/A')}</Text></Text>
         <Text style={{ color: colors.textMuted, marginBottom: 4 }}>{t("Joining Date")}: <Text style={{ color: colors.text }}>{values.joiningDate || t('N/A')}</Text></Text>
-        
-        <Text style={{ color: colors.textMuted, marginBottom: 4, marginTop: 8 }}>{t("Headquarter")}: <Text style={{ color: colors.text }}>{values.headquarter || t('N/A')}</Text></Text>
-        <Text style={{ color: colors.textMuted, marginBottom: 4 }}>{t("Territory")}: <Text style={{ color: colors.text }}>{values.territory || t('N/A')}</Text></Text>
-        <Text style={{ color: colors.textMuted, marginBottom: 4 }}>{t("Area/Beat")}: <Text style={{ color: colors.text }}>{values.area || t('N/A')}</Text></Text>
       </View>
 
       {/* 3. Statutory & Financial */}
@@ -110,12 +89,10 @@ export const Step6Review = ({ form, renderEditBtn }: Step6Props) => {
            <Text style={{ fontSize: 16, fontWeight: '800', color: colors.primary }}>{t("3. Statutory & Financial")}</Text>
            {renderEditBtn(3)}
         </View>
-        
         <Text style={{ color: colors.textMuted, marginBottom: 4 }}>{t("PAN Number")}: <Text style={{ color: colors.text, fontWeight: '700' }}>{values.panNumber || t('N/A')}</Text></Text>
         <Text style={{ color: colors.textMuted, marginBottom: 4 }}>{t("Bank Name")}: <Text style={{ color: colors.text }}>{values.bankName || t('N/A')}</Text></Text>
         <Text style={{ color: colors.textMuted, marginBottom: 4 }}>{t("Account Number")}: <Text style={{ color: colors.text }}>{values.bankAccountNumber || t('N/A')}</Text></Text>
         <Text style={{ color: colors.textMuted, marginBottom: 4 }}>{t("IFSC Code")}: <Text style={{ color: colors.text }}>{values.bankIfsc || t('N/A')}</Text></Text>
-        <Text style={{ color: colors.textMuted, marginBottom: 4, marginTop: 8 }}>{t("PF/Pension No.")}: <Text style={{ color: colors.text }}>{values.pfPensionNumber || t('N/A')}</Text></Text>
       </View>
 
       {/* 4. Assets & Logistics */}
@@ -124,21 +101,45 @@ export const Step6Review = ({ form, renderEditBtn }: Step6Props) => {
            <Text style={{ fontSize: 16, fontWeight: '800', color: colors.primary }}>{t("4. Assets & Logistics")}</Text>
            {renderEditBtn(4)}
         </View>
-        
         <Text style={{ color: colors.textMuted, marginBottom: 4 }}>{t("Vehicle Type")}: <Text style={{ color: colors.text }}>{values.vehicleType || t('N/A')}</Text></Text>
         <Text style={{ color: colors.textMuted, marginBottom: 4 }}>{t("Vehicle Number")}: <Text style={{ color: colors.text, fontWeight: '700' }}>{values.vehicleNumber || t('N/A')}</Text></Text>
         <Text style={{ color: colors.textMuted, marginBottom: 4 }}>{t("Driving License No")}: <Text style={{ color: colors.text }}>{values.drivingLicenseNo || t('N/A')}</Text></Text>
-        <Text style={{ color: colors.textMuted, marginBottom: 4 }}>{t("DL Expiry")}: <Text style={{ color: colors.text }}>{values.dlExpiryDate || t('N/A')}</Text></Text>
-        
-        <Text style={{ color: colors.textMuted, marginBottom: 4, marginTop: 8 }}>{t("Company Assets")}: <Text style={{ color: colors.text }}>{values.companyAssets?.length ? values.companyAssets.join(', ') : t('None')}</Text></Text>
-        <Text style={{ color: colors.textMuted, marginBottom: 4 }}>{t("Fuel Allowance")}: <Text style={{ color: colors.text }}>{values.fuelAllowance ? `₹${values.fuelAllowance}/km` : t('N/A')}</Text></Text>
       </View>
 
-      {/* 5. Documents */}
+      {/* 🚀 5. NEW: Insurances */}
       <View style={{ backgroundColor: colors.surface, padding: spacing.lg, borderRadius: radius.md, borderWidth: 1, borderColor: colors.border, marginBottom: spacing.md }}>
         <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.sm }}>
-           <Text style={{ fontSize: 16, fontWeight: '800', color: colors.primary }}>{t("5. Documents")}</Text>
+           <Text style={{ fontSize: 16, fontWeight: '800', color: colors.primary }}>{t("5. Insurance Details")}</Text>
            {renderEditBtn(5)}
+        </View>
+
+        {watch('insurances')?.length ? watch('insurances')?.map((ins: any, i: number) => (
+          <View key={i} style={{ marginBottom: spacing.md, backgroundColor: '#F8FAFC', padding: spacing.sm, borderRadius: radius.sm, borderWidth: 1, borderColor: '#E2E8F0' }}>
+            <Text style={{ fontWeight: '800', color: colors.primary, marginBottom: 4 }}>{t("Policy")} {i + 1}</Text>
+            <Text style={{ color: colors.textMuted, fontSize: 13, marginBottom: 2 }}>{t("Type")}: <Text style={{ color: colors.text }}>{ins.type || t("None")}</Text></Text>
+            <Text style={{ color: colors.textMuted, fontSize: 13, marginBottom: 2 }}>{t("Provider")}: <Text style={{ color: colors.text }}>{ins.provider || t("None")}</Text></Text>
+            <Text style={{ color: colors.textMuted, fontSize: 13, marginBottom: 2 }}>{t("Policy Number")}: <Text style={{ color: colors.text, fontWeight: '700' }}>{ins.insuranceId || t("None")}</Text></Text>
+            
+            <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4 }}>
+                <Text style={{ color: colors.textMuted, fontSize: 13 }}>{t("Document")}: </Text>
+                {ins.documentUrl ? (
+                  <Pressable onPress={() => handleViewFile(ins.documentUrl)} style={{ flexDirection: 'row', alignItems: 'center' }} disabled={downloadingDoc === ins.documentUrl}>
+                    {downloadingDoc === ins.documentUrl ? <ActivityIndicator size="small" color={colors.primary} style={{ marginRight: 4 }} /> : null}
+                    <Text style={{ color: colors.primary, fontWeight: '700', fontSize: 13, textDecorationLine: 'underline' }}>{t("View Uploaded File")}</Text>
+                  </Pressable>
+                ) : (
+                  <Text style={{ color: colors.danger, fontWeight: '700', fontSize: 13 }}>{t("Not Uploaded")}</Text>
+                )}
+            </View>
+          </View>
+        )) : <Text style={{ color: colors.textMuted, marginBottom: spacing.md }}>{t("No insurances recorded.")}</Text>}
+      </View>
+
+      {/* 🚀 6. Documents (Shifted to 6) */}
+      <View style={{ backgroundColor: colors.surface, padding: spacing.lg, borderRadius: radius.md, borderWidth: 1, borderColor: colors.border, marginBottom: spacing.md }}>
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.sm }}>
+           <Text style={{ fontSize: 16, fontWeight: '800', color: colors.primary }}>{t("6. Documents")}</Text>
+           {renderEditBtn(6)}
         </View>
         
         <Text style={{ color: colors.textMuted, marginBottom: 8 }}>{t("Files Uploaded")}:</Text>

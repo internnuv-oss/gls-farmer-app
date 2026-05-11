@@ -1,4 +1,4 @@
-import React, { useRef, useState, useCallback, useMemo } from "react";
+import React, { useRef, useState, useCallback, useMemo, useEffect } from "react";
 import {
   View,
   Text,
@@ -34,7 +34,7 @@ import { FilterModal, FilterState, defaultFilters } from "../../../design-system
 
 const { width } = Dimensions.get("window");
 
-export const DashboardScreen = ({ navigation }: any) => {
+export const DashboardScreen = ({ navigation, route }: any) => {
   const { t } = useTranslation();
   const drafts = useDraftStore((state) => state.drafts);
   const user = useAuthStore((state) => state.user);
@@ -43,6 +43,21 @@ export const DashboardScreen = ({ navigation }: any) => {
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const pagerRef = useRef<FlatList>(null);
+
+  // 🚀 NEW LOGIC: Catch the tab index from the Profile Screen and scroll to it
+  useEffect(() => {
+    if (route?.params?.activeTab !== undefined) {
+      const tabIndex = route.params.activeTab;
+      
+      setActiveTab(tabIndex);
+      
+      setTimeout(() => {
+        pagerRef.current?.scrollToIndex({ index: tabIndex, animated: true });
+      }, 100);
+
+      navigation.setParams({ activeTab: undefined });
+    }
+  }, [route?.params?.activeTab, navigation]);
   
   // Entity States
   const [distributors, setDistributors] = useState<any[]>([]);

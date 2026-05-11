@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, Pressable, BackHandler, Alert } from 'react-native';
+import { View, Text, Pressable, BackHandler } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
 
@@ -9,18 +9,21 @@ import { colors, spacing } from '../../../../design-system/tokens';
 import { useSEOnboarding } from '../hooks';
 import { useAlertStore } from '../../../../store/alertStore';
 
-// Import our step components
+// 🚀 Import all 7 steps (ensure Step5Insurances exists in the same folder!)
 import { Step1PersonalDetails } from './steps/Step1PersonalDetails';
 import { Step2Organization } from './steps/Step2Organization';
 import { Step3Financial } from './steps/Step3Financial';
 import { Step4AssetsLogistics } from './steps/Step4AssetsLogistics';
-import { Step5Documents } from './steps/Step5Documents';
-import { Step6Review } from './steps/Step6Review';
+import { Step5Insurances } from './steps/Step5Insurances';
+import { Step6Documents } from './steps/Step6Documents';
+import { Step7Review } from './steps/Step7Review';
 
 export const SEOnboardingScreen = ({ navigation }: any) => {
   const { t } = useTranslation();
   
   const { form, step, setStep, jumpBackTo, setJumpBackTo, submit, handleUpload, uploading, isSubmitting, isNextEnabled, showSuccess, saveAndExit, isEditing } = useSEOnboarding(navigation);
+
+  const { control, formState: { errors }, watch, setValue } = form;
 
   // Hardware back button logic
   React.useEffect(() => {
@@ -54,8 +57,9 @@ export const SEOnboardingScreen = ({ navigation }: any) => {
     );
   }
 
+  // 🚀 Jump back specifically to Step 7 now
   const renderEditBtn = (targetStep: number) => (
-    <Pressable onPress={() => { setJumpBackTo(6); setStep(targetStep); }} style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+    <Pressable onPress={() => { setJumpBackTo(7); setStep(targetStep); }} style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
       <MaterialIcons name="edit" size={16} color={colors.primary} />
       <Text style={{ color: colors.primary, fontWeight: '700' }}>{t("Edit")}</Text>
     </Pressable>
@@ -64,9 +68,9 @@ export const SEOnboardingScreen = ({ navigation }: any) => {
   return (
     <WizardFlowTemplate
       headerTitle={t("Complete Your Profile")} 
-      stepLabel={t("STEP {{current}} OF {{total}}", { current: step, total: 6 })} 
-      // 🚀 The prop below triggers the scroll reset in Templates.tsx
-      progress01={step / 6}
+      // 🚀 Out of 7 steps
+      stepLabel={t("STEP {{current}} OF {{total}}", { current: step, total: 7 })} 
+      progress01={step / 7}
       onBack={() => {
         if (jumpBackTo) { 
           if (!isNextEnabled) {
@@ -81,7 +85,6 @@ export const SEOnboardingScreen = ({ navigation }: any) => {
       footer={
         <View style={{ flexDirection: 'row', gap: spacing.sm }}>
           
-          {/* ---> NEW: Save & Exit Button (Hidden if they are editing a complete profile) <--- */}
           {!isEditing && (
             <View style={{ flex: 1 }}>
               <Button 
@@ -93,9 +96,9 @@ export const SEOnboardingScreen = ({ navigation }: any) => {
             </View>
           )}
 
-          {/* Existing Next / Complete Button */}
+          {/* 🚀 Changed bounds to 7 */}
           <View style={{ flex: 1 }}>
-            {step < 6 ? (
+            {step < 7 ? (
               <Button 
                 label={t(jumpBackTo ? "Return to Review" : "Next")} 
                 onPress={() => { jumpBackTo ? (setStep(jumpBackTo), setJumpBackTo(null)) : setStep(step + 1); }} 
@@ -114,12 +117,14 @@ export const SEOnboardingScreen = ({ navigation }: any) => {
         </View>
       }
     >
+      {/* 🚀 Map all 7 steps down properly */}
       {step === 1 && <Step1PersonalDetails form={form} />}
       {step === 2 && <Step2Organization form={form} />}
       {step === 3 && <Step3Financial form={form} />}
       {step === 4 && <Step4AssetsLogistics form={form} />}
-      {step === 5 && <Step5Documents form={form} uploading={uploading} handleUpload={handleUpload} />}
-      {step === 6 && <Step6Review form={form} renderEditBtn={renderEditBtn} />}
+      {step === 5 && <Step5Insurances control={control} errors={errors} t={t} watch={watch} setValue={setValue} uploading={uploading} handleUpload={handleUpload} />}
+      {step === 6 && <Step6Documents form={form} uploading={uploading} handleUpload={handleUpload} />}
+      {step === 7 && <Step7Review form={form} renderEditBtn={renderEditBtn} />}
     </WizardFlowTemplate>
   );
 };

@@ -1,9 +1,7 @@
-// modules/onboarding/se/hooks.ts
 import { useState, useMemo, useEffect, useRef } from "react";
-import { AppState } from "react-native"; // <-- IMPORT ADDED
+import { AppState } from "react-native"; 
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Alert } from "react-native";
 import * as DocumentPicker from "expo-document-picker";
 import * as ImagePicker from "expo-image-picker";
 import { useRoute } from "@react-navigation/native";
@@ -11,7 +9,7 @@ import * as ImageManipulator from 'expo-image-manipulator';
 
 import { requestMediaPermission, requestCameraPermission } from "../../../core/permissions";
 import { useAuthStore } from "../../../store/authStore";
-import { useDraftStore } from "../../../store/draftStore"; // <-- IMPORT ADDED
+import { useDraftStore } from "../../../store/draftStore"; 
 import { uploadFileToCloudinary } from "../services/cloudinaryService";
 import { supabase } from "../../../core/supabase";
 import { useAlertStore } from "../../../store/alertStore";
@@ -25,15 +23,12 @@ export function useSEOnboarding(navigation: any) {
   const user = useAuthStore((s) => s.user);
   const setUser = useAuthStore((s) => s.setUser);
 
-  // --- NEW: Access Draft Store ---
   const seDraftState = useDraftStore((s) => s.seDraft);
   const setSEDraft = useDraftStore((s) => s.setSEDraft);
   const clearSEDraft = useDraftStore((s) => s.clearSEDraft);
 
-  // Determine if we are editing an already submitted profile
   const isEditing = Object.keys(editData).length > 0;
   
-  // Priority: 1. Edit Data (if passed) -> 2. Saved Draft -> 3. Empty Object
   const defaultData = isEditing ? editData : (seDraftState?.data || {});
   const initialStep = isEditing ? 1 : (seDraftState?.step || 1);
 
@@ -80,7 +75,12 @@ export function useSEOnboarding(navigation: any) {
       dlExpiryDate: defaultData.dlExpiryDate || "",
       companyAssets: defaultData.companyAssets || [],
       fuelAllowance: defaultData.fuelAllowance || "",
-      documents: defaultData.documents || {}
+      documents: defaultData.documents || {},
+      
+      // 🚀 Safely map insurances from the database financial_details object or fallback
+      insurances: (defaultData.financial_details?.insurances?.length > 0) 
+        ? defaultData.financial_details.insurances 
+        : (defaultData.insurances || [{ type: '', provider: '', insuranceId: '', documentUrl: '' }]),
     } as any,
     mode: 'onChange'
   });
@@ -95,7 +95,6 @@ export function useSEOnboarding(navigation: any) {
     }
   }, [values.sameAsPermanent, values.permanentAddress, values.permanentPincode]);
 
-  // --- NEW: Background Auto-Save Logic ---
   const stepRef = useRef(step);
   useEffect(() => { stepRef.current = step; }, [step]);
 
@@ -103,58 +102,66 @@ export function useSEOnboarding(navigation: any) {
   useEffect(() => { showSuccessRef.current = showSuccess; }, [showSuccess]);
 
   const autoSave = () => {
-    // Only save drafts for new onboarding (not if editing an old approved profile)
     if (isEditing) return;
     const currentValues = form.getValues();
     setSEDraft(stepRef.current, currentValues);
   };
 
   useEffect(() => {
-    // Save data automatically every time the user transitions to a new step
     if (!showSuccessRef.current) autoSave();
   }, [step]);
 
   useEffect(() => {
-    // Save data if the phone locks, an incoming call arrives, or the app minimizes
     const subscription = AppState.addEventListener("change", nextAppState => {
       if (nextAppState === "inactive" || nextAppState === "background") {
         if (!showSuccessRef.current) autoSave();
       }
     });
-
-    // Save data if they forcefully use the back arrow to exit the screen
     return () => {
       subscription.remove();
       if (!showSuccessRef.current) autoSave();
     };
   }, []);
-  // ---------------------------------------
 
   const isNextEnabled = useMemo(() => {
-    // ... [KEEP YOUR EXISTING isNextEnabled LOGIC EXACTLY THE SAME] ...
-    if (step === 1) {
-      const basicValid = !!(
-        values.firstName && values.lastName && values.dob && 
-        values.bloodGroup && values.maritalStatus && 
-        values.mobileNumber?.length === 10 && 
-        values.emergencyContact?.length === 10 && 
-        values.emailId && 
-        values.permanentAddress && values.permanentPincode?.length === 6 && 
-        values.currentAddress && values.currentPincode?.length === 6
-      );
-      if (values.maritalStatus === "Married") {
-        return basicValid && !!(values.spouseName && values.spouseMobile && values.spouseMobile.length >= 10);
-      }
-      return basicValid;
-    }
-    if (step === 2) return !!(values.employeeId && values.designation && values.reportingTo && values.joiningDate && values.headquarter && values.territory && values.area);
-    if (step === 3) return !!(values.panNumber && values.bankName && values.bankAccountNumber && values.bankIfsc);
-    if (step === 4) return !!(values.vehicleType && values.vehicleNumber && values.drivingLicenseNo && values.dlExpiryDate); 
-    if (step === 5) return !!(values.documents?.profilePhoto && values.documents?.aadharCard && values.documents?.panCard && values.documents?.addressProof);
-    return true; 
+    // 🚀 Allow free navigation up to the new Review Step (Step 7)
+    if (step < 7) return true; 
+
+    // Step 1 Validation
+    const basicValid = !!(
+      values.firstName && values.lastName && values.dob && 
+      values.bloodGroup && values.maritalStatus && 
+      values.mobileNumber?.length === 10 && 
+      values.emergencyContact?.length === 10 && 
+      values.emailId && 
+      values.permanentAddress && values.permanentPincode?.length === 6 && 
+      values.currentAddress && values.currentPincode?.length === 6
+    );
+    const isStep1Valid = values.maritalStatus === "Married" 
+      ? basicValid && !!(values.spouseName && values.spouseMobile && values.spouseMobile.length >= 10)
+      : basicValid;
+      
+    // Step 2, 3, 4 Validation
+    const isStep2Valid = !!(values.employeeId && values.designation && values.reportingTo && values.joiningDate && values.headquarter && values.territory && values.area);
+    const isStep3Valid = !!(values.panNumber && values.bankName && values.bankAccountNumber && values.bankIfsc);
+    const isStep4Valid = !!(values.vehicleType && values.vehicleNumber && values.drivingLicenseNo && values.dlExpiryDate); 
+    
+    // 🚀 NEW Step 5 Validation (Insurances)
+    const isStep5Valid = (values.insurances || []).every(ins => {
+      // If it's completely empty, allow it (since it's optional)
+      if (!ins.type && !ins.provider && !ins.insuranceId) return true;
+      // If partially filled, demand the required fields
+      return !!(ins.type && ins.provider && ins.insuranceId);
+    });
+
+    // 🚀 Step 6 Validation (Documents - Shifted from 5)
+    const isStep6Valid = !!(values.documents?.profilePhoto && values.documents?.aadharCard && values.documents?.panCard && values.documents?.addressProof);
+    
+    return isStep1Valid && isStep2Valid && isStep3Valid && isStep4Valid && isStep5Valid && isStep6Valid; 
   }, [step, values]);
 
-  const handleUpload = async (key: keyof NonNullable<SEOnboardingValues['documents']>, type: 'camera' | 'image' | 'doc' = 'doc') => {
+  // Handle nested string paths properly for insurance document uploads
+  const handleUpload = async (key: string, type: 'camera' | 'image' | 'doc' = 'doc') => {
     let result;
     
     if (type === 'camera') {
@@ -172,17 +179,12 @@ export function useSEOnboarding(navigation: any) {
     }
     
     if (result.canceled) return;
-    
     const asset: any = result.assets[0];
     
-    // ---> NEW: FAIL-FAST FILE SIZE LIMIT (5MB) <---
     if (type === 'doc' && asset.size) {
       const fileSizeInMB = asset.size / (1024 * 1024);
       if (fileSizeInMB > 5) {
-        useAlertStore.getState().showAlert(
-          "File Too Large", 
-          `This document is ${fileSizeInMB.toFixed(1)}MB. Please select a file smaller than 5MB.`
-        );
+        useAlertStore.getState().showAlert("File Too Large", `This document is ${fileSizeInMB.toFixed(1)}MB. Please select a file smaller than 5MB.`);
         return; 
       }
     }
@@ -193,25 +195,32 @@ export function useSEOnboarding(navigation: any) {
     
     try {
       let finalUri = uri;
-
-      // ---> NEW: COMPRESSION LOGIC <---
       if (isCameraOrImage) {
-        const manipResult = await ImageManipulator.manipulateAsync(
-          uri,
-          [{ resize: { width: 1024 } }], // Shrinks to 1024px width, maintains aspect ratio
-          { compress: 0.6, format: ImageManipulator.SaveFormat.JPEG } // 60% compression
-        );
+        const manipResult = await ImageManipulator.manipulateAsync(uri, [{ resize: { width: 1024 } }], { compress: 0.6, format: ImageManipulator.SaveFormat.JPEG });
         finalUri = manipResult.uri;
       }
 
       const url = await uploadFileToCloudinary(finalUri, isCameraOrImage ? 'image' : 'raw');
-      const currentDocs = form.getValues('documents') || {};
       
-      if (key === 'educationalCertificates') {
-        const existingArray = Array.isArray(currentDocs[key]) ? currentDocs[key] : [];
-        form.setValue('documents', { ...currentDocs, [key]: [...existingArray, url] }, { shouldValidate: true });
+      // 🚀 Handle Insurance array nested keys (e.g. "insurances.0.documentUrl")
+      if (key.startsWith('insurances.')) {
+        const parts = key.split('.');
+        const index = parseInt(parts[1], 10);
+        const fieldName = parts[2];
+        const currentInsurances = [...(form.getValues('insurances') || [])];
+        if (currentInsurances[index]) {
+          currentInsurances[index] = { ...currentInsurances[index], [fieldName]: url };
+          form.setValue('insurances', currentInsurances, { shouldValidate: true });
+        }
       } else {
-        form.setValue('documents', { ...currentDocs, [key]: url }, { shouldValidate: true });
+        // Standard Documents Logic
+        const currentDocs = form.getValues('documents') || {};
+        if (key === 'educationalCertificates') {
+          const existingArray = Array.isArray(currentDocs[key as keyof typeof currentDocs]) ? currentDocs[key as keyof typeof currentDocs] as string[] : [];
+          form.setValue('documents', { ...currentDocs, [key]: [...existingArray, url] }, { shouldValidate: true });
+        } else {
+          form.setValue('documents', { ...currentDocs, [key]: url }, { shouldValidate: true });
+        }
       }
     } catch(e) {
       useAlertStore.getState().showAlert("Error", "Upload failed.");
@@ -260,7 +269,8 @@ export function useSEOnboarding(navigation: any) {
               bankName: data.bankName,
               bankAccountNumber: data.bankAccountNumber,
               bankIfsc: data.bankIfsc,
-              pfPensionNumber: data.pfPensionNumber
+              pfPensionNumber: data.pfPensionNumber,
+              insurances: data.insurances // 🚀 Tucked safely into JSONB, no DB changes needed!
             },
             assets_details: {
               vehicleType: data.vehicleType,
@@ -276,7 +286,7 @@ export function useSEOnboarding(navigation: any) {
         if (error) throw error;
         
         setUser({ ...user, isProfileComplete: true });
-        clearSEDraft(); // <-- NEW: Clean up the local storage draft upon success!
+        clearSEDraft(); 
         setShowSuccess(true);
       } catch (error: any) {
         useAlertStore.getState().showAlert("Submission Failed", error.message);

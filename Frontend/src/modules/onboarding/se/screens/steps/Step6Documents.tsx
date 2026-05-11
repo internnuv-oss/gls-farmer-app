@@ -3,16 +3,16 @@ import { View, Text } from 'react-native';
 import { UseFormReturn } from 'react-hook-form';
 import { UploadTile } from '../../../../../design-system/components';
 import { colors, spacing } from '../../../../../design-system/tokens';
-import { SEOnboardingValues } from '../../../se/schema';
+import { SEOnboardingValues } from '../../schema';
 import { useTranslation } from 'react-i18next';
 
-interface Step5Props {
+interface Step6Props {
   form: UseFormReturn<SEOnboardingValues>;
   uploading: Record<string, boolean>;
   handleUpload: (key: any, type?: 'camera' | 'doc' | 'image') => void;
 }
 
-export const Step5Documents = ({ form, uploading, handleUpload }: Step5Props) => {
+export const Step6Documents = ({ form, uploading, handleUpload }: Step6Props) => {
   const { watch, setValue } = form;
   const { t } = useTranslation();
 

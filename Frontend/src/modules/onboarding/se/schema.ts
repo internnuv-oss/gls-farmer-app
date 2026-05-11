@@ -1,8 +1,6 @@
 import { z } from 'zod';
 
-// Helper to calculate age from a date string (DD-MM-YYYY)
 const calculateAge = (dob: string) => {
-    // 🚀 Parse dd-mm-yyyy format
     const [day, month, year] = dob.split('-').map(Number);
     const birthDate = new Date(year, month - 1, day);
     const today = new Date();
@@ -12,7 +10,7 @@ const calculateAge = (dob: string) => {
       age--;
     }
     return age;
-  };
+};
 
 export const seOnboardingSchema = z.object({
   // Section 1: Personal Details
@@ -31,7 +29,7 @@ export const seOnboardingSchema = z.object({
   spouseName: z.string().optional(),
   spouseMobile: z.string().optional(),
   mobileNumber: z.string().regex(/^\d{10}$/, "Must be exactly 10 digits"),
-  emergencyContact: z.string().regex(/^\d{10}$/, "Must be exactly 10 digits"), // 🚀 ADDED
+  emergencyContact: z.string().regex(/^\d{10}$/, "Must be exactly 10 digits"),
   emailId: z.string().email("Invalid email format"),
   permanentAddress: z.string().min(10, "Full permanent address required"),
   permanentPincode: z.string().regex(/^\d{6}$/, "Must be exactly 6 digits"),
@@ -64,17 +62,25 @@ export const seOnboardingSchema = z.object({
   vehicleType: z.enum(["Two-Wheeler", "Four-Wheeler"], {
     message: "Select a vehicle type",
   }),
-  vehicleNumber: z.string().regex(/^[A-Z]{2}[0-9A-Z]{1,2}[A-Z]{0,2}[0-9]{4}$/, "Invalid Vehicle Number Format (e.g., GJ01AB1234)"), // 🚀 ADDED
+  vehicleNumber: z.string().regex(/^[A-Z]{2}[0-9A-Z]{1,2}[A-Z]{0,2}[0-9]{4}$/, "Invalid Vehicle Number Format (e.g., GJ01AB1234)"),
   drivingLicenseNo: z.string().regex(/^[A-Z]{2}[0-9]{2}\s?[0-9]{11}$/, "Invalid DL Format (e.g., MH04 20100012345)"),
   dlExpiryDate: z.string().min(8, "DL Expiry Date is required"),
   companyAssets: z.array(z.string()).optional(), 
   fuelAllowance: z.string().optional(),
 
-  // Section 5: Document Management
+  // 🚀 Section 5: NEW Insurances Array
+  insurances: z.array(z.object({
+    type: z.string().optional(),
+    provider: z.string().optional(),
+    insuranceId: z.string().optional(),
+    documentUrl: z.string().optional()
+  })).optional(),
+  
+  // Section 6: Document Management
   documents: z.object({
     profilePhoto: z.string().url("Profile photo is required").optional(), 
-    aadharCard: z.string().url("Aadhar Card is required").optional(), // 🚀 UPDATED
-    panCard: z.string().url("PAN Card is required").optional(),       // 🚀 UPDATED
+    aadharCard: z.string().url("Aadhar Card is required").optional(), 
+    panCard: z.string().url("PAN Card is required").optional(),       
     addressProof: z.string().url("Address proof is required").optional(),
     relievingLetter: z.string().optional(),
     educationalCertificates: z.array(z.string()).optional(),
@@ -82,18 +88,10 @@ export const seOnboardingSchema = z.object({
 }).superRefine((data, ctx) => {
   if (data.maritalStatus === "Married") {
     if (!data.spouseName || data.spouseName.length < 2) {
-      ctx.addIssue({
-        code: "custom",
-        path: ["spouseName"],
-        message: "Spouse Name is required if married",
-      });
+      ctx.addIssue({ code: "custom", path: ["spouseName"], message: "Spouse Name is required if married" });
     }
     if (!data.spouseMobile || !/^\d{10,12}$/.test(data.spouseMobile)) {
-      ctx.addIssue({
-        code: "custom",
-        path: ["spouseMobile"],
-        message: "Valid Spouse Mobile (10-12 digits) is required",
-      });
+      ctx.addIssue({ code: "custom", path: ["spouseMobile"], message: "Valid Spouse Mobile (10-12 digits) is required" });
     }
   }
 });

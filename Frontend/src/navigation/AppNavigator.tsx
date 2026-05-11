@@ -42,6 +42,7 @@ const DashboardStackNavigator = () => (
 
 const MainTabs = () => (
   <Tab.Navigator
+    initialRouteName="Profile" // 🚀 ADD THIS LINE HERE
     screenOptions={{
       headerShown: false,
       tabBarActiveTintColor: colors.primary,

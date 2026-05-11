@@ -7,7 +7,6 @@ import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
 import * as IntentLauncher from 'expo-intent-launcher';
 
-
 import { useAuthStore } from '../../../store/authStore';
 import { useDraftStore } from '../../../store/draftStore';
 import { Button } from '../../../design-system/components/Button';
@@ -26,7 +25,7 @@ export const ProfileScreen = () => {
   const [seData, setSeData] = useState<any>(null);
   
   const [viewerUrl, setViewerUrl] = useState<string | null>(null);
-  const [downloadingDoc, setDownloadingDoc] = useState<string | null>(null); // 🚀 Tracks which file is downloading
+  const [downloadingDoc, setDownloadingDoc] = useState<string | null>(null);
 
   const loadAllData = async () => {
     if (!user?.id) return;
@@ -68,9 +67,8 @@ export const ProfileScreen = () => {
 
   const isProfileComplete = user?.isProfileComplete || seData?.is_profile_complete;
 
-  // 🚀 RECOMBINE THE SPLIT COLUMNS SO THE UI KEEPS WORKING FLAWLESSLY
   const values = seData ? {
-    ...seData.personal_details, //firstName, lastName, dob, and contact info are all here now
+    ...seData.personal_details, 
     ...seData.organization_details,
     ...seData.financial_details,
     ...seData.assets_details,
@@ -79,8 +77,6 @@ export const ProfileScreen = () => {
 
   const profilePhotoUrl = values?.documents?.profilePhoto;
 
-
-// ... rest of the file remains exactly the same
   const DataRow = ({ label, value, prefix }: { label: string, value?: any, prefix?: string }) => {
     const hasValue = value && (Array.isArray(value) ? value.length > 0 : true);
     let displayValue = hasValue ? (Array.isArray(value) ? value.join(', ') : value) : "N/A";
@@ -94,26 +90,22 @@ export const ProfileScreen = () => {
     );
   };
 
-  // 🚀 SECURE NATIVE PDF OPENER
   const handleViewFile = async (url: string) => {
     if (url.toLowerCase().includes('.pdf') || url.includes('/raw/upload')) {
-      setDownloadingDoc(url); // Trigger loading spinner
+      setDownloadingDoc(url); 
       try {
-        // 1. Download file to hidden local cache
         const fileName = `secure_document_${Date.now()}.pdf`;
         const fileUri = `${FileSystem.cacheDirectory}${fileName}`;
         const { uri } = await FileSystem.downloadAsync(url, fileUri);
         
         if (Platform.OS === 'android') {
-          // 2a. ANDROID: Open with explicit read permissions
           const contentUri = await FileSystem.getContentUriAsync(uri);
           await IntentLauncher.startActivityAsync('android.intent.action.VIEW', {
             data: contentUri,
-            flags: 1, // 🚀 This is the magic flag that grants READ permission!
+            flags: 1, 
             type: 'application/pdf'
           });
         } else {
-          // 2b. IOS: Open in native QuickLook preview
           await Sharing.shareAsync(uri, { UTI: 'com.adobe.pdf', mimeType: 'application/pdf' });
         }
       } catch (error) {
@@ -122,7 +114,7 @@ export const ProfileScreen = () => {
         setDownloadingDoc(null);
       }
     } else {
-      setViewerUrl(url); // Standard images still use the Custom App Modal
+      setViewerUrl(url); 
     }
   };
 
@@ -146,12 +138,13 @@ export const ProfileScreen = () => {
     </View>
   );
 
-  const StatBox = ({ title, count, icon, color }: any) => (
-    <View style={styles.statBox}>
+  // 🚀 CHANGED TO PRESSABLE AND ADDED onPress PROP
+  const StatBox = ({ title, count, icon, color, onPress }: any) => (
+    <Pressable style={styles.statBox} onPress={onPress}>
       <MaterialIcons name={icon} size={28} color={color} style={{ marginBottom: 8 }} />
       <Text style={{ fontSize: 24, fontWeight: '900', color: colors.text }}>{count}</Text>
       <Text style={styles.statTitle}>{title}</Text>
-    </View>
+    </Pressable>
   );
 
   return (
@@ -190,6 +183,22 @@ export const ProfileScreen = () => {
         </Text>
       </View>
 
+      {/* 🚀 MOVED STATBOXES HERE - ALWAYS VISIBLE WITH NAVIGATION */}
+      <View style={{ flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.xl }}>
+        <StatBox 
+          title={t('Dealers')} count={counts.dealers} icon="storefront" color={colors.primary} 
+          onPress={() => navigation.navigate('Dashboard', { screen: 'DashboardMain', params: { activeTab: 1 } })} 
+        />
+        <StatBox 
+          title={t('Farmers')} count={counts.farmers} icon="agriculture" color={colors.success} 
+          onPress={() => navigation.navigate('Dashboard', { screen: 'DashboardMain', params: { activeTab: 2 } })} 
+        />
+        <StatBox 
+          title={t('Distributors')} count={counts.distributors} icon="domain" color={colors.warning} 
+          onPress={() => navigation.navigate('Dashboard', { screen: 'DashboardMain', params: { activeTab: 0 } })} 
+        />
+      </View>
+
       {!isProfileComplete ? (
         <View style={styles.incompleteCard}>
           <MaterialIcons 
@@ -213,9 +222,7 @@ export const ProfileScreen = () => {
               </Text>
             </View>
             
-            {/* Progress Bar */}
             <View style={{ height: 6, backgroundColor: '#FEF3C7', borderRadius: 3, overflow: 'hidden' }}>
-              {/* ---> BUG FIX: Aligned the bar width calculation to match the text percentage <--- */}
               <View style={{ width: `${((seDraft.step - 1) / 6) * 100}%`, height: '100%', backgroundColor: colors.warning, borderRadius: 3 }} />
             </View>
             
@@ -238,12 +245,6 @@ export const ProfileScreen = () => {
         </View>
       ) : (
         <>
-          <View style={{ flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.xl }}>
-            <StatBox title={t('Dealers')} count={counts.dealers} icon="storefront" color={colors.primary} />
-            <StatBox title={t('Farmers')} count={counts.farmers} icon="agriculture" color={colors.success} />
-            <StatBox title={t('Distributors')} count={counts.distributors} icon="domain" color={colors.warning} />
-          </View>
-
           <View style={styles.card}>
             <View style={styles.sectionHeader}><Text style={styles.sectionTitle}>{t("Personal Details")}</Text></View>
             <DataRow label="Date of Birth" value={values.dob} />
