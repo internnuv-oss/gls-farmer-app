@@ -4,6 +4,7 @@ import { Controller, UseFormReturn } from 'react-hook-form';
 import { CheckboxItem } from '../../../../../design-system/components';
 import { colors, spacing } from '../../../../../design-system/tokens';
 import { DealerOnboardingValues, GLS_COMMITMENTS } from '../../schema';
+import { useTranslation } from 'react-i18next';
 
 interface Props {
   form: UseFormReturn<DealerOnboardingValues>;
@@ -11,11 +12,12 @@ interface Props {
 
 export const Step4Commitments = ({ form }: Props) => {
   const { control } = form;
+  const { t } = useTranslation();
   return (
     <View>
-      <Text style={{ fontSize: 20, fontWeight: '800', marginBottom: spacing.sm }}>GLS Commitments</Text>
-      <Text style={{ color: colors.textMuted, marginBottom: spacing.lg }}>Tick to confirm acceptance from the dealer.</Text>
-      <Controller control={control} name="glsCommitments" render={({field}) => (
+      <Text style={{ fontSize: 20, fontWeight: '800', marginBottom: spacing.sm }}>{t("GLS Commitments")}</Text>
+        <Text style={{ color: colors.textMuted, marginBottom: spacing.lg }}>{t("Tick to confirm acceptance from the dealer.")}</Text>
+        <Controller control={control} name="glsCommitments" render={({field}) => (
         <View>{GLS_COMMITMENTS.map((item) => <CheckboxItem key={item} label={item} checked={field.value?.includes(item)} onChange={(checked) => { const curr = new Set(field.value); checked ? curr.add(item) : curr.delete(item); field.onChange(Array.from(curr)); }}/>)}</View>
       )} />
     </View>

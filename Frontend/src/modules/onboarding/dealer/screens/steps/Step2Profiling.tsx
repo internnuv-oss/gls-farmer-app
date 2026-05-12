@@ -4,6 +4,7 @@ import { Controller, UseFormReturn } from 'react-hook-form';
 import { ScoreSlider, TextArea, AudioRecorder } from '../../../../../design-system/components';
 import { colors, radius, spacing, shadows } from '../../../../../design-system/tokens';
 import { DealerOnboardingValues } from '../../schema';
+import { useTranslation } from 'react-i18next';
 
 const SCORING_ASPECTS = [
   { key: 'scoreFinancial', rem: 'remFinancial', aud: 'audioFinancial', label: 'Financial Health & Turnover', params: 'Annual turnover, payment discipline with suppliers' },
@@ -95,13 +96,14 @@ interface Props {
 
 export const Step2Profiling = ({ form, scoreData, uploading, handleAudioUpload, getCategoryBg, getCategoryColor }: Props) => {
   const { control, watch, setValue } = form;
+  const { t } = useTranslation(); // 🚀 Added hook here
 
   return (
     <View>
       <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.lg }}>
-        <Text style={{ fontSize: 20, fontWeight: '800' }}>Profiling & Scoring</Text>
+        <Text style={{ fontSize: 20, fontWeight: '800' }}>{t('Profiling & Scoring')}</Text>
         <View style={{ backgroundColor: getCategoryBg(scoreData.band), paddingHorizontal: 12, paddingVertical: 6, borderRadius: radius.pill }}>
-          <Text style={{ fontWeight: '900', color: getCategoryColor(scoreData.band) }}>SCORE: {scoreData.raw} ({scoreData.band})</Text>
+          <Text style={{ fontWeight: '900', color: getCategoryColor(scoreData.band) }}>{t('SCORE:')} {scoreData.raw} ({scoreData.band})</Text>
         </View>
       </View>
 
@@ -109,22 +111,26 @@ export const Step2Profiling = ({ form, scoreData, uploading, handleAudioUpload, 
         const tableData = getDynamicTableData(aspect.key, watch(aspect.key as any) || 5);
         return (
           <View key={aspect.key} style={{ backgroundColor: colors.surface, padding: spacing.md, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.border, marginBottom: spacing.lg, ...shadows.soft }}>
-            <Controller control={control} name={aspect.key as any} render={({field}) => <ScoreSlider label={aspect.label} value={field.value} onChange={field.onChange} />} />
+            {/* 🚀 Wrapped aspect labels */}
+            <Controller control={control} name={aspect.key as any} render={({field}) => <ScoreSlider label={t(aspect.label)} value={field.value} onChange={field.onChange} />} />
             <View style={{ backgroundColor: '#F8FAFC', padding: 12, borderRadius: radius.md, marginBottom: spacing.md, borderWidth: 1, borderColor: '#E2E8F0' }}>
-              <Text style={{ color: colors.textMuted, fontSize: 11, fontWeight: '800', marginBottom: 4, textTransform: 'uppercase', letterSpacing: 0.5 }}>Evaluate Based On:</Text>
-              <Text style={{ color: colors.text, fontSize: 12, fontWeight: '500', marginBottom: 12, lineHeight: 18 }}>{aspect.params}</Text>
+              <Text style={{ color: colors.textMuted, fontSize: 11, fontWeight: '800', marginBottom: 4, textTransform: 'uppercase', letterSpacing: 0.5 }}>{t('Evaluate Based On:')}</Text>
+              <Text style={{ color: colors.text, fontSize: 12, fontWeight: '500', marginBottom: 12, lineHeight: 18 }}>{t(aspect.params)}</Text>
               <View style={{ borderWidth: 1, borderColor: colors.border, borderRadius: radius.sm, overflow: 'hidden' }}>
                 <View style={{ flexDirection: 'row', backgroundColor: '#F1F5F9', borderBottomWidth: 1, borderBottomColor: colors.border }}>
-                  <View style={{ flex: 1, padding: 8, borderRightWidth: 1, borderRightColor: colors.border, justifyContent: 'center' }}><Text style={{ fontSize: 11, fontWeight: '800', color: colors.text }}>{tableData.headers[0]}</Text></View>
-                  <View style={{ flex: 1, padding: 8, justifyContent: 'center' }}><Text style={{ fontSize: 11, fontWeight: '800', color: colors.text }}>{tableData.headers[1]}</Text></View>
+                  {/* 🚀 Wrapped dynamic table headers */}
+                  <View style={{ flex: 1, padding: 8, borderRightWidth: 1, borderRightColor: colors.border, justifyContent: 'center' }}><Text style={{ fontSize: 11, fontWeight: '800', color: colors.text }}>{t(tableData.headers[0])}</Text></View>
+                  <View style={{ flex: 1, padding: 8, justifyContent: 'center' }}><Text style={{ fontSize: 11, fontWeight: '800', color: colors.text }}>{t(tableData.headers[1])}</Text></View>
                 </View>
                 <View style={{ flexDirection: 'row', backgroundColor: '#FFFFFF' }}>
-                  <View style={{ flex: 1, padding: 8, borderRightWidth: 1, borderRightColor: colors.border, justifyContent: 'center' }}><Text style={{ fontSize: 12, fontStyle: 'italic', color: colors.primary, fontWeight: '600', lineHeight: 18 }}>{tableData.row[0]}</Text></View>
-                  <View style={{ flex: 1, padding: 8, justifyContent: 'center' }}><Text style={{ fontSize: 12, fontStyle: 'italic', color: colors.primary, fontWeight: '600', lineHeight: 18 }}>{tableData.row[1]}</Text></View>
+                  {/* 🚀 Wrapped dynamic table rows */}
+                  <View style={{ flex: 1, padding: 8, borderRightWidth: 1, borderRightColor: colors.border, justifyContent: 'center' }}><Text style={{ fontSize: 12, fontStyle: 'italic', color: colors.primary, fontWeight: '600', lineHeight: 18 }}>{t(tableData.row[0])}</Text></View>
+                  <View style={{ flex: 1, padding: 8, justifyContent: 'center' }}><Text style={{ fontSize: 12, fontStyle: 'italic', color: colors.primary, fontWeight: '600', lineHeight: 18 }}>{t(tableData.row[1])}</Text></View>
                 </View>
               </View>
             </View>
-            <Controller control={control} name={aspect.rem as any} render={({field}) => <TextArea label="Remarks " value={field.value} onChangeText={field.onChange} minHeight={60} placeholder="Type notes here..." />} />
+            {/* 🚀 Wrapped labels and placeholders */}
+            <Controller control={control} name={aspect.rem as any} render={({field}) => <TextArea label={t("Remarks")} value={field.value} onChangeText={field.onChange} minHeight={60} placeholder={t("Type notes here...")} />} />
             <Controller control={control} name={aspect.aud as any} render={({field}) => (
               <AudioRecorder value={field.value} loading={uploading[aspect.aud]} onRecord={(uri) => handleAudioUpload(aspect.aud, uri)} onClear={() => { field.onChange(''); setValue(aspect.aud as any, ''); }} />
             )} />
@@ -133,7 +139,7 @@ export const Step2Profiling = ({ form, scoreData, uploading, handleAudioUpload, 
       })}
       
       <View style={{ backgroundColor: '#FEE2E2', padding: spacing.md, borderRadius: radius.lg, borderWidth: 1, borderColor: '#FCA5A5' }}>
-        <Controller control={control} name="redFlags" render={({field}) => <TextArea label="Red Flags Noted (If Any)" value={field.value} onChangeText={field.onChange} placeholder="Enter any critical warnings..." />} />
+        <Controller control={control} name="redFlags" render={({field}) => <TextArea label={t("Red Flags Noted (If Any)")} value={field.value} onChangeText={field.onChange} placeholder={t("Enter any critical warnings...")} />} />
         <Controller control={control} name="audioRedFlags" render={({field}) => (
           <AudioRecorder value={field.value} loading={uploading['audioRedFlags']} onRecord={(uri) => handleAudioUpload('audioRedFlags', uri)} onClear={() => { field.onChange(''); setValue('audioRedFlags', ''); }} />
         )} />

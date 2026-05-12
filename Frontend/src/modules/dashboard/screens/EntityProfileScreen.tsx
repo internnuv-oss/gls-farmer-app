@@ -8,28 +8,35 @@ import * as IntentLauncher from 'expo-intent-launcher';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAudioPlayer, useAudioPlayerStatus } from 'expo-audio';
 
+
 import { SimpleScreenTemplate } from '../../../design-system/templates/Templates';
 import { Button } from '../../../design-system/components/Button';
 import { colors, radius, spacing, shadows } from '../../../design-system/tokens';
 import { useAlertStore } from '../../../store/alertStore';
 
-const SectionCard = ({ title, icon, children }: { title: string, icon?: any, children: React.ReactNode }) => (
-  <View style={{ backgroundColor: colors.surface, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.border, ...shadows.soft, padding: spacing.lg, marginBottom: spacing.lg }}>
-    <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: spacing.lg, borderBottomWidth: 1, borderBottomColor: colors.border, paddingBottom: spacing.sm }}>
-      {icon && <MaterialIcons name={icon} size={22} color={colors.primary} style={{ marginRight: 8 }} />}
-      <Text style={{ fontSize: 16, fontWeight: '900', color: colors.primary }}>{title}</Text>
+const SectionCard = ({ title, icon, children }: { title: string, icon?: any, children: React.ReactNode }) => {
+  const { t } = useTranslation(); // 🚀 Added hook
+  return (
+    <View style={{ backgroundColor: colors.surface, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.border, ...shadows.soft, padding: spacing.lg, marginBottom: spacing.lg }}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: spacing.lg, borderBottomWidth: 1, borderBottomColor: colors.border, paddingBottom: spacing.sm }}>
+        {icon && <MaterialIcons name={icon} size={22} color={colors.primary} style={{ marginRight: 8 }} />}
+        {/* 🚀 Wrapped title in t() */}
+        <Text style={{ fontSize: 16, fontWeight: '900', color: colors.primary }}>{t(title)}</Text>
+      </View>
+      {children}
     </View>
-    {children}
-  </View>
-);
+  );
+};
 
 const DetailRow = ({ label, value, isVertical = false }: { label: string, value: any, isVertical?: boolean }) => {
-  const displayValue = (!value || value === '' || (Array.isArray(value) && value.length === 0)) ? 'N/A' : value;
+  const { t } = useTranslation(); // 🚀 Added hook
+  const displayValue = (!value || value === '' || (Array.isArray(value) && value.length === 0)) ? t('N/A') : value;
   
   if (isVertical) {
     return (
       <View style={{ marginBottom: spacing.md }}>
-        <Text style={{ color: colors.textMuted, fontWeight: '700', marginBottom: 4 }}>{label}</Text>
+        {/* 🚀 Wrapped label in t() */}
+        <Text style={{ color: colors.textMuted, fontWeight: '700', marginBottom: 4 }}>{t(label)}</Text>
         <View>{typeof displayValue === 'string' ? <Text style={{ color: colors.text, fontWeight: '600', lineHeight: 20 }}>{displayValue}</Text> : displayValue}</View>
       </View>
     );
@@ -37,7 +44,8 @@ const DetailRow = ({ label, value, isVertical = false }: { label: string, value:
 
   return (
     <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: spacing.md }}>
-      <Text style={{ color: colors.textMuted, fontWeight: '700', flex: 1, marginRight: spacing.sm }}>{label}</Text>
+      {/* 🚀 Wrapped label in t() */}
+      <Text style={{ color: colors.textMuted, fontWeight: '700', flex: 1, marginRight: spacing.sm }}>{t(label)}</Text>
       <View style={{ flex: 1.5, alignItems: 'flex-end' }}>
         {typeof displayValue === 'string' ? <Text style={{ color: colors.text, fontWeight: '800', textAlign: 'right' }}>{displayValue}</Text> : displayValue}
       </View>
@@ -46,7 +54,8 @@ const DetailRow = ({ label, value, isVertical = false }: { label: string, value:
 };
 
 const PillList = ({ items, align = 'flex-end' }: { items: any[], align?: 'flex-start' | 'flex-end' | 'center' }) => {
-  if (!items || items.length === 0) return <Text style={{ color: colors.text, fontWeight: '800' }}>N/A</Text>;
+  const { t } = useTranslation(); // 🚀 Added hook
+  if (!items || items.length === 0) return <Text style={{ color: colors.text, fontWeight: '800' }}>{t('N/A')}</Text>;
   return (
     <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, justifyContent: align }}>
       {items.map((item, i) => (
@@ -168,7 +177,8 @@ export const EntityProfileScreen = ({ navigation, route }: any) => {
   const ScoreRow = ({ label, score, remark, audio }: any) => (
     <View style={{ marginBottom: spacing.md, paddingBottom: spacing.sm, borderBottomWidth: 1, borderBottomColor: '#F1F5F9' }}>
       <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
-        <Text style={{ color: colors.text, fontWeight: '700', fontSize: 14 }}>{label}</Text>
+        {/* 🚀 Wrapped label in t() */}
+        <Text style={{ color: colors.text, fontWeight: '700', fontSize: 14 }}>{t(label)}</Text>
         <Text style={{ color: getScoreColor(score), fontWeight: '900', fontSize: 16 }}>{score}/10</Text>
       </View>
       {remark ? <Text style={{ color: colors.textMuted, fontSize: 13, fontStyle: 'italic', marginBottom: 4 }}>"{remark}"</Text> : null}
@@ -408,8 +418,8 @@ export const EntityProfileScreen = ({ navigation, route }: any) => {
         {isDealer ? (
           <>
             {/* --- 1. BUSINESS PROFILE (DEALER) --- */}
-            <SectionCard title="1. Business Profile" icon="business-center">
-              <DetailRow label="Primary Shop Name" value={raw.primary_shop_name} />
+            <SectionCard title={t("1. Business Profile") }icon="business-center">
+              <DetailRow label={t("Primary Shop Name")} value={raw.primary_shop_name} />
               <DetailRow label="Contact Person" value={raw.contact_person} />
               <DetailRow label="Owner(s) / Partner(s)" value={<PillList items={raw.owners_list || []} />} />
               <DetailRow label="Mobile Number" value={raw.contact_mobile ? <ActionablePhone phone={raw.contact_mobile} /> : ''} />
@@ -593,7 +603,7 @@ export const EntityProfileScreen = ({ navigation, route }: any) => {
             {/* --- 5. DEALER NETWORK --- */}
             <SectionCard title="5. Top Dealers" icon="groups">
               {distData.documents?.['dealer_network_list'] ? (
-                 <Text style={{ color: colors.success, fontWeight: '700' }}>✓ Dealer List Document Uploaded</Text>
+                 <Text style={{ color: colors.success, fontWeight: '700' }}>{t('✓ Dealer List Document Uploaded')}</Text>
               ) : distData.topDealers?.length > 0 ? (
                 distData.topDealers.map((d: any, i: number) => (
                   <View key={i} style={{ backgroundColor: '#F8FAFC', padding: spacing.sm, borderRadius: radius.sm, marginBottom: 8, borderWidth: 1, borderColor: '#E2E8F0' }}>
@@ -606,7 +616,7 @@ export const EntityProfileScreen = ({ navigation, route }: any) => {
 
             {/* --- 6. COMMERCIAL ANNEXURES --- */}
             <SectionCard title="6. Commercial Annexures" icon="request-quote">
-              <Text style={{ color: colors.primary, fontWeight: '800', marginBottom: spacing.sm }}>Territory Coverage</Text>
+              <Text style={{ color: colors.primary, fontWeight: '800', marginBottom: spacing.sm }}>{t('Territory Coverage')}</Text>
               {distData.anxTerritories?.map((t: any, i: number) => (
                 <View key={i} style={{ backgroundColor: '#F8FAFC', padding: spacing.sm, borderRadius: radius.sm, marginBottom: spacing.md, borderWidth: 1, borderColor: '#E2E8F0' }}>
                   <Text style={{ fontWeight: '800', color: colors.text }}>{t.district}, {t.taluka}</Text>
@@ -615,7 +625,7 @@ export const EntityProfileScreen = ({ navigation, route }: any) => {
                 </View>
               ))}
 
-              <Text style={{ color: colors.primary, fontWeight: '800', marginBottom: spacing.sm }}>Principal Suppliers</Text>
+              <Text style={{ color: colors.primary, fontWeight: '800', marginBottom: spacing.sm }}>{t('Principal Suppliers')}</Text>
               {distData.anxPrincipalSuppliers?.map((s: any, i: number) => (
                 <Text key={i} style={{ color: colors.text, fontSize: 13, marginBottom: 4 }}>• {s.name} ({s.share}%)</Text>
               ))}
@@ -624,15 +634,15 @@ export const EntityProfileScreen = ({ navigation, route }: any) => {
               <DetailRow label="Bio/Organic Range" value={<PillList items={distData.anxBioProducts || []} align="flex-start" />} isVertical />
               <DetailRow label="Other Products" value={<PillList items={distData.anxOtherProducts || []} align="flex-start" />} isVertical />
               
-              <DetailRow label="Will Share Sales Data?" value={distData.anxWillShareSales ? 'Yes, Confirmed' : 'Not Confirmed'} />
+              <DetailRow label="Will Share Sales Data?" value={distData.anxWillShareSales ? t('Yes, Confirmed') : t('Not Confirmed')} />
               
               <View style={{ marginBottom: spacing.md }}>
-                <Text style={{ color: colors.textMuted, fontWeight: '700', marginBottom: 4 }}>2-Year Growth Vision</Text>
+                <Text style={{ color: colors.textMuted, fontWeight: '700', marginBottom: 4 }}>{t('2-Year Growth Vision')}</Text>
                 <Text style={{ color: colors.text, fontWeight: '600', fontStyle: 'italic', marginBottom: distData.anxGrowthVisionAudio ? 4 : 0 }}>"{distData.anxGrowthVision || 'N/A'}"</Text>
                 <AudioPlayer url={distData.anxGrowthVisionAudio} title="Vision Audio" />
               </View>
 
-              <Text style={{ color: colors.textMuted, fontWeight: '700', marginBottom: spacing.sm, marginTop: spacing.md }}>Credit References:</Text>
+              <Text style={{ color: colors.textMuted, fontWeight: '700', marginBottom: spacing.sm, marginTop: spacing.md }}>{t('Credit References:')}</Text>
               {distData.anxSupplierRefs?.length > 0 ? distData.anxSupplierRefs.map((ref: any, i: number) => (
                 <View key={i} style={{ backgroundColor: '#F8FAFC', padding: spacing.sm, borderRadius: radius.sm, marginBottom: 8, borderWidth: 1, borderColor: '#E2E8F0' }}>
                   <Text style={{ fontWeight: '800', color: colors.text }}>{ref.name} <Text style={{ fontWeight: '500', color: colors.textMuted }}>({ref.contact})</Text></Text>
@@ -641,7 +651,7 @@ export const EntityProfileScreen = ({ navigation, route }: any) => {
                 </View>
               )) : <Text style={{ color: colors.text, fontWeight: '700', marginBottom: spacing.md }}>N/A</Text>}
 
-              <DetailRow label="Security Deposit" value={distData.securityDeposit ? `₹ ${distData.securityDeposit}` : 'N/A'} />
+              <DetailRow label="Security Deposit" value={distData.securityDeposit ? `₹ ${distData.securityDeposit}` : t('N/A')} />
               <DetailRow label="Payment Reference / Cheque No." value={distData.paymentProofText} />
             </SectionCard>
           </>

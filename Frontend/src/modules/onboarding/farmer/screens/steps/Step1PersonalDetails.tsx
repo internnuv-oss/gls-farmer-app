@@ -4,6 +4,7 @@ import { Controller } from 'react-hook-form';
 import { MaterialIcons } from '@expo/vector-icons';
 import { Input, SelectField } from '../../../../../design-system/components';
 import { colors, radius, spacing, shadows } from '../../../../../design-system/tokens';
+import { useTranslation } from 'react-i18next';
 
 // Hardcoded state list so we always have the top-level dropdown available
 export const INDIAN_STATES = [

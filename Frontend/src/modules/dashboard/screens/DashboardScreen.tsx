@@ -372,8 +372,20 @@ export const DashboardScreen = ({ navigation, route }: any) => {
     
     const phone = isDealer ? item.raw.contact_mobile : isDistributor ? item.raw.raw_data?.contactMobile : item.raw.mobile;
     const contactName = isDealer ? item.raw.contact_person : isDistributor ? item.raw.raw_data?.contactPerson : item.raw.personal_details?.fatherName;
-    const subTitle = isDealer ? item.raw.firm_type : isDistributor ? item.raw.raw_data?.firmType : `Crops: ${(item.raw.farm_details?.majorCrops || []).join(', ')}`;
-    const statLabel = isDealer ? `Est: ${item.raw.est_year}` : isDistributor ? `Est: ${item.raw.raw_data?.estYear}` : `Land: ${item.raw.farm_details?.totalLand || 0} Ac`;
+    
+    // 🚀 DYNAMIC TRANSLATION: Wrapped the DB output in t() and mapped over arrays
+    const subTitle = isDealer 
+      ? t(item.raw.firm_type || 'N/A') 
+      : isDistributor 
+      ? t(item.raw.raw_data?.firmType || 'N/A') 
+      : `${t("Crops:")} ${(item.raw.farm_details?.majorCrops || []).map((c: string) => t(c)).join(', ')}`;
+      
+    // 🚀 DYNAMIC TRANSLATION: Translated the prefixes like "Est:" and "Land:"
+    const statLabel = isDealer 
+      ? `${t("Est:")} ${item.raw.est_year || t('N/A')}` 
+      : isDistributor 
+      ? `${t("Est:")} ${item.raw.raw_data?.estYear || t('N/A')}` 
+      : `${t("Land:")} ${item.raw.farm_details?.totalLand || 0} ${t("Ac")}`;
 
     const badgeBg = isDealer ? '#FEF3C7' : isDistributor ? '#FFEDD5' : '#E0E7FF';
     const badgeColor = isDealer ? colors.warning : isDistributor ? colors.secondary : '#4F46E5';
@@ -414,7 +426,7 @@ export const DashboardScreen = ({ navigation, route }: any) => {
                 <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                   <MaterialIcons name="location-on" size={14} color={colors.textMuted} />
                   <Text style={{ fontSize: 13, color: colors.textMuted, marginLeft: 4 }}>
-                    {item.city || 'N/A'}, {item.state || 'N/A'}
+                    {item.city || t('N/A')}, {item.state || t('N/A')}
                   </Text>
                 </View>
                 
@@ -424,14 +436,14 @@ export const DashboardScreen = ({ navigation, route }: any) => {
                     style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#EFF6FF', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, borderWidth: 1, borderColor: '#BFDBFE' }}
                   >
                     <MaterialIcons name="map" size={12} color="#2563EB" style={{ marginRight: 2 }} />
-                    <Text style={{ fontSize: 10, color: '#2563EB', fontWeight: '800' }}>MAP</Text>
+                    <Text style={{ fontSize: 10, color: '#2563EB', fontWeight: '800' }}>{t("MAP")}</Text>
                   </Pressable>
                 )}
 
                 <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                   <MaterialIcons name="date-range" size={14} color={colors.textMuted} />
                   <Text style={{ fontSize: 13, color: colors.textMuted, marginLeft: 4 }}>
-                    Since {item.raw.created_at ? new Date(item.raw.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : 'N/A'}
+                    {t("Since")} {item.raw.created_at ? new Date(item.raw.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : t('N/A')}
                   </Text>
                 </View>
               </View>
@@ -453,7 +465,6 @@ export const DashboardScreen = ({ navigation, route }: any) => {
                     <Pressable
                       onPress={() => {
                         setMenuVisible(false);
-                        // 🚀 NAVIGATION LOGIC SAFELY INSIDE THE ONPRESS
                         if (item.type === 'Farmer') {
                           navigation.navigate("FarmerOnboarding", { editData: item.raw });
                         } else if (item.type === 'Distributor') {
@@ -485,7 +496,7 @@ export const DashboardScreen = ({ navigation, route }: any) => {
               <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
                 <MaterialIcons name="person" size={16} color={colors.primary} />
                 <Text style={{ fontSize: 13, color: colors.text, marginLeft: 6, fontWeight: '600' }} numberOfLines={1}>
-                  {contactName || 'N/A'}
+                  {contactName || t('N/A')}
                 </Text>
               </View>
               
@@ -501,7 +512,7 @@ export const DashboardScreen = ({ navigation, route }: any) => {
                    fontWeight: '700', 
                    textDecorationLine: phone ? 'underline' : 'none' 
                  }}>
-                  {phone ? `+91 ${phone}` : 'N/A'}
+                  {phone ? `+91 ${phone}` : t('N/A')}
                 </Text>
               </Pressable>
             </View>
@@ -510,7 +521,7 @@ export const DashboardScreen = ({ navigation, route }: any) => {
               <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
                 <MaterialIcons name="business" size={16} color={colors.primary} />
                 <Text style={{ fontSize: 13, color: colors.text, marginLeft: 6, fontWeight: '600' }} numberOfLines={1}>
-                  {subTitle || 'N/A'}
+                  {subTitle}
                 </Text>
               </View>
               <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
@@ -525,11 +536,13 @@ export const DashboardScreen = ({ navigation, route }: any) => {
           <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "flex-end", marginTop: spacing.lg }}>
             <View style={{ flexDirection: "row", gap: spacing.sm }}>
               <View style={{ backgroundColor: badgeBg, paddingHorizontal: 10, paddingVertical: 4, borderRadius: radius.pill }}>
-                <Text style={{ color: badgeColor, fontSize: 12, fontWeight: "700" }}>{item.type}</Text>
+                {/* 🚀 DYNAMIC TRANSLATION: Translated the entity type */}
+                <Text style={{ color: badgeColor, fontSize: 12, fontWeight: "700" }}>{t(item.type)}</Text>
               </View>
               <View style={{ backgroundColor: item.raw.status === 'SUBMITTED' ? '#DCFCE7' : '#F1F5F9', paddingHorizontal: 10, paddingVertical: 4, borderRadius: radius.pill }}>
+                {/* 🚀 DYNAMIC TRANSLATION: Translated the status */}
                 <Text style={{ color: item.raw.status === 'SUBMITTED' ? '#166534' : colors.textMuted, fontSize: 12, fontWeight: "700" }}>
-                  {item.raw.status === 'SUBMITTED' ? 'Approved' : 'Draft'}
+                  {t(item.raw.status === 'SUBMITTED' ? 'Approved' : 'Draft')}
                 </Text>
               </View>
             </View>
