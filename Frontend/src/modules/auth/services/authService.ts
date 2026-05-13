@@ -9,6 +9,8 @@ export async function registerUser(values: RegisterFormValues) {
       data: {
         first_name: values.firstName,
         last_name: values.lastName,
+        // 🚀 THE FIX: Concatenate them into the exact 'name' field the trigger expects
+        name: `${values.firstName} ${values.lastName}`.trim(), 
         real_email: values.email, 
         mobile: values.mobile,
         dob: values.dob,
