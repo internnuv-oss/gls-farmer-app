@@ -66,12 +66,12 @@ export const LoginScreen = ({ navigation }: any) => {
 <View style={{ marginTop: spacing.md }}>
           <Button label={t("Login")} onPress={submit} loading={loading} />
         </View>
-        <View style={{ flexDirection: "row", justifyContent: "center", marginTop: spacing.xl }}>
+        {/* <View style={{ flexDirection: "row", justifyContent: "center", marginTop: spacing.xl }}>
           <Text style={{ color: colors.textMuted }}>{t("New Sales Executive?")} </Text>
           <Pressable onPress={() => navigation.navigate("Register")}>
             <Text style={{ color: colors.primary, fontWeight: "800" }}>{t("Register")}</Text>
           </Pressable>
-        </View>
+        </View> */}
       </ScrollView>
       {/* Local AlertModal removed! */}
     </KeyboardAvoidingView>
