@@ -141,6 +141,39 @@ export function useFarmerOnboarding(navigation: any, route: any) {
     if (draftIdRef.current) updateDraft(draftIdRef.current, currentValues);
     else draftIdRef.current = addDraft(currentValues, 'FARMER'); 
   };
+  const saveAndExit = async () => {
+    const values = form.getValues();
+    
+    // Prevent saving blank drafts
+    if (!values.fullName) {
+      useAlertStore.getState().showAlert("Cannot Save", "Please enter at least the Farmer's Full Name to save a draft.");
+      return;
+    }
+
+    // Save locally
+    autoSave();
+    
+    const currentId = draftIdRef.current;
+    if (!currentId) return;
+
+    // 🚀 SYNC TO CLOUD DRAFTS TABLE
+    try {
+      await supabase.from('drafts').upsert({
+        se_id: user?.id,
+        entity_type: 'farmer',
+        entity_id: currentId,
+        draft_data: values,
+        current_step: step,
+        updated_at: new Date().toISOString()
+      }, { onConflict: 'entity_id' });
+    } catch (err) {
+      console.log("Failed to sync farmer draft to cloud", err);
+    }
+
+    useAlertStore.getState().hideAlert();
+    navigation.navigate("MainTabs", { screen: "Drafts" });
+  };
+  
 
   useEffect(() => {
     const sub = AppState.addEventListener("change", state => { if (state === "inactive" || state === "background") { if (!showSuccessRef.current) autoSave(); } });
@@ -399,5 +432,5 @@ export function useFarmerOnboarding(navigation: any, route: any) {
     }
   });
 
-  return { form, step, setStep, jumpBackTo, setJumpBackTo, saveDraft, submit, isSubmitting, isNextEnabled, showSuccess, setShowSuccess, dealers, generatePDF, uploading, handleUpload, isEditing: !!editData };
+  return { form, step, setStep, jumpBackTo, setJumpBackTo,saveAndExit, saveDraft, submit, isSubmitting, isNextEnabled, showSuccess, setShowSuccess, dealers, generatePDF, uploading, handleUpload, isEditing: !!editData };
 }

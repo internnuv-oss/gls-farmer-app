@@ -205,7 +205,38 @@ const isNextEnabled = useMemo(() => {
     else if (raw >= 45) band = 'Grade B (Operational)';
     return { raw, band }; 
   }, [values.scoreFinancial, values.scoreReputation, values.scoreOperations, values.scoreDealerNetwork, values.scoreTeam, values.scorePortfolio, values.scoreExperience, values.scoreGrowth]);
+  const saveAndExit = async () => {
+    const values = form.getValues();
+    
+    // Prevent saving blank drafts
+    if (!values.firmName) {
+      useAlertStore.getState().showAlert("Cannot Save", "Please enter at least the Firm Name to save a draft.");
+      return;
+    }
 
+    // Save locally (This handles Zustand and draftIdRef.current)
+    autoSave();
+    
+    const currentId = draftIdRef.current;
+    if (!currentId) return;
+
+    // 🚀 SYNC TO CLOUD DRAFTS TABLE
+    try {
+      await supabase.from('drafts').upsert({
+        se_id: user?.id,
+        entity_type: 'distributor',
+        entity_id: currentId,
+        draft_data: values,
+        current_step: step,
+        updated_at: new Date().toISOString()
+      }, { onConflict: 'entity_id' });
+    } catch (err) {
+      console.log("Failed to sync distributor draft to cloud", err);
+    }
+
+    useAlertStore.getState().hideAlert();
+    navigation.navigate("MainTabs", { screen: "Drafts" });
+  };
   const handleAudioUpload = async (key: string, uri: string) => {
     setUploading(prev => ({ ...prev, [key]: true }));
     try {
@@ -575,7 +606,7 @@ const isNextEnabled = useMemo(() => {
 
   return { 
     form, step, setStep, jumpBackTo, setJumpBackTo, saveDraft, submit, 
-    scoreData, handleUpload, handleAudioUpload, uploading, isSubmitting, 
+    scoreData, handleUpload, handleAudioUpload, uploading, isSubmitting, saveAndExit,
     isNextEnabled, showSuccess, setShowSuccess, generatePDF, 
     isEditing: !!editData 
   };

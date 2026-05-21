@@ -1,11 +1,13 @@
-// store/draftStore.ts
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as crypto from 'expo-crypto';
+import { useAuthStore } from './authStore'; // 🚀 IMPORT AUTH STORE
 
-// 🚀 1. Define a clear interface for what a Draft looks like
+// 1. Added userId to the Draft interface
 export interface Draft {
   id: string;
+  userId?: string; // 🚀 Link draft to a specific user
   type: 'DEALER' | 'FARMER' | 'DISTRIBUTOR'; 
   data: any;
   updatedAt: number;
@@ -13,12 +15,10 @@ export interface Draft {
 
 export interface DraftState {
   drafts: Draft[];
-  // 🚀 2. Updated addDraft to accept the type
   addDraft: (data: any, type: 'DEALER' | 'FARMER' | 'DISTRIBUTOR', customId?: string) => string;
   removeDraft: (id: string) => void;
-  updateDraft: (id: string, data: any) => void;
+  updateDraft: (id: string, data: any, overrideUserId?: string) => void;
   
-  // --- NEW: SE Draft State ---
   seDraft: { step: number; data: any } | null;
   setSEDraft: (step: number, data: any) => void;
   clearSEDraft: () => void;
@@ -30,25 +30,32 @@ export const useDraftStore = create<DraftState>()(
       drafts: [],
       
       addDraft: (data, type, customId) => {
-        const id = customId || Date.now().toString();
+        const id = customId || crypto.randomUUID();
+        const userId = useAuthStore.getState().user?.id; // 🚀 Tag with current user
+
         set((state) => ({ 
           drafts: [
-            { id, type, data, updatedAt: Date.now() }, 
+            { id, type, data, updatedAt: Date.now(), userId }, 
             ...state.drafts
           ] 
         }));
-        return id; // Return the ID so the hook can store it in a Ref
+        return id;
       },
 
       removeDraft: (id) => set((state) => ({ 
         drafts: state.drafts.filter((d) => d.id !== id) 
       })),
 
-      updateDraft: (id, data) => set((state) => ({
-        drafts: state.drafts.map((d) => (d.id === id ? { ...d, data, updatedAt: Date.now() } : d))
+      updateDraft: (id, data, overrideUserId) => set((state) => ({
+        drafts: state.drafts.map((d) => (d.id === id ? { 
+          ...d, 
+          data, 
+          updatedAt: Date.now(),
+          // 🚀 Preserve the original owner, or update it if needed
+          userId: overrideUserId || d.userId || useAuthStore.getState().user?.id 
+        } : d))
       })),
       
-      // --- NEW: SE Draft Actions ---
       seDraft: null,
       setSEDraft: (step, data) => set({ seDraft: { step, data } }),
       clearSEDraft: () => set({ seDraft: null }),

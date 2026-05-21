@@ -56,6 +56,14 @@ const MainTabs = () => (
       options={{ tabBarIcon: ({color}) => <MaterialIcons name="dashboard" size={24} color={color} /> }} 
     />
     <Tab.Screen 
+      name="Drafts" 
+      component={DraftsScreen} 
+      options={{ 
+        tabBarIcon: ({color}) => <MaterialIcons name="drafts" size={24} color={color} />,
+        tabBarLabel: "Saved Drafts" // Customizing the label to be clearer
+      }} 
+    />
+    <Tab.Screen 
       name="Profile" 
       component={ProfileScreen} 
       options={{ tabBarIcon: ({color}) => <MaterialIcons name="person" size={24} color={color} /> }} 

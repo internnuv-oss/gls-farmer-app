@@ -11,6 +11,8 @@ import * as FileSystem from 'expo-file-system';
 import { documentDirectory, copyAsync } from 'expo-file-system/legacy';
 import { AppState } from "react-native";
 import * as ImageManipulator from 'expo-image-manipulator';
+import * as crypto from 'expo-crypto';
+import { supabase } from '../../../core/supabase';
 
 
 import { requestMediaPermission, requestCameraPermission } from "../../../core/permissions";
@@ -53,6 +55,41 @@ export function useDealerOnboarding(navigation: any, route: any) {
     }
   };
 
+  const saveAndExit = async () => {
+    // 1. Get current values
+    const values = form.getValues();
+
+    // 2. Prevent saving blank drafts (Shop Name is a good minimum requirement)
+    if (!values.shopName) {
+      useAlertStore.getState().showAlert("Cannot Save", "Please enter at least the Primary Shop Name to save a draft.");
+      return;
+    }
+
+    // 3. Save locally to Zustand (This automatically handles and generates draftIdRef.current!)
+    autoSave();
+
+    // 4. Grab the ID that autoSave just generated/updated
+    const currentId = draftIdRef.current;
+    if (!currentId) return;
+
+    // 5. 🚀 SYNC TO CLOUD DRAFTS TABLE
+    try {
+      await supabase.from('drafts').upsert({
+        se_id: user?.id,             
+        entity_type: 'dealer',       
+        entity_id: currentId,        // The unique ID of this specific form
+        draft_data: values,          
+        current_step: step,          
+        updated_at: new Date().toISOString()
+      }, { onConflict: 'entity_id' }); 
+    } catch (err) {
+      console.log("Failed to sync draft to cloud", err);
+    }
+
+    // 6. Navigate to the Drafts Tab securely
+    useAlertStore.getState().hideAlert();
+    navigation.navigate("MainTabs", { screen: "Drafts" }); 
+  };
   // --- NEW: Add a ref to track success reliably for the cleanup function ---
   const showSuccessRef = useRef(showSuccess);
   useEffect(() => { 

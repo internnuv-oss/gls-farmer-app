@@ -43,6 +43,9 @@ export const DashboardScreen = ({ navigation, route }: any) => {
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const pagerRef = useRef<FlatList>(null);
+  const myDrafts = useMemo(() => {
+    return drafts.filter(d => !d.userId || d.userId === user?.id);
+  }, [drafts, user?.id]);
 
   // 🚀 NEW LOGIC: Catch the tab index from the Profile Screen and scroll to it
   useEffect(() => {
@@ -595,9 +598,9 @@ export const DashboardScreen = ({ navigation, route }: any) => {
 
         <Pressable onPress={() => navigation.navigate("DraftsScreen")} style={{ padding: 8, position: "relative" }}>
           <MaterialIcons name="file-present" size={28} color={colors.textMuted} />
-          {drafts.length > 0 && (
+          {myDrafts.length > 0 && (
             <View style={{ position: "absolute", top: 4, right: 4, backgroundColor: colors.danger, width: 18, height: 18, borderRadius: 9, justifyContent: "center", alignItems: "center", borderWidth: 2, borderColor: colors.screen }}>
-              <Text style={{ color: "#FFF", fontSize: 10, fontWeight: "900" }}>{drafts.length}</Text>
+              <Text style={{ color: "#FFF", fontSize: 10, fontWeight: "900" }}>{myDrafts.length}</Text>
             </View>
           )}
         </Pressable>
