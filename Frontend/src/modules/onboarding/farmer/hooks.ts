@@ -15,78 +15,9 @@ import { supabase } from "../../../core/supabase";
 import { uploadFileToCloudinary } from "../services/cloudinaryService";
 import { farmerOnboardingSchema, FarmerOnboardingValues } from "./schema";
 import { useAlertStore } from "../../../store/alertStore";
+import { saveFarmerOnboarding, mapFarmerDbToForm, updateFarmerPdfUrl } from '../services/onboardingService';
 
-const PREDEFINED_SOILS = ["Black", "Sandy", "Red", "Loamy"];
-const PREDEFINED_WATER = ["Canal", "Borewell", "Rain", "Tube-well" ,"Well", "Tank", "Pond","River"];
-const PREDEFINED_EQUIPMENTS = ["Mini Tractor", "Tractor", "Cultivation Equipments"];
-const PREDEFINED_INPUTS = ["DAP", "Urea", "NPK", "SSP", "MOP", "Compost", "Others"];
 
-export function mapFarmerDbToForm(db: any): FarmerOnboardingValues {
-  const dbSoil = db.farm_details?.soilType || [];
-  const knownSoil = dbSoil.filter((s: string) => PREDEFINED_SOILS.includes(s));
-  const otherSoil = dbSoil.find((s: string) => !PREDEFINED_SOILS.includes(s));
-  if (otherSoil) knownSoil.push("Others");
-
-  const dbWater = db.farm_details?.waterSource || [];
-  const knownWater = dbWater.filter((w: string) => PREDEFINED_WATER.includes(w));
-  const otherWater = dbWater.find((w: string) => !PREDEFINED_WATER.includes(w));
-  if (otherWater) knownWater.push("Others");
-
-  const dbEquip = db.farm_details?.farmEquipments || [];
-  const knownEquip = dbEquip.filter((e: string) => PREDEFINED_EQUIPMENTS.includes(e));
-  const otherEquip = dbEquip.find((e: string) => !PREDEFINED_EQUIPMENTS.includes(e));
-  if (otherEquip) knownEquip.push("Others");
-
-  return {
-    profilePhoto: db.personal_details?.profilePhoto || "", 
-    fullName: db.full_name || "",
-    fatherName: db.personal_details?.fatherName || "",
-    mobile: db.mobile || "",
-    alternateMobile: db.personal_details?.alternateMobile || "",
-    state: db.personal_details?.state || "",
-    city: db.personal_details?.city || "",
-    taluka: db.personal_details?.taluka || "",
-    village: db.village || "",
-    totalLand: db.farm_details?.totalLand || "",
-    irrigatedLand: db.farm_details?.irrigatedLand || "",
-    rainFedLand: db.farm_details?.rainFedLand || "",
-    majorCrops: db.farm_details?.majorCrops || [],
-    soilType: knownSoil,
-    otherSoilType: otherSoil || "",
-    waterSource: knownWater,
-    otherWaterSource: otherWater || "",
-    landUnit: db.farm_details?.landUnit || "Acres",
-    irrigationType: Array.isArray(db.farm_details?.irrigationType) ? db.farm_details.irrigationType : [],
-    farmEquipments: knownEquip,
-    otherFarmEquipment: otherEquip || "",
-    biofertilizer: db.farm_details?.biofertilizer || "",
-    isIntercropping: db.farm_details?.isIntercropping || undefined,
-    sideTrees: db.farm_details?.sideTrees || [],
-    cattles: db.farm_details?.cattles || [],
-    
-    pastCrops: (db.history_details?.pastCrops || []).length > 0 
-      ? db.history_details.pastCrops.map((c: any) => {
-          const dbInputs = Array.isArray(c.inputUsed) ? c.inputUsed : (c.inputUsed ? [c.inputUsed] : []);
-          const knownInputs = dbInputs.filter((i: string) => PREDEFINED_INPUTS.includes(i));
-          const otherInputs = dbInputs.filter((i: string) => !PREDEFINED_INPUTS.includes(i));
-          
-          if (otherInputs.length > 0) knownInputs.push("Others");
-
-          return {
-            ...c,
-            inputUsed: knownInputs,
-            otherInputUsed: otherInputs.join(", "),
-            yieldUnit: c.yieldUnit || "Quintals"
-          };
-        })
-      : [{ cropName: '', area: '', areaUnit: 'Acres', inputUsed: [], otherInputUsed: '', yield: '', yieldUnit: 'Quintals', problemsFaced: '' }],
-    
-    dealerId: db.dealer_id || "", 
-    agreementAccepted: true,
-    farmerSignature: db.farmer_signature || "",
-    seSignature: db.se_signature || ""
-  };
-}
 
 export function useFarmerOnboarding(navigation: any, route: any) {
   const user = useAuthStore((s) => s.user);
@@ -358,71 +289,18 @@ export function useFarmerOnboarding(navigation: any, route: any) {
     setIsSubmitting(true);
     
     try {
-      const formattedPastCrops = (data.pastCrops || []).map(c => ({
-        cropName: c.cropName,
-        area: c.area,
-        areaUnit: c.areaUnit,
-        inputUsed: (c.inputUsed || []).map(i => i === 'Others' ? c.otherInputUsed : i), 
-        yield: c.yield,
-        yieldUnit: c.yieldUnit,
-        problemsFaced: c.problemsFaced
-      }));
-
-      const dbPayload = {
-        se_id: user.id,
-        dealer_id: data.dealerId || null, 
-        full_name: data.fullName,
-        mobile: data.mobile,
-        village: data.village,
-        personal_details: { 
-          profilePhoto: data.profilePhoto, 
-          fatherName: data.fatherName, 
-          alternateMobile: data.alternateMobile, 
-          state: data.state, 
-          city: data.city, 
-          taluka: data.taluka ,
-          pincode: data.pincode,
-          village: data.village,
-        },
-        farm_details: { 
-          totalLand: data.totalLand, 
-          irrigatedLand: data.irrigatedLand, 
-          rainFedLand: data.rainFedLand, 
-          majorCrops: data.majorCrops, 
-          soilType: data.soilType.map(st => st === 'Others' ? data.otherSoilType : st), 
-          waterSource: data.waterSource.map(ws => ws === 'Others' ? data.otherWaterSource : ws),
-          landUnit: data.landUnit || 'Acres', 
-          irrigationType: data.irrigationType || [], 
-          farmEquipments: (data.farmEquipments || []).map(e => e === 'Others' ? data.otherFarmEquipment : e),
-          biofertilizer: data.biofertilizer,
-          isIntercropping: data.isIntercropping, 
-          sideTrees: data.sideTrees, 
-          cattles: data.cattles 
-        },
-        history_details: { pastCrops: formattedPastCrops }, 
-        farmer_signature: data.farmerSignature,
-        se_signature: data.seSignature,
-        status: 'SUBMITTED',
-        updated_at: new Date().toISOString()
-      };
-
-      let insertedId = editData?.id;
-
-      if (editData?.id) {
-        const { error } = await supabase.from('farmers').update(dbPayload).eq('id', editData.id);
-        if (error) throw error;
-      } else {
-        const { data: result, error } = await supabase.from('farmers').insert([dbPayload]).select('id').single();
-        if (error) throw error;
-        insertedId = result.id;
-      }
+      // 🚀 1. Cleanly call our newly structured service
+      const result = await saveFarmerOnboarding(data, user.id, editData?.id);
       
+      // 🚀 2. Generate PDF and Upload to Cloudinary
       const html = generateHTML();
       const { uri } = await Print.printToFileAsync({ html });
       const pdfUrl = await uploadFileToCloudinary(uri, 'raw');
       
-      await supabase.from('farmers').update({ pdf_url: pdfUrl }).eq('id', insertedId);
+      // 🚀 3. Update the PDF URL via the service
+      await updateFarmerPdfUrl(result.id, pdfUrl);
 
+      // 4. Cleanup and Show Success
       if (draftIdRef.current) removeDraft(draftIdRef.current);
       setShowSuccess(true);
     } catch (error: any) {

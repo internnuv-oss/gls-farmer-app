@@ -317,27 +317,21 @@ export function useDealerOnboarding(navigation: any, route: any) {
     
   //   return true; // Step 9
   // }, [step, values]);
-  const isNextEnabled = useMemo(() => {
-    // 🚀 1. ALLOW FREE NAVIGATION: Always enable "Next" up to Step 8, so they can reach Step 9 (Review)
-    if (step < 9) return true; 
-
-    // 🚀 2. FINAL SUBMISSION CHECK: Validate EVERYTHING on Step 9 (Final Review)
-    
-    // Step 1 Validation
+  // 🚀 1. Group Validations
+  const validationStatus = useMemo(() => {
+    // Step 1
     const mobileRegex = /^\d{10}$/;
     const landlineRegex = /^[0-9]{3,5}[- ]?[0-9]{6,8}$/;
     const gstRegex = /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/;
     const panRegex = /^[A-Z]{5}[0-9]{4}[A-Z]{1}$/;
     const ifscRegex = /^[A-Z]{4}0[A-Z0-9]{6}$/;
     const bankAccRegex = /^\d{9,18}$/;
-
     const areOwnersValid = values.owners?.every(o => o.name && o.name.length >= 2);
     const areBanksValid = values.bankAccounts?.every(b => b.accountType && b.bankName && b.bankBranch && b.accountName && bankAccRegex.test(b.accountNumber || '') && ifscRegex.test(b.bankIfsc || ''));
     const isLandlineValid = !values.landlineNumber || landlineRegex.test(values.landlineNumber);
-
     const isStep1Valid = !!(values.shopName && values.shopName.length >= 2 && values.firmType && values.estYear && values.estYear.length === 4 && areOwnersValid && mobileRegex.test(values.contactMobile || '') && isLandlineValid && values.state && values.city && values.taluka && values.village && values.address && values.address.length >= 5 && gstRegex.test(values.gstNumber || '') && panRegex.test(values.panNumber || '') && areBanksValid);
-
-    // Step 3 Validation
+    
+    // Step 3
     const distValid = values.isLinkedToDistributor === 'No' || (values.isLinkedToDistributor === 'Yes' && values.linkedDistributors?.[0]?.name && /^\d{10}$/.test(values.linkedDistributors?.[0]?.contact || ''));
     const hasAtLeastOneLocation = (values.additionalShops?.length || 0) > 0 || (values.godowns?.length || 0) > 0;
     const additionalShopsValid = (values.additionalShops || []).every(s => s.shopName && s.estYear && s.state && s.city && s.taluka && s.village && s.address);
@@ -346,32 +340,74 @@ export function useDealerOnboarding(navigation: any, route: any) {
     const hasFarmerFile = !!values.documents?.['demo_farmers_list'];
     const manualFarmersValid = (values.demoFarmers || []).some(f => f.name && f.contact && f.address);
     const demoFarmersValid = values.willingDemoFarmers === 'No' || (values.willingDemoFarmers === 'Yes' && (hasFarmerFile || manualFarmersValid));
-    
     const isStep3Valid = !!(values.isLinkedToDistributor && distValid && values.hasAdditionalLocations && addLocValid && values.proposedStatus && values.willingDemoFarmers && demoFarmersValid);
-
-    // Step 4 Validation
+    
+    // Step 4
     const isStep4Valid = Array.isArray(values.glsCommitments) && values.glsCommitments.length === GLS_COMMITMENTS.length; 
-
-    // Step 6 Validation
+    
+    // Step 6
     const requiredKeys = ['gst certificate / shop establishment license', 'pan card', 'cancelled cheque', 'shop_exterior', 'selfie_with_owner'];
     const dynamicKeys = (values.complianceChecklist || []).map((item: string) => item.replace(/[^a-zA-Z0-9]/g, '_').toLowerCase());
     const allRequired = [...requiredKeys, ...dynamicKeys];
     const isStep6Valid = allRequired.every(key => { const doc = values.documents?.[key]; return Array.isArray(doc) ? doc.length > 0 : !!doc; }) && !!values.shopLocations?.['shop_exterior']; 
-
-    // Step 7 Validation
+    
+    // Step 7
     const validCreditRefs = values.seHasCreditReferences !== 'Yes' || (values.seHasCreditReferences === 'Yes' && values.seCreditReferences && values.seCreditReferences.length > 0 && values.seCreditReferences.every(ref => (ref.name?.length ?? 0) >= 2 && (ref.contact?.length ?? 0) === 10));
     const validTerritories = values.seTerritories?.length > 0 && values.seTerritories.every(t => t.taluka && t.village?.length > 0 && t.cultivableArea && t.majorCrops?.length > 0);
     const securityDepositVal = parseInt(values.seSecurityDeposit || '0');
     const hasPaymentProof = securityDepositVal === 0 || (securityDepositVal > 0 && (!!values.sePaymentProofText || !!values.documents?.['se_payment_proof']));
+    const isStep7Valid = !!(validTerritories && values.sePrincipalSuppliers?.length > 0 && values.seChemicalProducts?.length > 0 && values.seBioProducts?.length > 0 && values.seOtherProducts?.length > 0 && validCreditRefs && hasPaymentProof && (values.seWillShareSales !== undefined));
     
-    const isStep7Valid = !!(validTerritories && values.sePrincipalSuppliers?.length > 0 && values.seChemicalProducts?.length > 0 && values.seBioProducts?.length > 0 && values.seOtherProducts?.length > 0 && validCreditRefs && hasPaymentProof);
-
-    // Step 8 (Agreements)
+    // Step 8
     const isStep8Valid = !!(values.agreementAccepted && values.dealerSignature && values.seSignature);
 
-    // 🚀 Return TRUE only if all steps are perfectly validated!
-    return isStep1Valid && isStep3Valid && isStep4Valid && isStep6Valid && isStep7Valid && isStep8Valid;
-  }, [step, values]);
+    return [
+      { isValid: isStep1Valid, name: "Step 1: Basic Profile (Check PAN/GST/Bank formats)" },
+      { isValid: isStep3Valid, name: "Step 3: Business Area (Check dropdown options)" },
+      { isValid: isStep4Valid, name: "Step 4: GLS Commitments (Must check all)" },
+      { isValid: isStep6Valid, name: "Step 6: Documents & Location (Check GPS & Required files)" },
+      { isValid: isStep7Valid, name: "Step 7: Annexures (Check required fields & references)" },
+      { isValid: isStep8Valid, name: "Step 8: Agreement & Signatures" },
+    ];
+  }, [values]);
+
+  // 🚀 2. Always allow navigation so they can click Submit and see the error
+  const isNextEnabled = true;
+
+  // 🚀 3. Intercept submit to show exactly what is missing
+  const submit = async () => {
+    const missingSteps = validationStatus.filter(v => !v.isValid).map(v => v.name);
+    
+    if (missingSteps.length > 0) {
+      useAlertStore.getState().showAlert(
+        "Missing Information", 
+        "Please complete the following sections before submitting:\n\n• " + missingSteps.join("\n• ")
+      );
+      return; 
+    }
+
+    // If valid, submit
+    await form.handleSubmit(async (data) => {
+      if (!user?.id) return useAlertStore.getState().showAlert("Error", "User session not found.");
+      setIsSubmitting(true);
+      try {
+        const dbResult = await saveDealerOnboarding(data, "SUBMITTED", scoreData.percentage, scoreData.band, user.id, editData?.id);
+        const html = generateHTML();
+        const { uri } = await Print.printToFileAsync({ html });
+        const pdfUrl = await uploadFileToCloudinary(uri, 'raw');
+        await updateDealerPdfUrl(dbResult.id, pdfUrl);
+        if (draftIdRef.current) {
+          removeDraft(draftIdRef.current);
+          draftIdRef.current = undefined; 
+        }
+        setShowSuccess(true);
+      } catch (error: any) {
+        useAlertStore.getState().showAlert("Submission Failed", error.message);
+      } finally {
+        setIsSubmitting(false);
+      }
+    })();
+  };
 
   const scores = watch(['scoreFinancial', 'scoreReputation', 'scoreOperations', 'scoreFarmerNetwork', 'scoreTeam', 'scorePortfolio', 'scoreExperience', 'scoreGrowth']);
 
@@ -761,54 +797,7 @@ export function useDealerOnboarding(navigation: any, route: any) {
     `;
   };
 
-  const submit = form.handleSubmit(
-    async (data) => {
-      if (!user?.id) return useAlertStore.getState().showAlert("Error", "User session not found.");
-      setIsSubmitting(true);
-      try {
-        const dbResult = await saveDealerOnboarding(data, "SUBMITTED", scoreData.percentage, scoreData.band, user.id, editData?.id);
-        const html = generateHTML();
-        const { uri } = await Print.printToFileAsync({ html });
-        const pdfUrl = await uploadFileToCloudinary(uri, 'raw');
-        await updateDealerPdfUrl(dbResult.id, pdfUrl);
-
-        // --- UPDATED: Use draftIdRef to delete the draft and clear the ref ---
-        if (draftIdRef.current) {
-          removeDraft(draftIdRef.current);
-          draftIdRef.current = undefined; // Nullify it so autoSave is fully disabled
-        }
-        
-        setShowSuccess(true);
-      } catch (error: any) {
-        useAlertStore.getState().showAlert("Submission Failed", error.message);
-      } finally {
-        setIsSubmitting(false);
-      }
-    },
-    (errors) => {
-      // ---> NEW: THIS CATCHES THE SILENT VALIDATION FAILURES! <---
-      console.log("Validation Errors: ", errors);
-      const messages = new Set<string>();
-      
-      const extractErrors = (obj: any) => {
-        for (const key in obj) {
-          if (obj[key]?.message) {
-            messages.add(obj[key].message);
-          } else if (typeof obj[key] === 'object' && obj[key] !== null) {
-            extractErrors(obj[key]);
-          }
-        }
-      };
-      
-      extractErrors(errors);
-      
-      useAlertStore.getState().showAlert(
-        "Validation Error", 
-        "The form has invalid formatting. Please go back and fix the following:\n\n" + 
-        Array.from(messages).map(m => `• ${m}`).join('\n')
-      );
-    }
-  );
+  
 
   const handleUpload = async (key: string, type: 'camera' | 'image' | 'doc' = 'doc') => {
     const useCamera = type === 'camera' || type === 'image';

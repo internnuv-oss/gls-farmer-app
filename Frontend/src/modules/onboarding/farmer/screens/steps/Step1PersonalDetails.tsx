@@ -167,19 +167,32 @@ export const Step1PersonalDetails = ({ control, errors, t, watch, setValue, uplo
         control={control} 
         name="city" 
         render={({field}) => (
-          <SelectField 
-            label={loadingLoc ? t("District (Loading...) *") : t("District *")} 
-            options={districtsList} 
-            value={field.value} 
-            searchable
-            onChange={(val: string) => { 
-              field.onChange(val); 
-              // Clear downstream when district changes
-              setValue('taluka', '', { shouldValidate: true }); 
-              setValue('village', '', { shouldValidate: true }); 
-            }} 
-            error={errors.city?.message} 
-          />
+          districtsList.length > 0 ? (
+            <SelectField 
+              label={loadingLoc ? t("District (Loading...) *") : t("District *")} 
+              options={districtsList} 
+              value={field.value} 
+              searchable
+              onChange={(val: string) => { 
+                field.onChange(val); 
+                setValue('taluka', '', { shouldValidate: true }); 
+                setValue('village', '', { shouldValidate: true }); 
+              }} 
+              error={errors.city?.message} 
+            />
+          ) : (
+            // 🚀 FALLBACK: If GitHub fails, let them type it manually!
+             <Input 
+               label={t("District *")} 
+               value={field.value} 
+               onChangeText={(val) => {
+                  field.onChange(val);
+                  setValue('taluka', '', { shouldValidate: true }); 
+                  setValue('village', '', { shouldValidate: true }); 
+               }} 
+               error={errors.city?.message} 
+             />
+          )
         )} 
       />
       

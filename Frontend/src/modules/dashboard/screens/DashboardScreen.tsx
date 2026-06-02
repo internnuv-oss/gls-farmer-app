@@ -588,22 +588,22 @@ export const DashboardScreen = ({ navigation, route }: any) => {
         }}
       >
         <View style={{ flexDirection: "row", alignItems: "center" }}>
-          <View style={{ padding: 4, borderRadius: 12, marginRight: spacing.sm }}>
+          <View style={{ padding: 0, borderRadius: 12, marginRight: spacing.sm }}>
             <Image 
               source={require('../../../../assets/company-logo.jpeg')} 
-              style={{ width: 140, height: 40, resizeMode: 'contain', borderRadius: 8 }} 
+              style={{ width: 180, height: 52, resizeMode: 'contain', borderRadius: 8 }} 
             />
           </View>
         </View>
 
-        <Pressable onPress={() => navigation.navigate("DraftsScreen")} style={{ padding: 8, position: "relative" }}>
+        {/* <Pressable onPress={() => navigation.navigate("DraftsScreen")} style={{ padding: 8, position: "relative" }}>
           <MaterialIcons name="file-present" size={28} color={colors.textMuted} />
           {myDrafts.length > 0 && (
             <View style={{ position: "absolute", top: 4, right: 4, backgroundColor: colors.danger, width: 18, height: 18, borderRadius: 9, justifyContent: "center", alignItems: "center", borderWidth: 2, borderColor: colors.screen }}>
               <Text style={{ color: "#FFF", fontSize: 10, fontWeight: "900" }}>{myDrafts.length}</Text>
             </View>
           )}
-        </Pressable>
+        </Pressable> */}
       </View>
 
       <View style={{ flexDirection: "row", paddingHorizontal: spacing.lg, marginBottom: spacing.md, gap: spacing.sm }}>

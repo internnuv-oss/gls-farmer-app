@@ -7,7 +7,7 @@ import * as ImagePicker from "expo-image-picker";
 import * as ImageManipulator from 'expo-image-manipulator';
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
-import * as Location from 'expo-location'; // 🚀 ADDED: Location tracking
+import * as Location from 'expo-location'; 
 import { documentDirectory, copyAsync } from 'expo-file-system/legacy';
 
 import { requestMediaPermission, requestCameraPermission } from "../../../core/permissions";
@@ -17,6 +17,7 @@ import { uploadFileToCloudinary } from "../services/cloudinaryService";
 import { supabase } from "../../../core/supabase";
 import { distributorOnboardingSchema, DistributorOnboardingValues, DISTRIBUTOR_GLS_COMMITMENTS } from "./schema";
 import { useAlertStore } from "../../../store/alertStore";
+import { saveDistributorOnboarding, mapDistributorDbToForm, updateDistributorPdfUrl } from '../services/onboardingService';
 
 export function useDistributorOnboarding(navigation: any, route: any) {
   const user = useAuthStore((s) => s.user);
@@ -34,22 +35,22 @@ export function useDistributorOnboarding(navigation: any, route: any) {
   const draftIdRef = useRef(draftId);
 
   const normalizedDraft = useMemo(() => {
-    const sourceData = editData ? editData.raw_data : draftData;
-    if (!sourceData) return null;
+    if (editData) return mapDistributorDbToForm(editData);
+    if (!draftData) return null;
     
     return {
-      ...sourceData,
-      appliedTerritory: Array.isArray(sourceData.appliedTerritory) ? sourceData.appliedTerritory : (sourceData.appliedTerritory ? [sourceData.appliedTerritory] : []),
-      currentSuppliers: Array.isArray(sourceData.currentSuppliers) ? sourceData.currentSuppliers : (sourceData.currentSuppliers ? [sourceData.currentSuppliers] : ['']),
-      anxTerritories: Array.isArray(sourceData.anxTerritories) ? sourceData.anxTerritories.map((t: any) => ({
+      ...draftData,
+      appliedTerritory: Array.isArray(draftData.appliedTerritory) ? draftData.appliedTerritory : [],
+      currentSuppliers: Array.isArray(draftData.currentSuppliers) ? draftData.currentSuppliers : [''],
+      anxTerritories: Array.isArray(draftData.anxTerritories) ? draftData.anxTerritories.map((t: any) => ({
         ...t,
-        villages: Array.isArray(t.villages) ? t.villages : (t.villages ? [t.villages] : []),
-        majorCrops: Array.isArray(t.majorCrops) ? t.majorCrops : (t.majorCrops ? [t.majorCrops] : [])
+        villages: Array.isArray(t.villages) ? t.villages : [],
+        majorCrops: Array.isArray(t.majorCrops) ? t.majorCrops : []
       })) : [{ state: '', district: '', taluka: '', villages: [], cultivableArea: '', majorCrops: [] }],
-      anxPrincipalSuppliers: Array.isArray(sourceData.anxPrincipalSuppliers) ? sourceData.anxPrincipalSuppliers : [{ name: '', share: '' }],
-      anxChemicalProducts: Array.isArray(sourceData.anxChemicalProducts) ? sourceData.anxChemicalProducts : (sourceData.anxChemicalProducts ? [sourceData.anxChemicalProducts] : []),
-      anxBioProducts: Array.isArray(sourceData.anxBioProducts) ? sourceData.anxBioProducts : (sourceData.anxBioProducts ? [sourceData.anxBioProducts] : []),
-      anxOtherProducts: Array.isArray(sourceData.anxOtherProducts) ? sourceData.anxOtherProducts : (sourceData.anxOtherProducts ? [sourceData.anxOtherProducts] : [])
+      anxPrincipalSuppliers: Array.isArray(draftData.anxPrincipalSuppliers) ? draftData.anxPrincipalSuppliers : [{ name: '', share: '' }],
+      anxChemicalProducts: Array.isArray(draftData.anxChemicalProducts) ? draftData.anxChemicalProducts : [],
+      anxBioProducts: Array.isArray(draftData.anxBioProducts) ? draftData.anxBioProducts : [],
+      anxOtherProducts: Array.isArray(draftData.anxOtherProducts) ? draftData.anxOtherProducts : []
     };
   }, [draftData, editData]);
 
@@ -62,7 +63,7 @@ export function useDistributorOnboarding(navigation: any, route: any) {
       bankAccounts: [{ accountName: '', accountNumber: '', bankIfsc: '', bankNameBranch: '' }],
       topDealers: [{ name: '', address: '', contact: '', turnover: '', products: '', farmersServed: '', bioExperience: '' }],
       glsCommitments: [], complianceChecklist: [], documents: {},
-      storageLocations: {}, // 🚀 ADDED: Safe container for GPS coordinates
+      storageLocations: {}, 
       anxTerritories: [{ state: '', district: '', taluka: '', villages: [], cultivableArea: '', majorCrops: [] }],
       anxPrincipalSuppliers: [{ name: '', share: '' }],
       anxChemicalProducts: [],
@@ -108,53 +109,11 @@ export function useDistributorOnboarding(navigation: any, route: any) {
     navigation.goBack();
   };
 
-//   const isNextEnabled = useMemo(() => {
-//     if (step === 1) {
-//         const mobileRegex = /^\d{10}$/;
-//         const gstRegex = /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/;
-//         const panRegex = /^[A-Z]{5}[0-9]{4}[A-Z]{1}$/;
-//         const ifscRegex = /^[A-Z]{4}0[A-Z0-9]{6}$/;
-//         const bankAccRegex = /^\d{9,18}$/;
-//         const pincodeRegex = /^\d{6}$/;
-//         const areBanksValid = values.bankAccounts?.every(b => b.accountName && b.bankNameBranch && bankAccRegex.test(b.accountNumber || '') && ifscRegex.test(b.bankIfsc || ''));
-//         return !!(values.firmName && values.firmName.length >= 2 && values.ownerName && values.ownerName.length >= 2 && values.contactPerson && values.contactPerson.length >= 2 && mobileRegex.test(values.contactMobile || '') && values.state && values.city && values.taluka && pincodeRegex.test(values.pincode || '') && values.address && values.address.length >= 5 && gstRegex.test(values.gstNumber || '') && panRegex.test(values.panNumber || '') && values.estYear && values.firmType && areBanksValid);
-//     }
-//     if (step === 2) return true;
-//     if (step === 3) return !!(values.appliedTerritory?.length > 0 && values.turnoverPotential && values.currentSuppliers?.length > 0 && values.currentSuppliers.every(s => s.length >= 2) && values.proposedStatus && values.demoFarmersCommitment && values.godownCapacity && values.coldChainFacility);
-//     if (step === 4) {
-//       const hasUploadedList = !!values.documents?.['dealer_network_list'];
-//       const hasValidManualDealers = !!(values.topDealers?.length && values.topDealers.every(d => d.name && d.name.length >= 2 && d.address && d.address.length >= 2 && /^\d{10}$/.test(d.contact || '')));
-//       return hasUploadedList || hasValidManualDealers;
-//     }
-//     if (step === 5) return Array.isArray(values.glsCommitments) && values.glsCommitments.length === DISTRIBUTOR_GLS_COMMITMENTS.length;
-//     if (step === 6) return true; 
-//     if (step === 7) {
-//       const coreDocs = ['gst_certificate', 'pan_card', 'cancelled_cheque', 'trade_licence', 'itr_declaration', 'authorisation_letter'];
-//       const photoDocs = ['storage_exterior', 'storage_interior'];
-//       const complianceDocs = (values.complianceChecklist || []).map((item: string) => item.replace(/[^a-zA-Z0-9]/g, '_').toLowerCase());
-//       const allRequired = [...coreDocs, ...photoDocs, ...complianceDocs];
-      
-//       // 🚀 EXTENDED: Ensure the exterior storage photo was captured (which guarantees GPS was pulled)
-//       return allRequired.every(key => { const doc = values.documents?.[key]; return Array.isArray(doc) ? doc.length > 0 : !!doc; }) && !!(values as any).storageLocations?.['storage_exterior'];
-//     }
-//     if (step === 8) {
-//       const validTerritories = values.anxTerritories?.length > 0 && values.anxTerritories.every(t => t.state && t.district && t.taluka && Array.isArray(t.villages) && t.villages.length > 0 && t.cultivableArea && Array.isArray(t.majorCrops) && t.majorCrops.length > 0);
-//       const validSuppliers = values.anxPrincipalSuppliers?.length > 0 && values.anxPrincipalSuppliers.every(s => s.name && s.share);
-//       const validProducts = (values.anxChemicalProducts?.length || 0) > 0 && (values.anxBioProducts?.length || 0) > 0 && (values.anxOtherProducts?.length || 0) > 0;
-//       const validRefs = values.anxSupplierRefs?.length > 0 && values.anxSupplierRefs.every(ref => ref.name && ref.name.length >= 2 && /^\d{10}$/.test(ref.contact || ''));
-//       const hasVision = !!values.anxGrowthVision || !!values.anxGrowthVisionAudio;
-//       const securityDepositVal = parseInt(values.securityDeposit || '0');
-//       const hasPaymentProof = securityDepositVal === 0 || (securityDepositVal > 0 && (!!values.paymentProofText || !!values.documents?.['distributor_payment_proof']));
-//       return !!(validTerritories && validSuppliers && validProducts && validRefs && hasVision && hasPaymentProof);
-//     }
-//     if (step === 9) return !!(values.agreementAccepted && values.distributorSignature && values.seSignature);
-//     return true; 
-//   }, [step, values]);
-const isNextEnabled = useMemo(() => {
-    // 🚀 1. ALLOW FREE NAVIGATION: Free movement up to Step 9
-    if (step < 9) return true; 
+  const isNextEnabled = useMemo(() => {
+    // 🚀 FIX: Change 9 to 10. Allow free movement up to the Final Review (Step 10)
+    if (step < 10) return true; 
 
-    // 🚀 2. FINAL SUBMISSION CHECK: Validate EVERYTHING on Step 9
+    // 🚀 2. FINAL SUBMISSION CHECK: Validate EVERYTHING on Step 10
     const mobileRegex = /^\d{10}$/;
     const gstRegex = /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/;
     const panRegex = /^[A-Z]{5}[0-9]{4}[A-Z]{1}$/;
@@ -172,7 +131,7 @@ const isNextEnabled = useMemo(() => {
     const hasValidManualDealers = !!(values.topDealers?.length && values.topDealers.every(d => d.name && d.name.length >= 2 && d.address && d.address.length >= 2 && /^\d{10}$/.test(d.contact || '')));
     const isStep4Valid = hasUploadedList || hasValidManualDealers;
 
-    const isStep5Valid = Array.isArray(values.glsCommitments) && values.glsCommitments.length === 10; // DISTRIBUTOR_GLS_COMMITMENTS.length
+    const isStep5Valid = Array.isArray(values.glsCommitments) && values.glsCommitments.length === 5; 
     
     const coreDocs = ['gst_certificate', 'pan_card', 'cancelled_cheque', 'trade_licence', 'itr_declaration', 'authorisation_letter'];
     const photoDocs = ['storage_exterior', 'storage_interior'];
@@ -205,22 +164,18 @@ const isNextEnabled = useMemo(() => {
     else if (raw >= 45) band = 'Grade B (Operational)';
     return { raw, band }; 
   }, [values.scoreFinancial, values.scoreReputation, values.scoreOperations, values.scoreDealerNetwork, values.scoreTeam, values.scorePortfolio, values.scoreExperience, values.scoreGrowth]);
+
   const saveAndExit = async () => {
     const values = form.getValues();
-    
-    // Prevent saving blank drafts
     if (!values.firmName) {
       useAlertStore.getState().showAlert("Cannot Save", "Please enter at least the Firm Name to save a draft.");
       return;
     }
 
-    // Save locally (This handles Zustand and draftIdRef.current)
     autoSave();
-    
     const currentId = draftIdRef.current;
     if (!currentId) return;
 
-    // 🚀 SYNC TO CLOUD DRAFTS TABLE
     try {
       await supabase.from('drafts').upsert({
         se_id: user?.id,
@@ -237,6 +192,7 @@ const isNextEnabled = useMemo(() => {
     useAlertStore.getState().hideAlert();
     navigation.navigate("MainTabs", { screen: "Drafts" });
   };
+
   const handleAudioUpload = async (key: string, uri: string) => {
     setUploading(prev => ({ ...prev, [key]: true }));
     try {
@@ -279,7 +235,6 @@ const isNextEnabled = useMemo(() => {
     
     setUploading(prev => ({ ...prev, [key]: true }));
 
-    // 🚀 NEW: GPS Location Tracking for Storage Photos
     let location: any = null;
     const requiresGPS = ['storage_exterior', 'storage_interior'].includes(key);
     
@@ -310,7 +265,6 @@ const isNextEnabled = useMemo(() => {
         form.setValue('documents', { ...currentDocs, [key]: url }, { shouldValidate: true });
       }
 
-      // 🚀 NEW: Save GPS Coordinates into the form payload
       if (location) {
         const currentLocs = (form.getValues() as any).storageLocations || {};
         form.setValue('storageLocations' as any, { 
@@ -345,8 +299,6 @@ const isNextEnabled = useMemo(() => {
       }
     };
 
-    const checkIcon = `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#166534" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: -2px; margin-right: 4px;"><polyline points="20 6 9 17 4 12"></polyline></svg>`;
-
     const bandColor = scoreData.band.includes('A') ? '#166534' : scoreData.band.includes('B') ? '#92400E' : '#991B1B';
     const bandBg = scoreData.band.includes('A') ? '#DCFCE7' : scoreData.band.includes('B') ? '#FEF3C7' : '#FEE2E2';
 
@@ -378,14 +330,11 @@ const isNextEnabled = useMemo(() => {
           .sub-heading { font-size: 15px; font-weight: 700; color: #334155; margin: 20px 0 10px 0; border-left: 4px solid #16A34A; padding-left: 10px; }
           .grid-2 { display: table; width: 100%; table-layout: fixed; margin-bottom: 15px; }
           .grid-col { display: table-cell; width: 50%; padding-right: 10px; vertical-align: top; }
-          .list { margin: 0; padding-left: 20px; font-size: 14px; }
-          .list li { margin-bottom: 6px; color: #334155; }
           .pill { display: inline-block; background-color: #E2E8F0; color: #334155; padding: 4px 10px; border-radius: 15px; font-size: 12px; font-weight: 600; margin: 2px 4px 2px 0; }
           .signatures { display: table; width: 100%; margin-top: 50px; page-break-inside: avoid; }
           .sig-box { display: table-cell; width: 50%; text-align: center; }
           .sig-line { border-top: 2px solid #94A3B8; margin: 10px 60px 0; padding-top: 8px; font-weight: 800; color: #1E293B; font-size: 14px; text-transform: uppercase; }
           .empty-text { color: #94A3B8; font-style: italic; font-weight: 400; }
-          .success-badge { color: #166534; font-weight: 800; font-size: 13px; }
         </style>
       </head>
       <body>
@@ -413,7 +362,7 @@ const isNextEnabled = useMemo(() => {
                   <th>Facility GPS Coordinates</th>
                   <td>
                     ${(data as any).storageLocations?.['storage_exterior'] 
-                      ? `<a href="https://maps.google.com/?q=$${(data as any).storageLocations['storage_exterior'].lat},${(data as any).storageLocations['storage_exterior'].lng}" style="color: #2563EB; font-weight: 800; text-decoration: underline;">📍 View on Map</a><br><span style="font-size: 11px; color: #64748B;">Lat: ${(data as any).storageLocations['storage_exterior'].lat.toFixed(5)}, Lng: ${(data as any).storageLocations['storage_exterior'].lng.toFixed(5)}</span>`
+                      ? `<a href="http://maps.google.com/?q=${(data as any).storageLocations['storage_exterior'].lat},${(data as any).storageLocations['storage_exterior'].lng}" style="color: #2563EB; font-weight: 800; text-decoration: underline;">📍 View on Map</a><br><span style="font-size: 11px; color: #64748B;">Lat: ${(data as any).storageLocations['storage_exterior'].lat.toFixed(5)}, Lng: ${(data as any).storageLocations['storage_exterior'].lng.toFixed(5)}</span>`
                       : '<span class="empty-text">Not Captured</span>'}
                   </td>
                 </tr>
@@ -548,49 +497,23 @@ const isNextEnabled = useMemo(() => {
   };
 
   const submit = form.handleSubmit(async (data) => {
+    if (!user?.id) return useAlertStore.getState().showAlert("Error", "User session not found.");
     setIsSubmitting(true);
     try {
-      const dbPayload = {
-        se_id: user?.id,
-        firm_name: data.firmName,
-        owner_name: data.ownerName,
-        contact_person: data.contactPerson,
-        contact_designation: data.contactDesignation,
-        contact_mobile: data.contactMobile,
-        email: data.email,
-        address: data.address,
-        city: data.city,
-        state: data.state,
-        taluka: data.taluka,
-        pincode: data.pincode,
-        gst_number: data.gstNumber,
-        pan_number: data.panNumber,
-        est_year: data.estYear,
-        firm_type: data.firmType,
-        total_score: scoreData.raw,
-        band: scoreData.band,
-        status: "SUBMITTED",
-        distributor_signature: data.distributorSignature,
-        se_signature: data.seSignature,
-        raw_data: data 
-      };
-
-      let dbResultId = editData?.id;
-
-      if (editData) {
-        const { error } = await supabase.from('distributors').update(dbPayload).eq('id', editData.id);
-        if (error) throw error;
-      } else {
-        const { data: dbResult, error } = await supabase.from('distributors').insert([dbPayload]).select('id').single();
-        if (error) throw error;
-        dbResultId = dbResult.id;
-      }
+      const result = await saveDistributorOnboarding(
+        data, 
+        'SUBMITTED', 
+        scoreData.raw, 
+        scoreData.band, 
+        user.id, 
+        editData?.id
+      );
 
       const html = generateHTML();
       const { uri } = await Print.printToFileAsync({ html });
       const pdfUrl = await uploadFileToCloudinary(uri, 'raw');
       
-      await supabase.from('distributors').update({ pdf_url: pdfUrl }).eq('id', dbResultId);
+      await updateDistributorPdfUrl(result.id, pdfUrl);
 
       if (draftIdRef.current) {
          removeDraft(draftIdRef.current);
