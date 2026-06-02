@@ -82,11 +82,14 @@ export const DraftsScreen = ({ navigation }: any) => {
   useEffect(() => { setPage(1); }, [searchQuery, sortOrder]);
 
   const processedDrafts = useMemo(() => {
-    let result = [...myDrafts]; // 🚀 Use myDrafts instead of allDrafts
+    let result = [...myDrafts];
     if (searchQuery.trim()) {
       result = result.filter(d => {
-        const nameToSearch = d.type === 'DEALER' ? d.data?.shopName : 
-                             d.type === 'DISTRIBUTOR' ? d.data?.firmName : 
+        // Normalizing type to uppercase for safe checking
+        const safeType = (d.type || '').toUpperCase();
+        
+        const nameToSearch = safeType === 'DEALER' ? d.data?.shopName : 
+                             safeType === 'DISTRIBUTOR' ? d.data?.firmName : 
                              d.data?.fullName;
         return (nameToSearch || "").toLowerCase().includes(searchQuery.toLowerCase());
       });
@@ -153,8 +156,13 @@ export const DraftsScreen = ({ navigation }: any) => {
           </View>
         }
         renderItem={({ item }) => {
-          const isDealer = item.type === 'DEALER';
-          const isDistributor = item.type === 'DISTRIBUTOR';
+          // Normalize the type to handle older lowercase drafts
+          const safeType = (item.type || '').toUpperCase();
+          
+          const isDealer = safeType === 'DEALER';
+          const isDistributor = safeType === 'DISTRIBUTOR';
+          const isFarmer = safeType === 'FARMER';
+          
           const iconBg = isDealer ? '#FEF3C7' : isDistributor ? '#FFEDD5' : '#E0E7FF';
           const iconColor = isDealer ? colors.warning : isDistributor ? colors.secondary : '#4F46E5';
           const iconName = isDealer ? 'storefront' : isDistributor ? 'domain' : 'agriculture';
@@ -173,7 +181,8 @@ export const DraftsScreen = ({ navigation }: any) => {
                   <Text style={{ fontSize: 16, fontWeight: '800', color: colors.text }}>{displayName}</Text>
                   <View style={{flexDirection: 'row', alignItems: 'center', marginTop: 4}}>
                     <View style={{ backgroundColor: '#F1F5F9', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, marginRight: 6 }}>
-                      <Text style={{ fontSize: 10, fontWeight: '800', color: colors.textMuted }}>{item.type}</Text>
+                      {/* Display the safeType so it looks consistent in the UI */}
+                      <Text style={{ fontSize: 10, fontWeight: '800', color: colors.textMuted }}>{safeType}</Text>
                     </View>
                     <Text style={{ fontSize: 12, color: colors.textMuted, fontWeight: '600' }}>
                       {new Date(item.updatedAt || Date.now()).toLocaleDateString()}
@@ -189,9 +198,10 @@ export const DraftsScreen = ({ navigation }: any) => {
               
               <Pressable 
                 onPress={() => {
-                  if (item.type === 'DEALER') navigation.navigate('DealerOnboarding', { draftData: item.data, draftId: item.id });
-                  else if (item.type === 'FARMER') navigation.navigate('FarmerOnboarding', { draftData: item.data, draftId: item.id });
-                  else if (item.type === 'DISTRIBUTOR') navigation.navigate('DistributorOnboarding', { draftData: item.data, draftId: item.id });
+                  // Use the normalized safeType for navigation routing
+                  if (safeType === 'DEALER') navigation.navigate('DealerOnboarding', { draftData: item.data, draftId: item.id });
+                  else if (safeType === 'FARMER') navigation.navigate('FarmerOnboarding', { draftData: item.data, draftId: item.id });
+                  else if (safeType === 'DISTRIBUTOR') navigation.navigate('DistributorOnboarding', { draftData: item.data, draftId: item.id });
                 }} 
                 style={{ flexDirection: 'row', justifyContent: 'center', alignItems: 'center', paddingVertical: spacing.xs }}
               >
