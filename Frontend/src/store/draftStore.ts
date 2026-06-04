@@ -18,6 +18,7 @@ export interface DraftState {
   addDraft: (data: any, type: 'DEALER' | 'FARMER' | 'DISTRIBUTOR', customId?: string) => string;
   removeDraft: (id: string) => void;
   updateDraft: (id: string, data: any, overrideUserId?: string) => void;
+  clearDrafts: () => void; // 🚀 ADDED: Required for the one-time DB migration
   
   seDraft: { step: number; data: any } | null;
   setSEDraft: (step: number, data: any) => void;
@@ -55,6 +56,9 @@ export const useDraftStore = create<DraftState>()(
           userId: overrideUserId || d.userId || useAuthStore.getState().user?.id 
         } : d))
       })),
+
+      // 🚀 ADDED: Wipes ONLY the entity drafts (leaves seDraft alone)
+      clearDrafts: () => set({ drafts: [] }),
       
       seDraft: null,
       setSEDraft: (step, data) => set({ seDraft: { step, data } }),

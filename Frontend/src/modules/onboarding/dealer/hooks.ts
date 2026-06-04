@@ -1,22 +1,18 @@
-import { useState, useMemo , useRef , useEffect} from "react";
+import { useState, useMemo, useRef, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Alert, Platform } from "react-native";
+import { AppState, Platform } from "react-native";
 import * as DocumentPicker from "expo-document-picker";
 import * as ImagePicker from "expo-image-picker";
 import * as Location from 'expo-location';
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
-import * as FileSystem from 'expo-file-system';
 import { documentDirectory, copyAsync } from 'expo-file-system/legacy';
-import { AppState } from "react-native";
 import * as ImageManipulator from 'expo-image-manipulator';
-import * as crypto from 'expo-crypto';
+import * as Crypto from 'expo-crypto'; // 🚀 IMPORT CRYPTO FOR UUIDs
+
 import { supabase } from '../../../core/supabase';
-
-
 import { requestMediaPermission, requestCameraPermission } from "../../../core/permissions";
-import { useDraftStore } from "../../../store/draftStore";
 import { useAuthStore } from "../../../store/authStore";
 import { uploadFileToCloudinary } from "../services/cloudinaryService";
 import { saveDealerOnboarding, mapDealerDbToForm, updateDealerPdfUrl } from "../services/onboardingService";
@@ -25,149 +21,40 @@ import { useAlertStore } from "../../../store/alertStore";
 
 export function useDealerOnboarding(navigation: any, route: any) {
   const user = useAuthStore((s) => s.user);
-  const addDraft = useDraftStore((s) => s.addDraft);
-  const updateDraft = useDraftStore((s) => s.updateDraft);
-  const removeDraft = useDraftStore((s) => s.removeDraft);
+  
   const editData = route?.params?.editData; 
   const draftData = route?.params?.draftData;
   const draftId = route?.params?.draftId;
 
   const [step, setStep] = useState(1);
+  const [jumpBackTo, setJumpBackTo] = useState<number | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [uploading, setUploading] = useState<Record<string, boolean>>({});
   const [showSuccess, setShowSuccess] = useState(false);
-  const draftIdRef = useRef(draftId);
-
-
-  const autoSave = () => {
-    // 🚀 FIX: Get the current form data
-    const currentValues = form.getValues(); 
-
-    // 🚀 FIX: Check 'shopName' (matching your schema's type)
-    if (!currentValues || !currentValues.shopName) return; 
-
-    if (draftIdRef.current) {
-      updateDraft(draftIdRef.current, currentValues);
-    } else {
-      // 🚀 FIX: Pass 'DEALER' in all caps
-      const newId = addDraft(currentValues, 'DEALER'); 
-      draftIdRef.current = newId;
-    }
-  };
-
-  const saveAndExit = async () => {
-    // 1. Get current values
-    const values = form.getValues();
-
-    // 2. Prevent saving blank drafts (Shop Name is a good minimum requirement)
-    if (!values.shopName) {
-      useAlertStore.getState().showAlert("Cannot Save", "Please enter at least the Primary Shop Name to save a draft.");
-      return;
-    }
-
-    // 3. Save locally to Zustand (This automatically handles and generates draftIdRef.current!)
-    autoSave();
-
-    // 4. Grab the ID that autoSave just generated/updated
-    const currentId = draftIdRef.current;
-    if (!currentId) return;
-
-    // 5. 🚀 SYNC TO CLOUD DRAFTS TABLE
-    try {
-      await supabase.from('drafts').upsert({
-        se_id: user?.id,             
-        entity_type: 'dealer',       
-        entity_id: currentId,        // The unique ID of this specific form
-        draft_data: values,          
-        current_step: step,          
-        updated_at: new Date().toISOString()
-      }, { onConflict: 'entity_id' }); 
-    } catch (err) {
-      console.log("Failed to sync draft to cloud", err);
-    }
-
-    // 6. Navigate to the Drafts Tab securely
-    useAlertStore.getState().hideAlert();
-    navigation.navigate("MainTabs", { screen: "Drafts" }); 
-  };
-  // --- NEW: Add a ref to track success reliably for the cleanup function ---
-  const showSuccessRef = useRef(showSuccess);
-  useEffect(() => { 
-    showSuccessRef.current = showSuccess; 
-  }, [showSuccess]);
-
-  useEffect(() => {
-    // Save when app is pushed to the background
-    const subscription = AppState.addEventListener("change", nextAppState => {
-      if (nextAppState === "inactive" || nextAppState === "background") {
-        if (!showSuccessRef.current) autoSave();
-      }
-    });
-
-    // Save when user abruptly navigates away
-    return () => {
-      subscription.remove();
-      // Use the ref to ensure we read the latest state, preventing the closure trap!
-      if (!showSuccessRef.current) autoSave(); 
-    };
-  // We removed showSuccess from the dependency array because we rely on the ref now
-  }, [editData]);
-
-  const saveDraft = () => {
-    autoSave();
-    useAlertStore.getState().showAlert("Saved", "Dealer onboarding saved as draft.");
-    navigation.goBack();
-  };
   
+  const draftIdRef = useRef<string | undefined>(draftId);
+  const showSuccessRef = useRef(showSuccess);
 
+  useEffect(() => { showSuccessRef.current = showSuccess; }, [showSuccess]);
 
   const defaultFormValues = editData 
     ? mapDealerDbToForm(editData)
     : (draftData ? draftData : {
-        // Step 1: Basic Info
         shopName: '', firmType: '', estYear: '', state: '', city: '', taluka: '', village: [], address: '', landmark: '',
         contactMobile: '', landlineNumber: '', gstNumber: '', panNumber: '',
         owners: [{ name: '' }], 
         bankAccounts: [{ accountType: '', bankName: '', bankBranch: '', accountName: '', accountNumber: '', bankIfsc: '' }],
-        
-        // Step 2: Scoring
         scoreFinancial: 5, scoreReputation: 5, scoreOperations: 5, scoreFarmerNetwork: 5,
         scoreTeam: 5, scorePortfolio: 5, scoreExperience: 5, scoreGrowth: 5,
-        
-        // Step 3: Business Details & Additional Locations
-        hasAdditionalLocations: undefined, 
-        additionalShops: [], 
-        godowns: [], 
-        isLinkedToDistributor: undefined, 
-        linkedDistributors: [{ name: '', contact: '' }],
-        proposedStatus: '', 
-        willingDemoFarmers: undefined,
-        demoFarmers: Array(5).fill({ name: '', contact: '', address: '' }),
-        
-        // Steps 4, 5, 6: Checklists & Media
-        glsCommitments: [], 
-        complianceChecklist: [], 
-        documents: {}, 
-        shopLocations: {}, // UPDATED: Changed from shopLocation: undefined
-        
-        // Step 7: Annexures
+        hasAdditionalLocations: undefined, additionalShops: [], godowns: [], 
+        isLinkedToDistributor: undefined, linkedDistributors: [{ name: '', contact: '' }],
+        proposedStatus: '', willingDemoFarmers: undefined, demoFarmers: Array(5).fill({ name: '', contact: '', address: '' }),
+        glsCommitments: [], complianceChecklist: [], documents: {}, shopLocations: {},
         seTerritories: [{ taluka: '', village: [], cultivableArea: '', majorCrops: [] }], 
-        sePrincipalSuppliers: [], 
-        seChemicalProducts: [], 
-        seBioProducts: [], 
-        seOtherProducts: [], 
-        seHasCreditReferences: undefined,
-        seCreditReferences: [{ name: '', contact: '', behavior: '', behaviorAudio: '' }],
-        seWillShareSales: false, 
-        seGrowthVision: '', 
-        seGrowthVisionAudio: '', 
-        seSecurityDeposit: '', 
-        sePaymentProofText: '',
-        
-        // Step 8: Agreement
-        agreementAccepted: false,
-        dealerSignature: '', 
-        seSignature: ''
+        sePrincipalSuppliers: [], seChemicalProducts: [], seBioProducts: [], seOtherProducts: [], 
+        seHasCreditReferences: undefined, seCreditReferences: [{ name: '', contact: '', behavior: '', behaviorAudio: '' }],
+        seWillShareSales: false, seGrowthVision: '', seGrowthVisionAudio: '', seSecurityDeposit: '', sePaymentProofText: '',
+        agreementAccepted: false, dealerSignature: '', seSignature: ''
       });
 
   const form = useForm<DealerOnboardingValues>({
@@ -179,147 +66,61 @@ export function useDealerOnboarding(navigation: any, route: any) {
   const { watch } = form;
   const values = watch();
 
-  // const isNextEnabled = useMemo(() => {
-  //   if (step === 1) {
-  //     // 1. Basic Regex Patterns (Matches schema.ts)
-  //     const mobileRegex = /^\d{10}$/;
-  //     const landlineRegex = /^[0-9]{3,5}[- ]?[0-9]{6,8}$/;
-  //     const gstRegex = /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/;
-  //     const panRegex = /^[A-Z]{5}[0-9]{4}[A-Z]{1}$/;
-  //     const ifscRegex = /^[A-Z]{4}0[A-Z0-9]{6}$/;
-  //     const bankAccRegex = /^\d{9,18}$/;
-
-  //     // 2. Validate Arrays (Owners and Bank Accounts)
-  //     const areOwnersValid = values.owners?.every(o => o.name && o.name.length >= 2);
-      
-  //     const areBanksValid = values.bankAccounts?.every(b => 
-  //       b.accountType && 
-  //       b.bankName && 
-  //       b.bankBranch && 
-  //       b.accountName && 
-  //       bankAccRegex.test(b.accountNumber || '') && 
-  //       ifscRegex.test(b.bankIfsc || '')
-  //     );
-
-  //     // 3. Optional Landline Check
-  //     const isLandlineValid = !values.landlineNumber || landlineRegex.test(values.landlineNumber);
-
-  //     // 4. Combined Validation
-  //     return !!(
-  //       values.shopName && values.shopName.length >= 2 &&
-  //       values.firmType &&
-  //       values.estYear && values.estYear.length === 4 &&
-  //       areOwnersValid &&
-  //       mobileRegex.test(values.contactMobile || '') &&
-  //       isLandlineValid &&
-  //       values.state && values.city && values.taluka && values.village &&
-  //       values.address && values.address.length >= 5 &&
-  //       gstRegex.test(values.gstNumber || '') &&
-  //       panRegex.test(values.panNumber || '') &&
-  //       areBanksValid
-  //     );
-  //   }
-  //   if (step === 2) return true; 
-  //   if (step === 3) {
-  //     // 1. Distributor Validation
-  //     const distValid = values.isLinkedToDistributor === 'No' || (
-  //       values.isLinkedToDistributor === 'Yes' && 
-  //       values.linkedDistributors?.[0]?.name && 
-  //       /^\d{10}$/.test(values.linkedDistributors?.[0]?.contact || '')
-  //     );
-
-  //     // 2. Additional Locations Validation
-  //     // If "Yes", at least one shop OR one godown must exist, and all provided must be valid.
-  //     const hasAtLeastOneLocation = (values.additionalShops?.length || 0) > 0 || (values.godowns?.length || 0) > 0;
-      
-  //     const additionalShopsValid = (values.additionalShops || []).every(s => 
-  //       s.shopName && s.estYear && s.state && s.city && s.taluka && s.village && s.address
-  //     );
-      
-  //     const godownsValid = (values.godowns || []).every(g => 
-  //       g.address && g.capacity && g.capacityUnit
-  //     );
-
-  //     const addLocValid = values.hasAdditionalLocations === 'No' || (
-  //       values.hasAdditionalLocations === 'Yes' && 
-  //       hasAtLeastOneLocation && 
-  //       additionalShopsValid && 
-  //       godownsValid
-  //     );
-
-  //     // 3. Demo Farmers Validation
-  //     // If "Yes", must either have an uploaded list OR at least one manual entry filled correctly.
-  //     const hasFarmerFile = !!values.documents?.['demo_farmers_list'];
-  //     const manualFarmersValid = (values.demoFarmers || []).some(f => 
-  //       f.name && f.contact && f.address
-  //     );
-
-  //     const demoFarmersValid = values.willingDemoFarmers === 'No' || (
-  //       values.willingDemoFarmers === 'Yes' && 
-  //       (hasFarmerFile || manualFarmersValid)
-  //     );
-
-  //     // 4. Combined Step 3 Check
-  //     return !!(
-  //       values.isLinkedToDistributor && 
-  //       distValid && 
-  //       values.hasAdditionalLocations &&
-  //       addLocValid && 
-  //       values.proposedStatus && 
-  //       values.willingDemoFarmers && 
-  //       demoFarmersValid
-  //     );
-  //   }
-  //   if (step === 4) return Array.isArray(values.glsCommitments) && values.glsCommitments.length === GLS_COMMITMENTS.length; 
-  //   if (step === 5) return true; 
-  //   if (step === 6) {
-  //     const requiredKeys = ['gst certificate / shop establishment license', 'pan card', 'cancelled cheque', 'shop_exterior', 'selfie_with_owner'];
-  //     const dynamicKeys = (values.complianceChecklist || []).map((item: string) => item.replace(/[^a-zA-Z0-9]/g, '_').toLowerCase());
-  //     const allRequired = [...requiredKeys, ...dynamicKeys];
-      
-  //     // UPDATED: Check for specific exterior GPS coordinates instead of a single object
-  //     return allRequired.every(key => { 
-  //       const doc = values.documents?.[key]; 
-  //       return Array.isArray(doc) ? doc.length > 0 : !!doc; 
-  //     }) && !!values.shopLocations?.['shop_exterior']; 
-  //   }
+  // 🚀 DB CRUD: Direct Save Function
+  const saveDraftToDB = async () => {
+    if (editData || showSuccessRef.current) return; 
     
-  //   // ---> NEW STEP 7 (SE ANNEXURE) VALIDATION <---
-  //   if (step === 7) {
-  //     const validCreditRefs = values.seHasCreditReferences !== 'Yes' || (
-  //       values.seHasCreditReferences === 'Yes' && 
-  //       values.seCreditReferences && values.seCreditReferences.length > 0 && 
-  //       values.seCreditReferences.every(ref => 
-  //         (ref.name?.length ?? 0) >= 2 && (ref.contact?.length ?? 0) === 10
-  //       )
-  //     );
-      
-  //     const validTerritories = values.seTerritories?.length > 0 && values.seTerritories.every(t => t.taluka && t.village?.length > 0 && t.cultivableArea && t.majorCrops?.length > 0);
+    const currentValues = form.getValues();
+    if (!currentValues || !currentValues.shopName || !user?.id) return; 
 
-  //     // ---> NEW: Check if payment proof is valid <---
-  //     const securityDepositVal = parseInt(values.seSecurityDeposit || '0');
-  //     const hasPaymentProof = securityDepositVal === 0 || (
-  //       securityDepositVal > 0 && 
-  //       (!!values.sePaymentProofText || !!values.documents?.['se_payment_proof'])
-  //     );
+    // Generate a UUID if this is a brand new draft
+    if (!draftIdRef.current) {
+      draftIdRef.current = Crypto.randomUUID(); 
+    }
 
-  //     return !!(
-  //       validTerritories && 
-  //       values.sePrincipalSuppliers?.length > 0 && 
-  //       values.seChemicalProducts?.length > 0 && 
-  //       values.seBioProducts?.length > 0 && 
-  //       values.seOtherProducts?.length > 0 && 
-  //       validCreditRefs &&
-  //       hasPaymentProof // <-- Block 'Next' button if false
-  //     );
-  //   }
-  //   if (step === 8) return !!(values.agreementAccepted && values.dealerSignature && values.seSignature);
-    
-  //   return true; // Step 9
-  // }, [step, values]);
-  // 🚀 1. Group Validations
+    try {
+      await supabase.from('drafts').upsert({
+        se_id: user.id,
+        entity_type: 'dealer',
+        entity_id: draftIdRef.current,
+        draft_data: currentValues,
+        current_step: step,
+        updated_at: new Date().toISOString()
+      }, { onConflict: 'entity_id' });
+    } catch (err) {
+      console.log("Failed to sync draft to DB", err);
+    }
+  };
+
+  // 🚀 DB CRUD: Background Auto-Save
+  useEffect(() => {
+    const subscription = AppState.addEventListener("change", async (nextAppState) => {
+      if (nextAppState === "inactive" || nextAppState === "background") {
+        if (!showSuccessRef.current) await saveDraftToDB();
+      }
+    });
+    return () => {
+      subscription.remove();
+      if (!showSuccessRef.current) saveDraftToDB(); 
+    };
+  }, [step]); 
+
+  // 🚀 DB CRUD: Save & Exit Button
+  const saveAndExit = async () => {
+    const values = form.getValues();
+    if (!values.shopName) {
+      useAlertStore.getState().showAlert("Cannot Save", "Please enter at least the Primary Shop Name to save a draft.");
+      return;
+    }
+    useAlertStore.getState().showAlert("Saving...", "Syncing draft to database...");
+    await saveDraftToDB();
+    useAlertStore.getState().hideAlert();
+    navigation.navigate("MainTabs", { screen: "Drafts" }); 
+  };
+
+  const saveDraft = () => saveAndExit();
+
   const validationStatus = useMemo(() => {
-    // Step 1
     const mobileRegex = /^\d{10}$/;
     const landlineRegex = /^[0-9]{3,5}[- ]?[0-9]{6,8}$/;
     const gstRegex = /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/;
@@ -331,7 +132,6 @@ export function useDealerOnboarding(navigation: any, route: any) {
     const isLandlineValid = !values.landlineNumber || landlineRegex.test(values.landlineNumber);
     const isStep1Valid = !!(values.shopName && values.shopName.length >= 2 && values.firmType && values.estYear && values.estYear.length === 4 && areOwnersValid && mobileRegex.test(values.contactMobile || '') && isLandlineValid && values.state && values.city && values.taluka && values.village && values.address && values.address.length >= 5 && gstRegex.test(values.gstNumber || '') && panRegex.test(values.panNumber || '') && areBanksValid);
     
-    // Step 3
     const distValid = values.isLinkedToDistributor === 'No' || (values.isLinkedToDistributor === 'Yes' && values.linkedDistributors?.[0]?.name && /^\d{10}$/.test(values.linkedDistributors?.[0]?.contact || ''));
     const hasAtLeastOneLocation = (values.additionalShops?.length || 0) > 0 || (values.godowns?.length || 0) > 0;
     const additionalShopsValid = (values.additionalShops || []).every(s => s.shopName && s.estYear && s.state && s.city && s.taluka && s.village && s.address);
@@ -342,23 +142,19 @@ export function useDealerOnboarding(navigation: any, route: any) {
     const demoFarmersValid = values.willingDemoFarmers === 'No' || (values.willingDemoFarmers === 'Yes' && (hasFarmerFile || manualFarmersValid));
     const isStep3Valid = !!(values.isLinkedToDistributor && distValid && values.hasAdditionalLocations && addLocValid && values.proposedStatus && values.willingDemoFarmers && demoFarmersValid);
     
-    // Step 4
     const isStep4Valid = Array.isArray(values.glsCommitments) && values.glsCommitments.length === GLS_COMMITMENTS.length; 
     
-    // Step 6
     const requiredKeys = ['gst certificate / shop establishment license', 'pan card', 'cancelled cheque', 'shop_exterior', 'selfie_with_owner'];
     const dynamicKeys = (values.complianceChecklist || []).map((item: string) => item.replace(/[^a-zA-Z0-9]/g, '_').toLowerCase());
     const allRequired = [...requiredKeys, ...dynamicKeys];
     const isStep6Valid = allRequired.every(key => { const doc = values.documents?.[key]; return Array.isArray(doc) ? doc.length > 0 : !!doc; }) && !!values.shopLocations?.['shop_exterior']; 
     
-    // Step 7
     const validCreditRefs = values.seHasCreditReferences !== 'Yes' || (values.seHasCreditReferences === 'Yes' && values.seCreditReferences && values.seCreditReferences.length > 0 && values.seCreditReferences.every(ref => (ref.name?.length ?? 0) >= 2 && (ref.contact?.length ?? 0) === 10));
     const validTerritories = values.seTerritories?.length > 0 && values.seTerritories.every(t => t.taluka && t.village?.length > 0 && t.cultivableArea && t.majorCrops?.length > 0);
     const securityDepositVal = parseInt(values.seSecurityDeposit || '0');
     const hasPaymentProof = securityDepositVal === 0 || (securityDepositVal > 0 && (!!values.sePaymentProofText || !!values.documents?.['se_payment_proof']));
     const isStep7Valid = !!(validTerritories && values.sePrincipalSuppliers?.length > 0 && values.seChemicalProducts?.length > 0 && values.seBioProducts?.length > 0 && values.seOtherProducts?.length > 0 && validCreditRefs && hasPaymentProof && (values.seWillShareSales !== undefined));
     
-    // Step 8
     const isStep8Valid = !!(values.agreementAccepted && values.dealerSignature && values.seSignature);
 
     return [
@@ -371,46 +167,9 @@ export function useDealerOnboarding(navigation: any, route: any) {
     ];
   }, [values]);
 
-  // 🚀 2. Always allow navigation so they can click Submit and see the error
   const isNextEnabled = true;
 
-  // 🚀 3. Intercept submit to show exactly what is missing
-  const submit = async () => {
-    const missingSteps = validationStatus.filter(v => !v.isValid).map(v => v.name);
-    
-    if (missingSteps.length > 0) {
-      useAlertStore.getState().showAlert(
-        "Missing Information", 
-        "Please complete the following sections before submitting:\n\n• " + missingSteps.join("\n• ")
-      );
-      return; 
-    }
-
-    // If valid, submit
-    await form.handleSubmit(async (data) => {
-      if (!user?.id) return useAlertStore.getState().showAlert("Error", "User session not found.");
-      setIsSubmitting(true);
-      try {
-        const dbResult = await saveDealerOnboarding(data, "SUBMITTED", scoreData.percentage, scoreData.band, user.id, editData?.id);
-        const html = generateHTML();
-        const { uri } = await Print.printToFileAsync({ html });
-        const pdfUrl = await uploadFileToCloudinary(uri, 'raw');
-        await updateDealerPdfUrl(dbResult.id, pdfUrl);
-        if (draftIdRef.current) {
-          removeDraft(draftIdRef.current);
-          draftIdRef.current = undefined; 
-        }
-        setShowSuccess(true);
-      } catch (error: any) {
-        useAlertStore.getState().showAlert("Submission Failed", error.message);
-      } finally {
-        setIsSubmitting(false);
-      }
-    })();
-  };
-
   const scores = watch(['scoreFinancial', 'scoreReputation', 'scoreOperations', 'scoreFarmerNetwork', 'scoreTeam', 'scorePortfolio', 'scoreExperience', 'scoreGrowth']);
-
   const scoreData = useMemo(() => {
     const raw = scores.reduce((a, b) => (a || 0) + (b || 0), 0);
     let band = 'C-Category';
@@ -446,14 +205,12 @@ export function useDealerOnboarding(navigation: any, route: any) {
           return `M ${points[0].x} ${points[0].y} ` + points.slice(1).map(p => `L ${p.x} ${p.y}`).join(' ');
         };
         const paths = strokes.map((pts: any[]) => `<path d="${toPath(pts)}" stroke="#16A34A" stroke-width="4" fill="none" stroke-linecap="round" stroke-linejoin="round" />`).join('');
-        // BUG FIX: Added xmlns attribute to prevent Android Webview SVG crashes
         return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 250" style="width: 100%; max-width: 250px; height: 80px;">${paths}</svg>`;
       } catch (e) {
         return '<span style="color:red">Invalid Signature Format</span>';
       }
     };
 
-    // BUG FIX: Added xmlns attribute to inline SVGs
     const checkIcon = `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#166534" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: -2px; margin-right: 4px;"><polyline points="20 6 9 17 4 12"></polyline></svg>`;
     const flagIcon = `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#DC2626" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: -2px; margin-right: 4px;"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"></path><line x1="4" y1="22" x2="4" y2="15"></line></svg>`;
 
@@ -497,7 +254,6 @@ export function useDealerOnboarding(navigation: any, route: any) {
           .signatures { display: table; width: 100%; margin-top: 50px; page-break-inside: avoid; }
           .sig-box { display: table-cell; width: 50%; text-align: center; }
           .sig-line { border-top: 2px solid #94A3B8; margin: 10px 60px 0; padding-top: 8px; font-weight: 800; color: #1E293B; font-size: 14px; text-transform: uppercase; }
-          .sig-img { max-height: 80px; max-width: 200px; margin-bottom: 10px; }
           .empty-text { color: #94A3B8; font-style: italic; font-weight: 400; }
           .success-badge { color: #166534; font-weight: 800; font-size: 13px; }
           .danger-badge { color: #DC2626; font-weight: 800; font-size: 13px; }
@@ -527,10 +283,9 @@ export function useDealerOnboarding(navigation: any, route: any) {
                 <tr><th>Landmark</th><td>${data.landmark || '<span class="empty-text">N/A</span>'}</td></tr>
                 <tr><th>Owner(s) / Partner(s)</th><td>${data.owners?.map(o => `<span class="pill">${o.name}</span>`).join('') || '-'}</td></tr>
                 
-                <!-- BUG FIX: Removed 'a href=tel:' tags to prevent Android PDF Generator crashes. The text is now just wrapped in a span for styling. Native PDF viewers will auto-link the phone numbers. -->
                 <tr><th>Contact Numbers</th><td>
-                  ${data.contactMobile ? `<a href="tel:+91${data.contactMobile}" class="action-link">+91 ${data.contactMobile}</a>` : '-'} 
-                  ${data.landlineNumber ? `<br><span style="color:#64748B; font-size:12px;">Landline: <a href="tel:${data.landlineNumber}" class="action-link">${data.landlineNumber}</a></span>` : ''}
+                  ${data.contactMobile ? `<span class="action-link">+91 ${data.contactMobile}</span>` : '-'} 
+                  ${data.landlineNumber ? `<br><span style="color:#64748B; font-size:12px;">Landline: <span class="action-link">${data.landlineNumber}</span></span>` : ''}
                 </td></tr>
                 
                 <tr><th>Tax IDs</th><td><strong>GST:</strong> ${data.gstNumber || '-'}<br><strong>PAN:</strong> ${data.panNumber || '-'}</td></tr>
@@ -584,7 +339,7 @@ export function useDealerOnboarding(navigation: any, route: any) {
                     <tr><th>Proposed Status</th><td><strong>${data.proposedStatus || '-'}</strong></td></tr>
                     <tr><th>Demo Farmers</th><td>${data.willingDemoFarmers || '-'}</td></tr>
                     
-                    <tr><th>Linked Distributor</th><td>${data.isLinkedToDistributor === 'Yes' ? data.linkedDistributors?.map(d => `${d.name} (<a href="tel:+91${d.contact}" class="action-link">${d.contact}</a>)`).join('<br>') : 'No'}</td></tr>
+                    <tr><th>Linked Distributor</th><td>${data.isLinkedToDistributor === 'Yes' ? data.linkedDistributors?.map(d => `${d.name} (<span class="action-link">${d.contact}</span>)`).join('<br>') : 'No'}</td></tr>
                   </table>
                 </div>
               </div>
@@ -594,12 +349,11 @@ export function useDealerOnboarding(navigation: any, route: any) {
                     <tr><th>Additional Shops</th><td>${data.additionalShops?.length || '0'} Recorded</td></tr>
                     <tr><th>Godowns</th><td>${data.godowns?.length || '0'} Recorded</td></tr>
                     
-                    <!-- Maps URL uses the standard HTTPS protocol, so it remains perfectly safe and clickable -->
                     <tr>
                       <th>GPS Coordinates</th>
                       <td>
                         ${data.shopLocations?.['shop_exterior'] 
-                           ? `<a href="https://maps.google.com/?q=${data.shopLocations['shop_exterior'].lat},${data.shopLocations['shop_exterior'].lng}" class="action-link">📍 View on Map</a><br><span style="font-size: 11px; color: #64748B;">${data.shopLocations['shop_exterior'].lat.toFixed(5)}, ${data.shopLocations['shop_exterior'].lng.toFixed(5)}</span>` 
+                           ? `<a href="https://maps.google.com/?q=$${data.shopLocations['shop_exterior'].lat},${data.shopLocations['shop_exterior'].lng}" class="action-link">📍 View on Map</a><br><span style="font-size: 11px; color: #64748B;">${data.shopLocations['shop_exterior'].lat.toFixed(5)}, ${data.shopLocations['shop_exterior'].lng.toFixed(5)}</span>` 
                            : '<span class="empty-text">Missing</span>'}
                       </td>
                     </tr>
@@ -640,7 +394,6 @@ export function useDealerOnboarding(navigation: any, route: any) {
                 <div class="table-wrapper">
                   <table>
                     <tr style="background-color: #F1F5F9; font-weight: 600;"><td>Name</td><td>Contact</td><td>Address</td></tr>
-                    <!-- BUG FIX: Removed 'a href=tel:' tags for demo farmers -->
                     ${data.demoFarmers?.filter(f => f.name).map(f => `<tr><td>${f.name}</td><td><span class="action-link">${f.contact}</span></td><td>${f.address}</td></tr>`).join('') || '<tr><td colspan="3" class="empty-text">No manual entries</td></tr>'}
                   </table>
                 </div>
@@ -709,10 +462,9 @@ export function useDealerOnboarding(navigation: any, route: any) {
                 <tr>
                   <th>Credit References</th>
                   <td>
-                    <!-- BUG FIX: Removed 'a href=tel:' tags for credit references -->
                     ${data.seHasCreditReferences === 'Yes' ? data.seCreditReferences?.map((r, i) => `
                       <div style="margin-bottom:8px; border-bottom:1px solid #E2E8F0; padding-bottom:8px;">
-                        <strong>${i+1}. ${r.name} (<a href="tel:+91${r.contact}" class="action-link">${r.contact}</a>)</strong><br>
+                        <strong>${i+1}. ${r.name} (<span class="action-link">${r.contact}</span>)</strong><br>
                         <span style="color:#64748B; font-size:13px;">${r.behavior || 'No text behavior'} ${r.behaviorAudio ? `| <span class="success-badge">${checkIcon} Audio Recorded</span>` : ''}</span>
                       </div>
                     `).join('') : '<span class="empty-text">No references provided</span>'}
@@ -797,8 +549,6 @@ export function useDealerOnboarding(navigation: any, route: any) {
     `;
   };
 
-  
-
   const handleUpload = async (key: string, type: 'camera' | 'image' | 'doc' = 'doc') => {
     const useCamera = type === 'camera' || type === 'image';
     const perm = useCamera ? await requestCameraPermission() : await requestMediaPermission();
@@ -809,7 +559,6 @@ export function useDealerOnboarding(navigation: any, route: any) {
 
     const asset: any = result.assets[0];
 
-    // ---> NEW: FAIL-FAST FILE SIZE LIMIT (5MB) <---
     if (!useCamera && asset.size) {
       const fileSizeInMB = asset.size / (1024 * 1024);
       if (fileSizeInMB > 5) {
@@ -841,18 +590,16 @@ export function useDealerOnboarding(navigation: any, route: any) {
     try {
       let finalUri = uri;
 
-      // ---> NEW: COMPRESSION LOGIC <---
       if (isCameraOrImage) {
         const manipResult = await ImageManipulator.manipulateAsync(
           uri,
-          [{ resize: { width: 1024 } }], // Shrinks to 1024px width, maintains aspect ratio
-          { compress: 0.6, format: ImageManipulator.SaveFormat.JPEG } // 60% compression
+          [{ resize: { width: 1024 } }], 
+          { compress: 0.6, format: ImageManipulator.SaveFormat.JPEG } 
         );
         finalUri = manipResult.uri;
       }
 
       const url = await uploadFileToCloudinary(finalUri, isCameraOrImage ? 'image' : 'raw');
-      
       const currentDocs = form.getValues('documents') || {};
       
       if (['shop_interior', 'shop_exterior', 'shop_godown'].includes(key)) {
@@ -862,7 +609,6 @@ export function useDealerOnboarding(navigation: any, route: any) {
         form.setValue('documents', { ...currentDocs, [key]: url }, { shouldValidate: true });
       }
       
-      // Store GPS by its specific key (exterior, interior, or godown)
       if (location) {
         const currentLocs = form.getValues('shopLocations') || {};
         form.setValue('shopLocations', { 
@@ -881,36 +627,18 @@ export function useDealerOnboarding(navigation: any, route: any) {
     const html = generateHTML();
     const data = form.getValues();
     
-    // Create a safe, standardized file name from the shop name
     const rawShopName = data.shopName ? data.shopName.replace(/[^a-zA-Z0-9]/g, '_') : 'Dealer';
     const finalFileName = `${rawShopName}_Dossier.pdf`;
 
     try {
-      // Print HTML into a temporary default PDF URI
       const { uri } = await Print.printToFileAsync({ html });
       
       if (Platform.OS !== 'web') {
-        // IMPORTANT: Use the destructured documentDirectory and copyAsync directly
         const renamedUri = `${documentDirectory}${finalFileName}`;
-        
-        await copyAsync({
-          from: uri,
-          to: renamedUri
-        });
-        
-        // Share the freshly named file with the correct Adobe UTI
-        await Sharing.shareAsync(renamedUri, { 
-          UTI: 'com.adobe.pdf', 
-          mimeType: 'application/pdf',
-          dialogTitle: 'Share PDF'
-        });
+        await copyAsync({ from: uri, to: renamedUri });
+        await Sharing.shareAsync(renamedUri, { UTI: 'com.adobe.pdf', mimeType: 'application/pdf', dialogTitle: 'Share PDF' });
       } else {
-        // FALLBACK: If FileSystem is unavailable (e.g., Web browser)
-        await Sharing.shareAsync(uri, { 
-          UTI: 'com.adobe.pdf', 
-          mimeType: 'application/pdf',
-          dialogTitle: 'Share PDF'
-        });
+        await Sharing.shareAsync(uri, { UTI: 'com.adobe.pdf', mimeType: 'application/pdf', dialogTitle: 'Share PDF' });
       }
     } catch (error) {
       console.error("Error renaming or sharing PDF:", error);
@@ -918,5 +646,42 @@ export function useDealerOnboarding(navigation: any, route: any) {
     }
   };
 
-  return { form, step, setStep, saveDraft, submit, scoreData, handleUpload, handleAudioUpload, uploading, isSubmitting, isNextEnabled, showSuccess, setShowSuccess, generatePDF, isEditing: !!editData };
+  // 🚀 DB CRUD: Delete Draft from DB on Submit
+  const submit = async () => {
+    const missingSteps = validationStatus.filter(v => !v.isValid).map(v => v.name);
+    
+    if (missingSteps.length > 0) {
+      useAlertStore.getState().showAlert(
+        "Missing Information", 
+        "Please complete the following sections before submitting:\n\n• " + missingSteps.join("\n• ")
+      );
+      return; 
+    }
+
+    await form.handleSubmit(async (data) => {
+      if (!user?.id) return useAlertStore.getState().showAlert("Error", "User session not found.");
+      setIsSubmitting(true);
+      try {
+        const dbResult = await saveDealerOnboarding(data, "SUBMITTED", scoreData.percentage, scoreData.band, user.id, editData?.id);
+        const html = generateHTML();
+        const { uri } = await Print.printToFileAsync({ html });
+        const pdfUrl = await uploadFileToCloudinary(uri, 'raw');
+        await updateDealerPdfUrl(dbResult.id, pdfUrl);
+        
+        // 🚀 THE FIX: Delete from Supabase Drafts table ONLY
+        if (draftIdRef.current) {
+          await supabase.from('drafts').delete().eq('entity_id', draftIdRef.current);
+          draftIdRef.current = undefined; 
+        }
+        
+        setShowSuccess(true);
+      } catch (error: any) {
+        useAlertStore.getState().showAlert("Submission Failed", error.message);
+      } finally {
+        setIsSubmitting(false);
+      }
+    })();
+  };
+
+  return { form, step, setStep, jumpBackTo, setJumpBackTo, saveDraft, submit, scoreData, handleUpload, handleAudioUpload, uploading, isSubmitting, isNextEnabled, showSuccess, setShowSuccess, generatePDF, isEditing: !!editData, saveAndExit };
 }

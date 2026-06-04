@@ -1,5 +1,3 @@
-// FieldCommander/Frontend/src/modules/onboarding/farmer/hooks.ts
-
 import { useState, useMemo, useEffect, useRef } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -9,21 +7,18 @@ import * as Sharing from 'expo-sharing';
 import * as ImagePicker from "expo-image-picker";
 import * as ImageManipulator from 'expo-image-manipulator';
 import { documentDirectory, copyAsync } from 'expo-file-system/legacy';
+import * as Crypto from 'expo-crypto'; // 🚀 IMPORT CRYPTO FOR UUIDs
 
 import { requestCameraPermission } from "../../../core/permissions";
 import { useAuthStore } from "../../../store/authStore";
-import { useDraftStore } from "../../../store/draftStore";
 import { supabase } from "../../../core/supabase"; 
 import { uploadFileToCloudinary } from "../services/cloudinaryService";
 import { farmerOnboardingSchema, FarmerOnboardingValues } from "./schema";
 import { useAlertStore } from "../../../store/alertStore";
 import { saveFarmerOnboarding, mapFarmerDbToForm, updateFarmerPdfUrl } from '../services/onboardingService';
 
-
-
 export function useFarmerOnboarding(navigation: any, route: any) {
   const user = useAuthStore((s) => s.user);
-  const { addDraft, updateDraft, removeDraft } = useDraftStore();
   
   const editData = route?.params?.editData;
   const draftData = route?.params?.draftData;
@@ -37,7 +32,7 @@ export function useFarmerOnboarding(navigation: any, route: any) {
   const [uploading, setUploading] = useState<Record<string, boolean>>({}); 
   
   const draftIdRef = useRef<string | undefined>(draftId);
-  const showSuccessRef = useRef(false);
+  const showSuccessRef = useRef(showSuccess);
 
   useEffect(() => { showSuccessRef.current = showSuccess; }, [showSuccess]);
 
@@ -67,53 +62,60 @@ export function useFarmerOnboarding(navigation: any, route: any) {
     fetchDealers();
   }, [user?.id]);
 
-  const autoSave = () => {
-    if (editData) return; 
+  // 🚀 DB CRUD: Direct Save Function
+  const saveDraftToDB = async () => {
+    if (editData || showSuccessRef.current) return; 
+    
     const currentValues = form.getValues();
-    if (!currentValues || !currentValues.fullName) return; 
-    if (draftIdRef.current) updateDraft(draftIdRef.current, currentValues);
-    else draftIdRef.current = addDraft(currentValues, 'FARMER'); 
+    if (!currentValues || !currentValues.fullName || !user?.id) return; 
+
+    // Generate a UUID if this is a brand new draft
+    if (!draftIdRef.current) {
+      draftIdRef.current = Crypto.randomUUID(); 
+    }
+
+    try {
+      await supabase.from('drafts').upsert({
+        se_id: user.id,
+        entity_type: 'farmer',
+        entity_id: draftIdRef.current,
+        draft_data: currentValues,
+        current_step: step,
+        updated_at: new Date().toISOString()
+      }, { onConflict: 'entity_id' });
+    } catch (err) {
+      console.log("Failed to sync draft to DB", err);
+    }
   };
+
+  // 🚀 DB CRUD: Save & Exit Button
   const saveAndExit = async () => {
     const values = form.getValues();
-    
-    // Prevent saving blank drafts
     if (!values.fullName) {
       useAlertStore.getState().showAlert("Cannot Save", "Please enter at least the Farmer's Full Name to save a draft.");
       return;
     }
 
-    // Save locally
-    autoSave();
-    
-    const currentId = draftIdRef.current;
-    if (!currentId) return;
-
-    // 🚀 SYNC TO CLOUD DRAFTS TABLE
-    try {
-      await supabase.from('drafts').upsert({
-        se_id: user?.id,
-        entity_type: 'farmer',
-        entity_id: currentId,
-        draft_data: values,
-        current_step: step,
-        updated_at: new Date().toISOString()
-      }, { onConflict: 'entity_id' });
-    } catch (err) {
-      console.log("Failed to sync farmer draft to cloud", err);
-    }
-
+    useAlertStore.getState().showAlert("Saving...", "Syncing draft to database...");
+    await saveDraftToDB();
     useAlertStore.getState().hideAlert();
     navigation.navigate("MainTabs", { screen: "Drafts" });
   };
   
-
+  // 🚀 DB CRUD: Background Auto-Save
   useEffect(() => {
-    const sub = AppState.addEventListener("change", state => { if (state === "inactive" || state === "background") { if (!showSuccessRef.current) autoSave(); } });
-    return () => { sub.remove(); if (!showSuccessRef.current) autoSave(); };
-  }, []);
+    const sub = AppState.addEventListener("change", async (nextAppState) => {
+      if (nextAppState === "inactive" || nextAppState === "background") {
+        if (!showSuccessRef.current) await saveDraftToDB();
+      }
+    });
+    return () => {
+      sub.remove();
+      if (!showSuccessRef.current) saveDraftToDB(); 
+    };
+  }, [step]);
 
-  const saveDraft = () => { autoSave(); useAlertStore.getState().showAlert("Saved", "Farmer onboarding saved as draft."); navigation.goBack(); };
+  const saveDraft = () => saveAndExit();
 
   const handleUpload = async (key: string) => {
     const perm = await requestCameraPermission();
@@ -134,25 +136,7 @@ export function useFarmerOnboarding(navigation: any, route: any) {
     }
   };
 
-  // const isNextEnabled = useMemo(() => {
-  //   if (step === 1) return !!(values.fullName && values.fatherName && values.mobile?.length === 10 && values.state && values.city && values.taluka && values.village);
-  //   if (step === 2) {
-  //       const baseValid = !!(values.totalLand && values.majorCrops?.length > 0 && values.soilType?.length > 0 && values.waterSource?.length > 0);
-  //       if (values.soilType?.includes('Others') && !values.otherSoilType) return false;
-  //       if (values.waterSource?.includes('Others') && !values.otherWaterSource) return false;
-  //       if (values.farmEquipments?.includes('Others') && !values.otherFarmEquipment) return false;
-  //       return baseValid;
-  //   }
-  //   if (step === 3) return true; 
-  //   if (step === 4) return !!(values.agreementAccepted && values.farmerSignature && values.seSignature);
-  //   if (step === 5) return true; 
-  //   return true; 
-  // }, [step, values]);
-  const isNextEnabled = useMemo(() => {
-    // 🚀 1. ALLOW FREE NAVIGATION: Always enable "Next" for intermediate steps
-    if (step < 5) return true; 
-
-    // 🚀 2. FINAL SUBMISSION CHECK: Validate EVERYTHING on the last step (Step 5)
+  const validationStatus = useMemo(() => {
     const isStep1Valid = !!(values.fullName && values.fatherName && values.mobile?.length === 10 && values.state && values.city && values.taluka && values.village);
     
     const isStep2Valid = !!(values.totalLand && values.majorCrops?.length > 0 && values.soilType?.length > 0 && values.waterSource?.length > 0) &&
@@ -160,18 +144,23 @@ export function useFarmerOnboarding(navigation: any, route: any) {
                          !(values.waterSource?.includes('Others') && !values.otherWaterSource) &&
                          !(values.farmEquipments?.includes('Others') && !values.otherFarmEquipment);
                          
-    // 🚀 FIXED: Validating the new pastCrops array instead of the deleted majorProblems
     const isStep3Valid = (values.pastCrops || []).every(crop => {
-       // If they select 'Others' for input used, they MUST type what it is
        if ((crop.inputUsed || []).includes('Others') && !crop.otherInputUsed) return false;
        return true;
     });
     
     const isStep4Valid = !!(values.agreementAccepted && values.farmerSignature && values.seSignature);
 
-    // The "Submit Profile" button will only be clickable if ALL of these are true
-    return isStep1Valid && isStep2Valid && isStep3Valid && isStep4Valid; 
-  }, [step, values]);
+    return [
+      { isValid: isStep1Valid, name: "Step 1: Personal Details (Check Mobile/Location)" },
+      { isValid: isStep2Valid, name: "Step 2: Farm Details (Check 'Others' text)" },
+      { isValid: isStep3Valid, name: "Step 3: History & Linking (Check 'Others' text)" },
+      { isValid: isStep4Valid, name: "Step 4: Agreement & Signatures" },
+    ];
+  }, [values]);
+
+  // 🚀 Always allow navigation
+  const isNextEnabled = true;
 
   const generateHTML = () => {
     const data = form.getValues();
@@ -266,7 +255,6 @@ export function useFarmerOnboarding(navigation: any, route: any) {
     `;
   };
 
-  // 🚀 ADDED BACK IN: The generatePDF function
   const generatePDF = async () => {
     const html = generateHTML();
     const rawName = form.getValues('fullName') ? form.getValues('fullName').replace(/[^a-zA-Z0-9]/g, '_') : 'Farmer';
@@ -286,31 +274,43 @@ export function useFarmerOnboarding(navigation: any, route: any) {
     }
   };
 
-  const submit = form.handleSubmit(async (data) => {
-    if (!user?.id) return useAlertStore.getState().showAlert("Error", "User session not found.");
-    setIsSubmitting(true);
+  // 🚀 DB CRUD: Delete Draft from DB on Submit
+  const submit = async () => {
+    const missingSteps = validationStatus.filter(v => !v.isValid).map(v => v.name);
     
-    try {
-      // 🚀 1. Cleanly call our newly structured service
-      const result = await saveFarmerOnboarding(data, user.id, editData?.id);
-      
-      // 🚀 2. Generate PDF and Upload to Cloudinary
-      const html = generateHTML();
-      const { uri } = await Print.printToFileAsync({ html });
-      const pdfUrl = await uploadFileToCloudinary(uri, 'raw');
-      
-      // 🚀 3. Update the PDF URL via the service
-      await updateFarmerPdfUrl(result.id, pdfUrl);
-
-      // 4. Cleanup and Show Success
-      if (draftIdRef.current) removeDraft(draftIdRef.current);
-      setShowSuccess(true);
-    } catch (error: any) {
-      useAlertStore.getState().showAlert("Submission Failed", error.message);
-    } finally {
-      setIsSubmitting(false);
+    if (missingSteps.length > 0) {
+      useAlertStore.getState().showAlert(
+        "Missing Information", 
+        "Please complete the following sections before submitting:\n\n• " + missingSteps.join("\n• ")
+      );
+      return; 
     }
-  });
+
+    await form.handleSubmit(async (data) => {
+      if (!user?.id) return useAlertStore.getState().showAlert("Error", "User session not found.");
+      setIsSubmitting(true);
+      
+      try {
+        const result = await saveFarmerOnboarding(data, user.id, editData?.id);
+        const html = generateHTML();
+        const { uri } = await Print.printToFileAsync({ html });
+        const pdfUrl = await uploadFileToCloudinary(uri, 'raw');
+        await updateFarmerPdfUrl(result.id, pdfUrl);
+        
+        // 🚀 THE FIX: Delete from Supabase Drafts table ONLY
+        if (draftIdRef.current) {
+           await supabase.from('drafts').delete().eq('entity_id', draftIdRef.current);
+           draftIdRef.current = undefined; 
+        }
+        
+        setShowSuccess(true);
+      } catch (error: any) {
+        useAlertStore.getState().showAlert("Submission Failed", error.message);
+      } finally {
+        setIsSubmitting(false);
+      }
+    })();
+  };
 
   return { form, step, setStep, jumpBackTo, setJumpBackTo,saveAndExit, saveDraft, submit, isSubmitting, isNextEnabled, showSuccess, setShowSuccess, dealers, generatePDF, uploading, handleUpload, isEditing: !!editData };
 }
