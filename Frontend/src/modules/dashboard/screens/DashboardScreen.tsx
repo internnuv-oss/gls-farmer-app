@@ -1,4 +1,5 @@
 import React, { useRef, useState, useCallback, useMemo, useEffect } from "react";
+import * as crypto from 'expo-crypto';
 import {
   View, Text, FlatList, Pressable, Dimensions, TextInput,
   ActivityIndicator, Modal, RefreshControl, Linking, Image
@@ -9,6 +10,8 @@ import { MaterialIcons } from "@expo/vector-icons";
 import { useFocusEffect } from "@react-navigation/native";
 import { useAuthStore } from "../../../store/authStore";
 import { useAlertStore } from "../../../store/alertStore";
+import { useDraftStore } from "../../../store/draftStore";
+import { supabase } from "../../../core/supabase";
 import { fetchMyDealers, fetchMyFarmers, fetchMyDistributors, fetchMyDrafts, deleteDraft } from "../services/dashboardService";
 
 import { FloatingActionMenu, EmptyState } from "../../../design-system/components";
@@ -41,6 +44,61 @@ export const DashboardScreen = ({ navigation, route }: any) => {
   const [dealers, setDealers] = useState<any[]>([]);
   const [farmers, setFarmers] = useState<any[]>([]); 
   const [dbDrafts, setDbDrafts] = useState<any[]>([]); // 🚀 State for DB Drafts
+
+  // Migration to DB: Pull legacy local drafts to the cloud
+  const localDrafts = useDraftStore((state) => state.drafts);
+  const clearLocalDrafts = useDraftStore((state) => state.clearDrafts);
+  const [isMigrating, setIsMigrating] = useState(false);
+
+  useEffect(() => {
+    const migrateLocalDrafts = async () => {
+      if (!user?.id || !localDrafts || localDrafts.length === 0) return;
+
+      setIsMigrating(true);
+      try {
+        const myLocalDrafts = localDrafts.filter((d: any) => !d.userId || d.userId === user.id);
+        
+        if (myLocalDrafts.length > 0) {
+          // 1. Format payload for bulk insert
+          const migrationPayload = myLocalDrafts.map((draft: any) => {
+            let draftIdToSync = draft.id;
+            if (!draftIdToSync || draftIdToSync.length < 32) draftIdToSync = crypto.randomUUID(); // Fix legacy IDs
+            
+            return {
+              se_id: user.id,
+              entity_type: draft.type.toLowerCase(), // 'DEALER' -> 'dealer'
+              entity_id: draftIdToSync,
+              draft_data: draft.data,
+              current_step: 1, 
+              updated_at: new Date(draft.updatedAt || Date.now()).toISOString()
+            };
+          });
+
+          // 2. Perform a single, fast bulk Upsert
+          const { error } = await supabase.from('drafts').upsert(migrationPayload, { onConflict: 'entity_id' });
+
+          if (error) throw error;
+
+          // 3. Wipe local storage robustly so it never runs again
+          if (typeof clearLocalDrafts === 'function') {
+            clearLocalDrafts();
+          } else {
+            const store = useDraftStore.getState();
+            myLocalDrafts.forEach((d: any) => store.removeDraft(d.id));
+          }
+
+          // 4. Refresh the dashboard lists to show the newly synced data
+          loadData(0, true);
+        }
+      } catch (error) {
+        console.error("Failed to migrate legacy local drafts:", error);
+      } finally {
+        setIsMigrating(false);
+      }
+    };
+
+    migrateLocalDrafts();
+  }, [user?.id, localDrafts]);
 
   const [page, setPage] = useState(0);
   const [hasMore, setHasMore] = useState(true);
@@ -720,8 +778,15 @@ export const DashboardScreen = ({ navigation, route }: any) => {
               ListFooterComponent={() => loadingMore ? <View style={{ paddingVertical: spacing.md }}><ActivityIndicator color={colors.primary} /></View> : null}
               refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[colors.primary]} tintColor={colors.primary} />}
               ListEmptyComponent={
-                loading && !refreshing ? (
-                  <View style={{ marginTop: 60, alignItems: 'center' }}><ActivityIndicator size="large" color={colors.primary} /></View>
+                (loading || isMigrating) && !refreshing ? (
+                  <View style={{ marginTop: 60, alignItems: 'center' }}>
+                    <ActivityIndicator size="large" color={colors.primary} />
+                    {isMigrating && (
+                       <Text style={{ marginTop: 10, color: colors.primary, fontWeight: '700' }}>
+                         {t("Syncing drafts...")}
+                       </Text>
+                    )}
+                  </View>
                 ) : (
                   <EmptyState
                     title={t(searchQuery ? "No Results Found" : `No ${item.key} Yet`)}
