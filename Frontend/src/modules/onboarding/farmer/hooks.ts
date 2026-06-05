@@ -24,7 +24,7 @@ export function useFarmerOnboarding(navigation: any, route: any) {
   const draftData = route?.params?.draftData;
   const draftId = route?.params?.draftId;
 
-  const [step, setStep] = useState(1);
+  const [step, setStep] = useState(route?.params?.initialStep || 1);
   const [jumpBackTo, setJumpBackTo] = useState<number | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);

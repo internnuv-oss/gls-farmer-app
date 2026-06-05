@@ -11,7 +11,6 @@ import { DealerOnboardingScreen } from '../modules/onboarding/dealer/screens/Dea
 import { SEOnboardingScreen } from '../modules/onboarding/se/screens/SEOnboardingScreen';
 import { LoginScreen } from '../modules/auth/screens/LoginScreen';
 import { RegisterScreen } from '../modules/auth/screens/RegisterScreen';
-import { DraftsScreen } from '../modules/dashboard/screens/DraftsScreen';
 import { EntityProfileScreen } from '../modules/dashboard/screens/EntityProfileScreen';
 import { ComingSoonScreen } from '../modules/core/screens/ComingSoonScreen';
 import { useAuthStore } from '../store/authStore';
@@ -35,7 +34,6 @@ const DashboardStackNavigator = () => (
     }}
   >
     <DashboardStack.Screen name="DashboardMain" component={DashboardScreen} />
-    <DashboardStack.Screen name="DraftsScreen" component={DraftsScreen} />
     <DashboardStack.Screen name="EntityProfile" component={EntityProfileScreen} />
   </DashboardStack.Navigator>
 );
@@ -54,14 +52,6 @@ const MainTabs = () => (
       name="Dashboard" 
       component={DashboardStackNavigator} 
       options={{ tabBarIcon: ({color}) => <MaterialIcons name="dashboard" size={24} color={color} /> }} 
-    />
-    <Tab.Screen 
-      name="Drafts" 
-      component={DraftsScreen} 
-      options={{ 
-        tabBarIcon: ({color}) => <MaterialIcons name="drafts" size={24} color={color} />,
-        tabBarLabel: "Saved Drafts" // Customizing the label to be clearer
-      }} 
     />
     <Tab.Screen 
       name="Profile" 
@@ -85,16 +75,12 @@ export const AppNavigator = () => {
     return () => unsubscribe();
   }, []);
 
-  
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       if (event === 'SIGNED_OUT' || !session) {
         logout(); 
       } else if (event === 'SIGNED_IN' && session) {
-        
         const meta = session.user.user_metadata;
-        
-        // 🚀 BULLETPROOF FALLBACK: Uses exact fields if they exist, otherwise splits the old 'name' field
         const extractedFirstName = meta.first_name || (meta.name ? meta.name.split(' ')[0] : '');
         const extractedLastName = meta.last_name || (meta.name ? meta.name.split(' ').slice(1).join(' ') : '');
 
@@ -157,7 +143,7 @@ export const AppNavigator = () => {
         const lowerTitle = title.toLowerCase();
         if (lowerTitle.includes('error') || lowerTitle.includes('failed') || lowerTitle.includes('denied') || lowerTitle.includes('incomplete')) autoTone = 'danger';
         else if (lowerTitle.includes('success') || lowerTitle.includes('complete')) autoTone = 'success';
-        else if (buttons?.some(b => b.style === 'destructive')) autoTone = 'warning'; // Confirmations like Delete are warnings
+        else if (buttons?.some(b => b.style === 'destructive')) autoTone = 'warning';
 
         return (
           <AlertModal 

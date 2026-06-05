@@ -21,8 +21,7 @@ export const fetchMyFarmers = async (userId: string, page: number = 0, limit: nu
     .range(from, to);
 
   if (error) throw error;
-  if (!data) return [];
-  return data;
+  return data || [];
 };
 
 export const fetchMyDealers = async (userId: string, page: number = 0, limit: number = 5) => { 
@@ -55,7 +54,6 @@ export const fetchMyDealers = async (userId: string, page: number = 0, limit: nu
   return translatedData;
 };
 
-// 🚀 ADDED: Fetch Distributors from the database
 export const fetchMyDistributors = async (userId: string, page: number = 0, limit: number = 5) => {
   const from = page * limit;
   const to = from + limit - 1;
@@ -67,8 +65,19 @@ export const fetchMyDistributors = async (userId: string, page: number = 0, limi
     .range(from, to);
 
   if (error) throw error;
-  if (!data) return [];
-  return data;
+  return data || [];
+};
+
+// 🚀 NEW: Fetch remote drafts directly from the drafts table
+export const fetchMyDrafts = async (userId: string) => {
+  const { data, error } = await supabase
+    .from('drafts')
+    .select('*')
+    .eq('se_id', userId)
+    .order('updated_at', { ascending: false });
+
+  if (error) throw error;
+  return data || [];
 };
 
 export async function fetchSEProfile(seId: string) {
@@ -118,8 +127,13 @@ export async function fetchNetworkSummary(seId: string) {
   const [dealers, farmers, distributors] = await Promise.all([
     fetchCount("dealers", true),
     fetchCount("farmers"),
-    fetchCount("distributors") // Tracks distributors dynamically now!
+    fetchCount("distributors")
   ]);
 
   return { dealers, farmers, distributors };
 }
+
+export const deleteDraft = async (entityId: string) => {
+  const { error } = await supabase.from('drafts').delete().eq('entity_id', entityId);
+  if (error) throw error;
+};

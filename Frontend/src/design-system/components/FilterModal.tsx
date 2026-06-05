@@ -4,9 +4,9 @@ import { MaterialIcons } from '@expo/vector-icons';
 import { Button } from './Button';
 import { colors, radius, shadows, spacing, typography } from '../tokens';
 
-// Upgraded to arrays for sophisticated multi-select capabilities
 export type FilterState = {
   sortBy: string;
+  completionStatus: string[]; // 🚀 Added Completion Status
   category: string[];
   firmType: string[];
   linkedStatus: string[];
@@ -24,6 +24,7 @@ export type FilterState = {
 
 export const defaultFilters: FilterState = {
   sortBy: "latest",
+  completionStatus: [],
   category: [],
   firmType: [],
   linkedStatus: [],
@@ -41,13 +42,12 @@ export const defaultFilters: FilterState = {
 
 type FilterModalProps = {
   visible: boolean;
-  entityType: string; // "Dealers" | "Distributors" | "Farmers"
+  entityType: string;
   currentFilters: FilterState;
   onApply: (filters: FilterState) => void;
   onClose: () => void;
 };
 
-// Sleek Custom Checkbox
 const CheckboxRow = ({ label, isSelected, onToggle }: { label: string, isSelected: boolean, onToggle: () => void }) => (
   <Pressable onPress={onToggle} style={styles.checkboxRow}>
     <View style={[styles.checkbox, isSelected && styles.checkboxActive]}>
@@ -57,7 +57,6 @@ const CheckboxRow = ({ label, isSelected, onToggle }: { label: string, isSelecte
   </Pressable>
 );
 
-// Professional Accordion Group
 const FilterAccordionGroup = ({ title, options, selectedValues, onToggleItem }: { title: string, options: {label: string, value: string}[], selectedValues: string[], onToggleItem: (val: string) => void }) => {
   const [expanded, setExpanded] = useState(false);
   const count = selectedValues.length;
@@ -99,12 +98,10 @@ export const FilterModal: React.FC<FilterModalProps> = ({ visible, entityType, c
     if (visible) setLocalFilters(currentFilters);
   }, [visible, currentFilters]);
 
-  // Handle Single Select (Sort)
   const handleSortUpdate = (value: string) => {
     setLocalFilters(prev => ({ ...prev, sortBy: value }));
   };
 
-  // Handle Multi Select (Filters)
   const toggleFilter = (key: keyof FilterState, value: string) => {
     setLocalFilters(prev => {
       const currentArray = prev[key] as string[];
@@ -141,17 +138,14 @@ export const FilterModal: React.FC<FilterModalProps> = ({ visible, entityType, c
 
             <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: spacing.xl }}>
               
-              {/* --- DYNAMIC SORTING --- */}
               <View style={styles.sectionBlock}>
                 <Text style={styles.sectionLabel}>Sort {entityType}</Text>
                 {[
                   { label: "Newest First", value: "latest" },
-                  // 🚀 UPDATED: Score sorting now applies to BOTH Dealers and Distributors
                   ...(entityType === "Dealers" || entityType === "Distributors" ? [
                     { label: "Highest Score", value: "score_high" },
                     { label: "Lowest Score", value: "score_low" }
                   ] : []),
-                  // Farmer Specific Sorting
                   ...(entityType === "Farmers" ? [
                     { label: "Largest Land Holding", value: "land_high" },
                     { label: "Smallest Land Holding", value: "land_low" }
@@ -169,7 +163,17 @@ export const FilterModal: React.FC<FilterModalProps> = ({ visible, entityType, c
               <View style={styles.divider} />
               <Text style={[styles.sectionLabel, { marginBottom: 0 }]}>Filter Parameters</Text>
 
-              {/* --- DEALER FILTERS --- */}
+              {/* 🚀 New Completion Status applied to all entity types */}
+              <FilterAccordionGroup 
+                title="Completion Status" 
+                selectedValues={localFilters.completionStatus} 
+                onToggleItem={(val) => toggleFilter('completionStatus', val)}
+                options={[
+                  { label: "Completed Profiles", value: "Completed" },
+                  { label: "Incomplete (Drafts)", value: "Incomplete" }
+                ]} 
+              />
+
               {entityType === "Dealers" && (
                 <>
                   <FilterAccordionGroup 
@@ -224,7 +228,6 @@ export const FilterModal: React.FC<FilterModalProps> = ({ visible, entityType, c
                 </>
               )}
 
-              {/* --- 🚀 DISTRIBUTOR FILTERS --- */}
               {entityType === "Distributors" && (
                 <>
                   <FilterAccordionGroup 
@@ -259,7 +262,6 @@ export const FilterModal: React.FC<FilterModalProps> = ({ visible, entityType, c
                 </>
               )}
 
-              {/* --- FARMER FILTERS --- */}
               {entityType === "Farmers" && (
                 <>
                   <FilterAccordionGroup 
@@ -312,13 +314,11 @@ export const FilterModal: React.FC<FilterModalProps> = ({ visible, entityType, c
                   />
                 </>
               )}
-
             </ScrollView>
 
             <View style={styles.footer}>
               <Button label={`Apply Settings`} onPress={() => { onApply(localFilters); onClose(); }} />
             </View>
-
           </View>
         </View>
       </KeyboardAvoidingView>
@@ -340,14 +340,12 @@ const styles = StyleSheet.create({
   sectionBlock: { marginTop: spacing.sm },
   sectionLabel: { fontSize: 12, fontWeight: "800", color: colors.textMuted, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: spacing.sm },
   
-  // Radio Styles (For Sort)
   radioRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 12 },
   radio: { width: 20, height: 20, borderRadius: 10, borderWidth: 2, borderColor: colors.border, alignItems: 'center', justifyContent: 'center', marginRight: 12 },
   radioActive: { borderColor: colors.primary },
   radioDot: { width: 10, height: 10, borderRadius: 5, backgroundColor: colors.primary },
   radioLabel: { fontSize: 15, color: colors.textMuted, fontWeight: '600' },
 
-  // Accordion Styles
   accordionContainer: { borderBottomWidth: 1, borderBottomColor: colors.border },
   accordionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 16 },
   accordionTitle: { fontSize: 15, fontWeight: '700', color: colors.text },
@@ -355,7 +353,6 @@ const styles = StyleSheet.create({
   badgeText: { color: colors.primary, fontSize: 12, fontWeight: '800' },
   accordionBody: { paddingBottom: 16 },
   
-  // Checkbox Styles
   checkboxRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 10 },
   checkbox: { width: 20, height: 20, borderRadius: 4, borderWidth: 2, borderColor: colors.border, alignItems: 'center', justifyContent: 'center', marginRight: 12 },
   checkboxActive: { backgroundColor: colors.primary, borderColor: colors.primary },
