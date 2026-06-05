@@ -27,7 +27,7 @@
         "android.permission.MODIFY_AUDIO_SETTINGS"
       ],
       "package": "com.intern_skilltelligent.fieldcommander",
-      "versionCode": 2
+      "versionCode": 6
     },
     "web": {
       "favicon": "./assets/icon.png"
