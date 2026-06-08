@@ -205,7 +205,9 @@ export const DashboardScreen = ({ navigation, route }: any) => {
         (d.name || "").toLowerCase().includes(query) || 
         (d.city || "").toLowerCase().includes(query) ||
         (d.state || "").toLowerCase().includes(query) ||
-        (d.raw?.raw_data?.contactPerson || d.raw?.contactPerson || "").toLowerCase().includes(query)
+        (d.raw?.raw_data?.contactPerson || d.raw?.contactPerson || "").toLowerCase().includes(query) ||
+        // 🚀 Added phone number search for Distributors (DB & Drafts)
+        (d.raw?.contact_mobile || d.raw?.contactMobile || d.raw?.raw_data?.contactMobile || "").includes(query)
       );
     }
 
@@ -248,7 +250,9 @@ export const DashboardScreen = ({ navigation, route }: any) => {
           (d.name || "").toLowerCase().includes(query) ||
           (d.city || "").toLowerCase().includes(query) ||
           (d.state || "").toLowerCase().includes(query) ||
-          (d.raw?.contact_person || d.raw?.contactPerson || "").toLowerCase().includes(query),
+          (d.raw?.contact_person || d.raw?.contactPerson || "").toLowerCase().includes(query) ||
+          // 🚀 Added phone number search for Dealers (DB & Drafts)
+          (d.raw?.contact_mobile || d.raw?.contactMobile || "").includes(query)
       );
     }
 
@@ -301,8 +305,9 @@ export const DashboardScreen = ({ navigation, route }: any) => {
           (f.city || "").toLowerCase().includes(query) ||
           (f.state || "").toLowerCase().includes(query) ||
           (f.raw?.village || "").toLowerCase().includes(query) ||
-          (f.raw?.mobile || "").includes(query) ||
-          (f.raw?.personal_details?.fatherName || f.raw?.personalDetails?.fatherName || "").toLowerCase().includes(query)
+          (f.raw?.personal_details?.fatherName || f.raw?.personalDetails?.fatherName || "").toLowerCase().includes(query) ||
+          // 🚀 Added/Enhanced phone number search for Farmers (DB & Drafts)
+          (f.raw?.mobile || f.raw?.contactMobile || "").includes(query)
       );
     }
 
@@ -700,9 +705,10 @@ export const DashboardScreen = ({ navigation, route }: any) => {
           <TextInput
             value={searchQuery}
             onChangeText={setSearchQuery}
-            placeholder={t("Search by name or location...")}
+            // 🚀 Updated placeholder text
+            placeholder={t("Search by name, location, or phone...")}
             placeholderTextColor={colors.textMuted}
-            style={{ flex: 1, marginLeft: spacing.sm, fontSize: 15, fontWeight: "500", color: colors.text }}
+            style={{ flex: 1, marginLeft: spacing.sm, fontSize: 13, fontWeight: "500", color: colors.text }}
           />
         </View>
         <Pressable
