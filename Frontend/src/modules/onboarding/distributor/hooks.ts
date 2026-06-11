@@ -19,7 +19,7 @@ import { uploadFileToCloudinary } from "../services/cloudinaryService";
 import { supabase } from "../../../core/supabase";
 import { distributorOnboardingSchema, DistributorOnboardingValues, DISTRIBUTOR_GLS_COMMITMENTS } from "./schema";
 import { useAlertStore } from "../../../store/alertStore";
-import { saveDistributorOnboarding, mapDistributorDbToForm, updateDistributorPdfUrl } from '../services/onboardingService';
+import { saveDistributorOnboarding, mapDistributorDbToForm, updateDistributorPdfUrl, fetchProfileByMobile } from '../services/onboardingService';
 
 export function useDistributorOnboarding(navigation: any, route: any) {
   const user = useAuthStore((s) => s.user);
@@ -45,6 +45,17 @@ export function useDistributorOnboarding(navigation: any, route: any) {
     
     return {
       ...draftData,
+      // 🚀 NEW: Safely convert old string products to arrays so TagsInput works on resumed drafts!
+      turnoverPotentialUnit: draftData.turnoverPotentialUnit || 'Cr',
+      topDealers: Array.isArray(draftData.topDealers) ? draftData.topDealers.map((dealer: any) => ({
+        ...dealer,
+        products: Array.isArray(dealer.products) 
+          ? dealer.products 
+          : (typeof dealer.products === 'string' && dealer.products.trim() 
+              ? dealer.products.split(',').map((s: string) => s.trim()) 
+              : [])
+      })) : [{ name: '', address: '', contact: '', turnover: '', turnoverUnit: 'Lacs', products: [], farmersServed: '', bioExperience: '' }],
+
       appliedTerritory: Array.isArray(draftData.appliedTerritory) ? draftData.appliedTerritory : [],
       currentSuppliers: Array.isArray(draftData.currentSuppliers) ? draftData.currentSuppliers : [''],
       anxTerritories: Array.isArray(draftData.anxTerritories) ? draftData.anxTerritories.map((t: any) => ({
@@ -64,9 +75,9 @@ export function useDistributorOnboarding(navigation: any, route: any) {
     defaultValues: normalizedDraft || {
       contactDesignation: '', state: '', city: '', taluka: '', pincode: '',
       appliedTerritory: [],
-      currentSuppliers: [''],
-      bankAccounts: [{ accountName: '', accountNumber: '', bankIfsc: '', bankNameBranch: '' }],
-      topDealers: [{ name: '', address: '', contact: '', turnover: '', products: '', farmersServed: '', bioExperience: '' }],
+      currentSuppliers: [],
+      bankAccounts: [{ isActive: true, accountName: '', accountNumber: '', bankIfsc: '', bankNameBranch: '' }],
+      topDealers: [{ name: '', address: '', contact: '', turnover: '', turnoverUnit: 'Lacs', products: [], farmersServed: '', bioExperience: '' }],
       glsCommitments: [], complianceChecklist: [], documents: {},
       storageLocations: {}, 
       anxTerritories: [{ state: '', district: '', taluka: '', villages: [], cultivableArea: '', majorCrops: [] }],
@@ -78,32 +89,84 @@ export function useDistributorOnboarding(navigation: any, route: any) {
       agreementAccepted: false,
       scoreFinancial: 5, scoreReputation: 5, scoreOperations: 5, scoreDealerNetwork: 5,
       scoreTeam: 5, scorePortfolio: 5, scoreExperience: 5, scoreGrowth: 5,
-      coldChainFacility: 'No'
+      coldChainFacility: ""
     },
     mode: 'onChange'
   });
 
-  const { watch } = form;
+  const { watch, reset } = form;
   const values = watch();
 
-  // 🚀 DB CRUD: Direct Save Function
-  const saveDraftToDB = async () => {
+  // 🚀 NEW: Auto-Fetch tracking states
+  const mobileNumber = watch('contactMobile');
+  const [isFetchingProfile, setIsFetchingProfile] = useState(false);
+  const [fetchedRecordId, setFetchedRecordId] = useState<string | undefined>(undefined);
+  const [isLocked, setIsLocked] = useState(editData?.status === 'SUBMITTED');
+
+  useEffect(() => {
+    const fetchExistingProfile = async () => {
+      if (editData || draftData || mobileNumber?.length !== 10) return;
+      setIsFetchingProfile(true);
+      try {
+        const existingProfile = await fetchProfileByMobile('distributor', mobileNumber); 
+        if (existingProfile) {
+          useAlertStore.getState().showAlert("Profile Found", "An existing profile was found and has been loaded.");
+          if (existingProfile.source === 'draft') {
+            reset(existingProfile.data.draft_data);
+            draftIdRef.current = existingProfile.data.entity_id;
+            setStep(existingProfile.data.current_step || 1);
+            setIsLocked(false); 
+          } else {
+            const mappedData = mapDistributorDbToForm(existingProfile.data);
+            reset(mappedData);
+            setFetchedRecordId(existingProfile.data.id);
+            if (existingProfile.data.status === 'SUBMITTED') setIsLocked(true); 
+          }
+        }
+      } catch (error) {
+        console.error("Failed to check existing profiles:", error);
+      } finally {
+        setIsFetchingProfile(false);
+      }
+    };
+
+    const timeout = setTimeout(fetchExistingProfile, 600);
+    return () => clearTimeout(timeout);
+  }, [mobileNumber, editData, draftData]);
+
+  // 🚀 DB CRUD: Direct Save Function (With Draft Auditing)
+  const saveDraftToDB = async (isManualSave = false) => {
     if (editData || showSuccessRef.current) return; 
     
-    const currentValues = form.getValues();
-    if (!currentValues || !currentValues.firmName || !user?.id) return; 
+    const dirtyKeys = Object.keys(form.formState.dirtyFields);
+    if (dirtyKeys.length === 0) return; // 🚀 Prevent unmount duplication
 
-    if (!draftIdRef.current) {
-      draftIdRef.current = Crypto.randomUUID(); 
+    if (fetchedRecordId) { // 🚀 Prevent drafting completed profiles
+      if (isManualSave) useAlertStore.getState().showAlert("Cannot Save Draft", "This profile is already complete. Click 'Next' to the last step and click 'Save Changes' to update it directly.");
+      return;
     }
 
+    const currentValues = form.getValues();
+    if (!currentValues || !currentValues.firmName || !currentValues.contactMobile || !user?.id) return; 
+
+    if (!draftIdRef.current) draftIdRef.current = Crypto.randomUUID(); 
+
     try {
+      const { data: existingDraft } = await supabase.from('drafts').select('update_history').eq('entity_id', draftIdRef.current).maybeSingle();
+      const history = existingDraft?.update_history || [];
+      
+      if (isManualSave && dirtyKeys.length > 0) {
+        history.push({ updated_by: user.id, updated_at: new Date().toISOString(), modified_fields: dirtyKeys });
+        form.reset(currentValues, { keepValues: true }); 
+      }
+
       await supabase.from('drafts').upsert({
         se_id: user.id,
         entity_type: 'distributor',
         entity_id: draftIdRef.current,
         draft_data: currentValues,
         current_step: step,
+        update_history: history,
         updated_at: new Date().toISOString()
       }, { onConflict: 'entity_id' });
     } catch (err) {
@@ -115,28 +178,51 @@ export function useDistributorOnboarding(navigation: any, route: any) {
   useEffect(() => {
     const subscription = AppState.addEventListener("change", async (nextAppState) => {
       if (nextAppState === "inactive" || nextAppState === "background") {
-        if (!showSuccessRef.current) await saveDraftToDB();
+        if (!showSuccessRef.current) await saveDraftToDB(false);
       }
     });
     return () => {
       subscription.remove();
-      if (!showSuccessRef.current) saveDraftToDB(); 
+      if (!showSuccessRef.current) saveDraftToDB(false); 
     };
-  }, [step]); 
+  }, [step]);
+
+  const checkRestrictions = () => {
+    const dirtyKeys = Object.keys(form.formState.dirtyFields);
+    // 🚀 FIX: Prevent blocking users if they hit submit without modifying anything
+    if (dirtyKeys.length === 0) return { pass: true, error: "", dirtyKeys: [] };
+
+    if ((editData || fetchedRecordId) && isLocked) { 
+      const allowedEdits = [
+        'contactPerson', 'contactDesignation', 'contactMobile', 'email', 'bankAccounts',
+        'scoreFinancial', 'scoreReputation', 'scoreOperations', 'scoreDealerNetwork', 'scoreTeam', 'scorePortfolio', 'scoreExperience', 'scoreGrowth',
+        'remFinancial', 'remReputation', 'remOperations', 'remDealerNetwork', 'remTeam', 'remPortfolio', 'remExperience', 'remGrowth',
+        'audioFinancial', 'audioReputation', 'audioOperations', 'audioDealerNetwork', 'audioTeam', 'audioPortfolio', 'audioExperience', 'audioGrowth', 'redFlags', 'audioRedFlags',
+        'appliedTerritory', 'turnoverPotential', 'currentSuppliers', 'proposedStatus', 'demoFarmersCommitment', 'godownCapacity', 'coldChainFacility',
+        'topDealers', 'anxTerritories', 'anxPrincipalSuppliers', 'anxChemicalProducts', 'anxBioProducts', 'anxOtherProducts', 'anxSupplierRefs', 'anxWillShareSales', 'anxGrowthVision', 'anxGrowthVisionAudio', 'securityDeposit', 'paymentProofText', 'documents', 'storageLocations', 'distributorSignature', 'seSignature'
+      ];
+      const illegalEdits = dirtyKeys.filter(k => !allowedEdits.includes(k.split('.')[0]));
+      if (illegalEdits.length > 0) return { pass: false, error: "You are only authorized to edit Contact Details, Banks, Scoring, Scope, Dealer Network, and Annexures for completed profiles.", dirtyKeys: [] };
+    }
+    return { pass: true, error: "", dirtyKeys };
+  };
 
   // 🚀 DB CRUD: Save & Exit Button
   const saveAndExit = async () => {
-    const values = form.getValues();
-    if (!values.firmName) {
-      useAlertStore.getState().showAlert("Cannot Save", "Please enter at least the Firm Name.");
-      return;
+    const check = checkRestrictions();
+    if (!check.pass) return useAlertStore.getState().showAlert("Cannot Save", check.error);
+
+    if (fetchedRecordId) {
+      return useAlertStore.getState().showAlert("Cannot Save Draft", "This profile is already complete. Click 'Next' to the last step and click 'Save Changes' to update it directly.");
     }
 
+    const values = form.getValues();
+    if (!values.firmName || !values.contactMobile) return useAlertStore.getState().showAlert("Cannot Save", "Please enter both the Firm Name and Mobile Number to save a draft.");
+
     useAlertStore.getState().showAlert("Saving...", "Syncing draft to database...");
-    await saveDraftToDB();
-    
+    await saveDraftToDB(true);
     useAlertStore.getState().hideAlert();
-    navigation.navigate("MainTabs", { screen: "Drafts" });
+    navigation.navigate("MainTabs");
   };
 
   const saveDraft = () => saveAndExit();
@@ -149,35 +235,36 @@ export function useDistributorOnboarding(navigation: any, route: any) {
     const ifscRegex = /^[A-Z]{4}0[A-Z0-9]{6}$/;
     const bankAccRegex = /^\d{9,18}$/;
     const pincodeRegex = /^\d{6}$/;
-
-    const areBanksValid = values.bankAccounts?.every(b => b.accountName && b.bankNameBranch && bankAccRegex.test(b.accountNumber || '') && ifscRegex.test(b.bankIfsc || ''));
+  
+    // 🚀 CRITICAL FIX: Prepend Array.isArray checks
+    const areBanksValid = Array.isArray(values.bankAccounts) && values.bankAccounts.every(b => b.accountName && b.bankNameBranch && bankAccRegex.test(b.accountNumber || '') && ifscRegex.test(b.bankIfsc || ''));
     const isStep1Valid = !!(values.firmName && values.firmName.length >= 2 && values.ownerName && values.ownerName.length >= 2 && values.contactPerson && values.contactPerson.length >= 2 && mobileRegex.test(values.contactMobile || '') && values.state && values.city && values.taluka && pincodeRegex.test(values.pincode || '') && values.address && values.address.length >= 5 && gstRegex.test(values.gstNumber || '') && panRegex.test(values.panNumber || '') && values.estYear && values.firmType && areBanksValid);
     
-    const isStep3Valid = !!(values.appliedTerritory?.length > 0 && values.turnoverPotential && values.currentSuppliers?.length > 0 && values.currentSuppliers.every(s => s.length >= 2) && values.proposedStatus && values.demoFarmersCommitment && values.godownCapacity && values.coldChainFacility);
+    const isStep3Valid = !!(Array.isArray(values.appliedTerritory) && values.appliedTerritory.length > 0 && values.turnoverPotential && Array.isArray(values.currentSuppliers) && values.currentSuppliers.length > 0 && values.currentSuppliers.every(s => s.length >= 2) && values.proposedStatus && values.demoFarmersCommitment && values.godownCapacity && values.coldChainFacility);
     
     const hasUploadedList = !!values.documents?.['dealer_network_list'];
-    const hasValidManualDealers = !!(values.topDealers?.length && values.topDealers.every(d => d.name && d.name.length >= 2 && d.address && d.address.length >= 2 && /^\d{10}$/.test(d.contact || '')));
+    const hasValidManualDealers = !!(Array.isArray(values.topDealers) && values.topDealers.length && values.topDealers.every(d => d.name && d.name.length >= 2 && d.address && d.address.length >= 2 && /^\d{10}$/.test(d.contact || '')));
     const isStep4Valid = hasUploadedList || hasValidManualDealers;
-
+  
     const isStep5Valid = Array.isArray(values.glsCommitments) && values.glsCommitments.length === 5; 
     
     const coreDocs = ['gst_certificate', 'pan_card', 'cancelled_cheque', 'trade_licence', 'itr_declaration', 'authorisation_letter'];
     const photoDocs = ['storage_exterior', 'storage_interior'];
-    const complianceDocs = (values.complianceChecklist || []).map((item: string) => item.replace(/[^a-zA-Z0-9]/g, '_').toLowerCase());
+    const complianceDocs = Array.isArray(values.complianceChecklist) ? values.complianceChecklist.map((item: string) => item.replace(/[^a-zA-Z0-9]/g, '_').toLowerCase()) : [];
     const allRequiredDocs = [...coreDocs, ...photoDocs, ...complianceDocs];
     const isStep7Valid = allRequiredDocs.every(key => { const doc = values.documents?.[key]; return Array.isArray(doc) ? doc.length > 0 : !!doc; }) && !!(values as any).storageLocations?.['storage_exterior'];
     
-    const validTerritories = values.anxTerritories?.length > 0 && values.anxTerritories.every(t => t.state && t.district && t.taluka && Array.isArray(t.villages) && t.villages.length > 0 && t.cultivableArea && Array.isArray(t.majorCrops) && t.majorCrops.length > 0);
-    const validSuppliers = values.anxPrincipalSuppliers?.length > 0 && values.anxPrincipalSuppliers.every(s => s.name && s.share);
-    const validProducts = (values.anxChemicalProducts?.length || 0) > 0 && (values.anxBioProducts?.length || 0) > 0 && (values.anxOtherProducts?.length || 0) > 0;
-    const validRefs = values.anxSupplierRefs?.length > 0 && values.anxSupplierRefs.every(ref => ref.name && ref.name.length >= 2 && /^\d{10}$/.test(ref.contact || ''));
+    const validTerritories = Array.isArray(values.anxTerritories) && values.anxTerritories.length > 0 && values.anxTerritories.every(t => t.state && t.district && t.taluka && Array.isArray(t.villages) && t.villages.length > 0 && t.cultivableArea && Array.isArray(t.majorCrops) && t.majorCrops.length > 0);
+    const validSuppliers = Array.isArray(values.anxPrincipalSuppliers) && values.anxPrincipalSuppliers.length > 0 && values.anxPrincipalSuppliers.every(s => s.name && s.share);
+    const validProducts = Array.isArray(values.anxChemicalProducts) && values.anxChemicalProducts.length > 0 && Array.isArray(values.anxBioProducts) && values.anxBioProducts.length > 0 && Array.isArray(values.anxOtherProducts) && values.anxOtherProducts.length > 0;
+    const validRefs = Array.isArray(values.anxSupplierRefs) && values.anxSupplierRefs.length > 0 && values.anxSupplierRefs.every(ref => ref.name && ref.name.length >= 2 && /^\d{10}$/.test(ref.contact || ''));
     const hasVision = !!values.anxGrowthVision || !!values.anxGrowthVisionAudio;
     const securityDepositVal = parseInt(values.securityDeposit || '0');
     const hasPaymentProof = securityDepositVal === 0 || (securityDepositVal > 0 && (!!values.paymentProofText || !!values.documents?.['distributor_payment_proof']));
-    const isStep8Valid = !!(validTerritories && validSuppliers && validProducts && validRefs && hasVision && hasPaymentProof);
     
+    const isStep8Valid = !!(validTerritories && validSuppliers && validProducts && validRefs && hasVision && hasPaymentProof);
     const isStep9Valid = !!(values.agreementAccepted && values.distributorSignature && values.seSignature);
-
+  
     return [
       { isValid: isStep1Valid, name: "Step 1: Basic Profile (Check PAN/GST/Bank formats)" },
       { isValid: isStep3Valid, name: "Step 3: Business Scope & Infra" },
@@ -318,6 +405,7 @@ export function useDistributorOnboarding(navigation: any, route: any) {
         <meta charset="utf-8">
         <style>
           @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap');
+          
           @page { margin: 20mm; size: A4; }
           body { font-family: 'Inter', Helvetica, Arial, sans-serif; color: #1E293B; margin: 0; padding: 0; line-height: 1.6; background-color: #FFFFFF; }
           .container { background-color: #FFFFFF; width: 100%; padding: 0; }
@@ -335,15 +423,22 @@ export function useDistributorOnboarding(navigation: any, route: any) {
           th, td { padding: 12px 16px; text-align: left; border-bottom: 1px solid #E2E8F0; vertical-align: top; }
           th { width: 35%; color: #475569; font-weight: 600; background-color: #F1F5F9; border-right: 1px solid #E2E8F0; }
           td { color: #0F172A; font-weight: 500; }
+          tr:last-child th, tr:last-child td { border-bottom: none; }
           .table-wrapper { border: 1px solid #E2E8F0; border-radius: 8px; overflow: hidden; margin-bottom: 15px; }
           .sub-heading { font-size: 15px; font-weight: 700; color: #334155; margin: 20px 0 10px 0; border-left: 4px solid #16A34A; padding-left: 10px; }
           .grid-2 { display: table; width: 100%; table-layout: fixed; margin-bottom: 15px; }
           .grid-col { display: table-cell; width: 50%; padding-right: 10px; vertical-align: top; }
+          .grid-col:last-child { padding-right: 0; padding-left: 10px; }
+          .list { margin: 0; padding-left: 20px; font-size: 14px; }
+          .list li { margin-bottom: 6px; color: #334155; }
           .pill { display: inline-block; background-color: #E2E8F0; color: #334155; padding: 4px 10px; border-radius: 15px; font-size: 12px; font-weight: 600; margin: 2px 4px 2px 0; }
           .signatures { display: table; width: 100%; margin-top: 50px; page-break-inside: avoid; }
           .sig-box { display: table-cell; width: 50%; text-align: center; }
           .sig-line { border-top: 2px solid #94A3B8; margin: 10px 60px 0; padding-top: 8px; font-weight: 800; color: #1E293B; font-size: 14px; text-transform: uppercase; }
           .empty-text { color: #94A3B8; font-style: italic; font-weight: 400; }
+          .success-badge { color: #166534; font-weight: 800; font-size: 13px; }
+          .danger-badge { color: #DC2626; font-weight: 800; font-size: 13px; }
+          .action-link { color: #2563EB; text-decoration: none; font-weight: 700; border-bottom: 1px dashed #2563EB; }
         </style>
       </head>
       <body>
@@ -371,12 +466,12 @@ export function useDistributorOnboarding(navigation: any, route: any) {
                   <th>Facility GPS Coordinates</th>
                   <td>
                     ${(data as any).storageLocations?.['storage_exterior'] 
-                      ? `<a href="http://maps.google.com/?q=${(data as any).storageLocations['storage_exterior'].lat},${(data as any).storageLocations['storage_exterior'].lng}" style="color: #2563EB; font-weight: 800; text-decoration: underline;">📍 View on Map</a><br><span style="font-size: 11px; color: #64748B;">Lat: ${(data as any).storageLocations['storage_exterior'].lat.toFixed(5)}, Lng: ${(data as any).storageLocations['storage_exterior'].lng.toFixed(5)}</span>`
+                      ? `<a href="http://maps.google.com/?q=${(data as any).storageLocations['storage_exterior'].lat},${(data as any).storageLocations['storage_exterior'].lng}" class="action-link">📍 View on Map</a><br><span style="font-size: 11px; color: #64748B;">Lat: ${(data as any).storageLocations['storage_exterior'].lat.toFixed(5)}, Lng: ${(data as any).storageLocations['storage_exterior'].lng.toFixed(5)}</span>`
                       : '<span class="empty-text">Not Captured</span>'}
                   </td>
                 </tr>
 
-                <tr><th>Contact Numbers</th><td>${data.contactMobile ? `+91 ${data.contactMobile}` : '-'}</td></tr>
+                <tr><th>Contact Numbers</th><td>${data.contactMobile ? `<span class="action-link">+91 ${data.contactMobile}</span>` : '-'}</td></tr>
                 <tr><th>Email</th><td>${data.email || '-'}</td></tr>
                 <tr><th>Firm Type & Est. Year</th><td>${data.firmType || '-'} / ${data.estYear || '-'}</td></tr>
                 <tr><th>Tax IDs</th><td><strong>GST:</strong> ${data.gstNumber || '-'}<br><strong>PAN:</strong> ${data.panNumber || '-'}</td></tr>
@@ -423,7 +518,7 @@ export function useDistributorOnboarding(navigation: any, route: any) {
                   <table>
                     <tr><th>Proposed Status</th><td><strong>${data.proposedStatus || '-'}</strong></td></tr>
                     <tr><th>Applied Territory</th><td>${data.appliedTerritory?.join(', ') || '-'}</td></tr>
-                    <tr><th>Turnover Potential</th><td>₹${data.turnoverPotential || '-'} Cr</td></tr>
+                    <tr><th>Turnover Potential</th><td>₹${data.turnoverPotential || '-'} ${data.turnoverPotentialUnit || 'Cr'}</td></tr>
                     <tr><th>Target Dealers</th><td>${data.demoFarmersCommitment || '-'}</td></tr>
                   </table>
                 </div>
@@ -445,7 +540,7 @@ export function useDistributorOnboarding(navigation: any, route: any) {
             <div class="sub-heading" style="margin-top:0;">Annexure A: Territory Coverage</div>
             <div class="table-wrapper">
               <table>
-                <tr style="background-color: #F1F5F9; font-weight: 600;"><td>#</td><td>Location (District, Taluka)</td><td>Villages</td><td>Cultivable Area</td><td>Major Crops</td></tr>
+                <tr style="background-color: #F1F5F9; font-weight: 600; color: #475569;"><td>#</td><td>Location (District, Taluka)</td><td>Villages</td><td>Cultivable Area</td><td>Major Crops</td></tr>
                 ${data.anxTerritories?.map((t, i) => `<tr><td>${i+1}</td><td><strong>${t.district}, ${t.taluka}</strong></td><td>${t.villages?.join(', ')}</td><td>${t.cultivableArea} Acres</td><td>${t.majorCrops?.join(', ')}</td></tr>`).join('') || '<tr><td colspan="5" class="empty-text">No territories defined</td></tr>'}
               </table>
             </div>
@@ -494,38 +589,35 @@ export function useDistributorOnboarding(navigation: any, route: any) {
   // 🚀 DB CRUD: Delete Draft from DB on Submit
   const submit = async () => {
     const missingSteps = validationStatus.filter(v => !v.isValid).map(v => v.name);
-    
     if (missingSteps.length > 0) {
-      useAlertStore.getState().showAlert(
-        "Missing Information", 
-        "Please complete the following sections before submitting:\n\n• " + missingSteps.join("\n• ")
-      );
+      useAlertStore.getState().showAlert("Missing Information", "Please complete the following sections before submitting:\n\n• " + missingSteps.join("\n• "));
       return; 
     }
 
     await form.handleSubmit(async (data) => {
       if (!user?.id) return useAlertStore.getState().showAlert("Error", "User session not found.");
+      
+      const check = checkRestrictions();
+      if (!check.pass) return useAlertStore.getState().showAlert("Restricted Action", check.error);
+
       setIsSubmitting(true);
       try {
-        const result = await saveDistributorOnboarding(
-          data, 
-          'SUBMITTED', 
-          scoreData.raw, 
-          scoreData.band, 
-          user.id, 
-          editData?.id
-        );
-
-        const html = generateHTML();
-        const { uri } = await Print.printToFileAsync({ html });
-        const pdfUrl = await uploadFileToCloudinary(uri, 'raw');
+        const result = await saveDistributorOnboarding(data, 'SUBMITTED', scoreData.raw, scoreData.band, user.id, editData?.id || fetchedRecordId, check.dirtyKeys);
         
-        await updateDistributorPdfUrl(result.id, pdfUrl);
-
-        // 🚀 THE FIX: Delete from Supabase Drafts table ONLY
+        // 🚀 THE FIX: IMMEDIATELY Delete draft before attempting PDF generation
         if (draftIdRef.current) {
            await supabase.from('drafts').delete().eq('entity_id', draftIdRef.current);
            draftIdRef.current = undefined; 
+        }
+        showSuccessRef.current = true; // Block auto-save logic
+
+        try {
+            const html = generateHTML();
+            const { uri } = await Print.printToFileAsync({ html });
+            const pdfUrl = await uploadFileToCloudinary(uri, 'raw');
+            await updateDistributorPdfUrl(result.id, pdfUrl);
+        } catch(pdfErr) {
+            console.log("PDF Generation/Upload Failed", pdfErr);
         }
 
         setShowSuccess(true);
@@ -541,6 +633,6 @@ export function useDistributorOnboarding(navigation: any, route: any) {
     form, step, setStep, jumpBackTo, setJumpBackTo, saveDraft, submit, 
     scoreData, handleUpload, handleAudioUpload, uploading, isSubmitting, saveAndExit,
     isNextEnabled, showSuccess, setShowSuccess, generatePDF, 
-    isEditing: !!editData 
+    isEditing: !!editData || !!fetchedRecordId, isLocked
   };
 }

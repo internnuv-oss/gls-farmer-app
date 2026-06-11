@@ -1,3 +1,4 @@
+// src/modules/onboarding/services/onboardingService.ts
 import { supabase } from "../../../core/supabase";
 import { DealerOnboardingValues } from "../dealer/schema";
 import { FarmerOnboardingValues } from "../farmer/schema";
@@ -9,19 +10,20 @@ export async function saveDealerOnboarding(
   totalScore: number,
   recommendation: string,
   seId: string,
-  existingId?: string
+  existingId?: string,
+  dirtyFields: string[] = []
 ) {
 
   const dbPayload = {
     se_id: seId,
-    primary_shop_name: payload.shopName, // Renamed column
+    primary_shop_name: payload.shopName,
     proposed_status: payload.proposedStatus,
-    contact_person: payload.owners[0]?.name || '', // Renamed column (First owner)
+    contact_person: payload.owners[0]?.name || '', 
     owners_list: payload.owners,
     contact_mobile: payload.contactMobile,
     landline_number: payload.landlineNumber,
-    primary_address: payload.address, // Renamed column
-    primary_shop_location: { // New JSONB structure
+    primary_address: payload.address, 
+    primary_shop_location: { 
       state: payload.state,
       city: payload.city,
       taluka: payload.taluka,
@@ -42,7 +44,7 @@ export async function saveDealerOnboarding(
       hasAdditionalLocations: payload.hasAdditionalLocations,
       shops: payload.additionalShops,
       godowns: payload.godowns,
-      godown_gps: payload.shopLocations?.['shop_godown'] || null // Specific GPS for godowns
+      godown_gps: payload.shopLocations?.['shop_godown'] || null
     },
     distributor_links: {
       isLinked: payload.isLinkedToDistributor,
@@ -50,7 +52,7 @@ export async function saveDealerOnboarding(
     },
     demo_farmers_data: {
       willing: payload.willingDemoFarmers,
-      media_url: payload.documents?.['demo_farmers_list'] || null, // Cloudinary link for media
+      media_url: payload.documents?.['demo_farmers_list'] || null,
       farmers: payload.demoFarmers
     },
   
@@ -92,7 +94,7 @@ export async function saveDealerOnboarding(
       redFlags: payload.redFlags,
     },
     total_score: totalScore,
-    category: recommendation, // Renamed column
+    category: recommendation,
     documents: payload.documents || {},
     annexures: {
       territories: payload.seTerritories,
@@ -118,6 +120,13 @@ export async function saveDealerOnboarding(
   let result;
   
   if (existingId) {
+    const { data: existing } = await supabase.from("dealers").select("update_history").eq("id", existingId).single();
+    
+    const history = existing?.update_history || [];
+    if (dirtyFields.length > 0) {
+      history.push({ updated_by: seId, updated_at: new Date().toISOString(), modified_fields: dirtyFields });
+      (dbPayload as any).update_history = history; 
+    }
     result = await query.update(dbPayload).eq('id', existingId).select().single();
   } else {
     result = await query.insert([dbPayload]).select().single();
@@ -128,40 +137,33 @@ export async function saveDealerOnboarding(
 }
 
 export function mapDealerDbToForm(db: any): DealerOnboardingValues {
-  // Extract distributors and linkage status from the new distributor_links JSONB column
-  const distributors = db.distributor_links?.distributors || [];
+  // 🚀 CRITICAL FIX: Safe Array Extractors
+  const distributors = Array.isArray(db.distributor_links?.distributors) ? db.distributor_links.distributors : [];
   const isLinked = db.distributor_links?.isLinked || "No";
 
-  // Reconstruct the owners array from owners_list (renamed from owners)
-  const owners = db.owners_list || [{ name: "" }];
+  const owners = Array.isArray(db.owners_list) ? db.owners_list : [{ name: "" }];
 
-  // Ensure villages within territories are treated as arrays (multiselect requirement)
-  const seTerritories = db.annexures?.territories?.map((t: any) => ({
+  const seTerritories = Array.isArray(db.annexures?.territories) ? db.annexures.territories.map((t: any) => ({
     ...t,
     village: Array.isArray(t.village) ? t.village : (t.village ? [t.village] : [])
-  })) || [{ taluka: '', village: [], cultivableArea: '', majorCrops: [] }];
+  })) : [{ taluka: '', village: [], cultivableArea: '', majorCrops: [] }];
 
-  // ---> ADDED: Safely build shopLocations without passing `null` to Zod <---
   const mappedShopLocations: Record<string, { lat: number, lng: number }> = {};
   if (db.primary_shop_location?.gps?.exterior) mappedShopLocations['shop_exterior'] = db.primary_shop_location.gps.exterior;
   if (db.primary_shop_location?.gps?.interior) mappedShopLocations['shop_interior'] = db.primary_shop_location.gps.interior;
   if (db.additional_locations?.godown_gps) mappedShopLocations['shop_godown'] = db.additional_locations.godown_gps;
 
   return {
-    // 1. Basic Info
     shopName: db.primary_shop_name || "",
     firmType: db.firm_type || "",
     estYear: db.est_year || "",
     
-    // 2. Location
     state: db.primary_shop_location?.state || "",
     city: db.primary_shop_location?.city || "",
     taluka: db.primary_shop_location?.taluka || "",
-    village: db.primary_shop_location?.village || [], 
+    village: Array.isArray(db.primary_shop_location?.village) ? db.primary_shop_location.village : (db.primary_shop_location?.village ? [db.primary_shop_location.village] : []), 
     address: db.primary_address || "",
     landmark: db.landmark || "",
-
-    // 3. GPS - Using the safely mapped object
     shopLocations: mappedShopLocations,
 
     owners: owners,
@@ -169,14 +171,13 @@ export function mapDealerDbToForm(db: any): DealerOnboardingValues {
     landlineNumber: db.landline_number || "",
     gstNumber: db.gst_number || "",
     panNumber: db.pan_number || "",
-    bankAccounts: db.bank_details || [{ accountType: '', bankName: '', bankBranch: '', accountName: '', accountNumber: '', bankIfsc: '' }],
+    // 🚀 CRITICAL FIX: Force bank array
+    bankAccounts: Array.isArray(db.bank_details) ? db.bank_details : [{ isActive: true, accountType: '', bankName: '', bankBranch: '', accountName: '', accountNumber: '', bankIfsc: '' }],
 
-    // 4. Additional Locations
     hasAdditionalLocations: db.additional_locations?.hasAdditionalLocations || "No",
-    additionalShops: db.additional_locations?.shops || [],
-    godowns: db.additional_locations?.godowns || [],
+    additionalShops: Array.isArray(db.additional_locations?.shops) ? db.additional_locations.shops : [],
+    godowns: Array.isArray(db.additional_locations?.godowns) ? db.additional_locations.godowns : [],
 
-    // 5. Scoring & Remarks
     scoreFinancial: db.scoring?.financial || 5, 
     remFinancial: db.scoring?.remarks?.financial || "",
     scoreReputation: db.scoring?.reputation || 5, 
@@ -195,7 +196,6 @@ export function mapDealerDbToForm(db: any): DealerOnboardingValues {
     remGrowth: db.scoring?.remarks?.growth || "",
     redFlags: db.scoring?.redFlags || "",
 
-    // 6. Audio Evidence
     audioFinancial: db.scoring?.audio?.financial || "",
     audioReputation: db.scoring?.audio?.reputation || "",
     audioOperations: db.scoring?.audio?.operations || "",
@@ -206,33 +206,29 @@ export function mapDealerDbToForm(db: any): DealerOnboardingValues {
     audioGrowth: db.scoring?.audio?.growth || "",
     audioRedFlags: db.scoring?.audio?.redFlags || "",
 
-    // 7. Business Linkages & Demo Farmers
     isLinkedToDistributor: isLinked,
     linkedDistributors: isLinked === 'Yes' ? (distributors.length > 0 ? distributors : [{ name: '', contact: '' }]) : [],
     proposedStatus: db.proposed_status || "",
     willingDemoFarmers: db.demo_farmers_data?.willing || "No",
-    demoFarmers: db.demo_farmers_data?.farmers || [],
+    demoFarmers: Array.isArray(db.demo_farmers_data?.farmers) ? db.demo_farmers_data.farmers : [],
 
-    // 8. Commitments, Compliance & Documents
-    glsCommitments: db.commitments?.glsCommitments || [],
-    complianceChecklist: db.commitments?.complianceChecklist || [],
+    glsCommitments: Array.isArray(db.commitments?.glsCommitments) ? db.commitments.glsCommitments : [],
+    complianceChecklist: Array.isArray(db.commitments?.complianceChecklist) ? db.commitments.complianceChecklist : [],
     documents: db.documents || {},
 
-    // 9. Annexures (SE Evaluated)
     seTerritories: seTerritories,
-    sePrincipalSuppliers: db.annexures?.principalSuppliers || [],
-    seChemicalProducts: db.annexures?.chemicalProducts || [],
-    seBioProducts: db.annexures?.bioProducts || [],
-    seOtherProducts: db.annexures?.otherProducts || [],
+    sePrincipalSuppliers: Array.isArray(db.annexures?.principalSuppliers) ? db.annexures.principalSuppliers : [],
+    seChemicalProducts: Array.isArray(db.annexures?.chemicalProducts) ? db.annexures.chemicalProducts : [],
+    seBioProducts: Array.isArray(db.annexures?.bioProducts) ? db.annexures.bioProducts : [],
+    seOtherProducts: Array.isArray(db.annexures?.otherProducts) ? db.annexures.otherProducts : [],
     seHasCreditReferences: db.annexures?.hasCreditReferences || "No",
-    seCreditReferences: db.annexures?.creditReferences || [],
-    seWillShareSales: db.annexures?.willShareSales || false,
+    seCreditReferences: Array.isArray(db.annexures?.creditReferences) ? db.annexures.creditReferences : [],
+    seWillShareSales: typeof db.annexures?.willShareSales === 'boolean' ? db.annexures.willShareSales : false,
     seGrowthVision: db.annexures?.growthVision || "",
     seGrowthVisionAudio: db.annexures?.growthVisionAudio || "",
     seSecurityDeposit: db.annexures?.securityDeposit || "",
     sePaymentProofText: db.annexures?.paymentProofText || "",
 
-    // 10. Agreement & Signatures
     agreementAccepted: true,
     dealerSignature: db.dealer_signature || "",
     seSignature: db.se_signature || "",
@@ -244,14 +240,12 @@ export async function updateDealerPdfUrl(id: string, pdfUrl: string) {
   if (error) throw error;
 }
 
-
-
 export async function saveFarmerOnboarding(
   payload: FarmerOnboardingValues,
   seId: string,
-  existingId?: string
+  existingId?: string,
+  dirtyFields: string[] = []
 ) {
-  // 1. Format dynamic arrays correctly
   const formattedPastCrops = (payload.pastCrops || []).map((c) => ({
     cropName: c.cropName,
     area: c.area,
@@ -290,7 +284,6 @@ export async function saveFarmerOnboarding(
       farmEquipments: (payload.farmEquipments || []).map((e) => (e === "Others" ? payload.otherFarmEquipment : e)),
       biofertilizer: payload.biofertilizer,
       isIntercropping: payload.isIntercropping,
-      // Filter out empty rows where user clicked "Add" but didn't type anything
       sideTrees: (payload.sideTrees || []).filter(t => t.type && t.quantity),
       cattles: (payload.cattles || []).filter(c => c.type && c.quantity),
     },
@@ -305,6 +298,12 @@ export async function saveFarmerOnboarding(
   let result;
 
   if (existingId) {
+    const { data: existing } = await supabase.from("farmers").select("update_history").eq("id", existingId).single();
+    const history = existing?.update_history || [];
+    if (dirtyFields.length > 0) {
+      history.push({ updated_by: seId, updated_at: new Date().toISOString(), modified_fields: dirtyFields });
+      (dbPayload as any).update_history = history;
+    }
     result = await query.update(dbPayload).eq("id", existingId).select("id").single();
   } else {
     result = await query.insert([dbPayload]).select("id").single();
@@ -320,17 +319,17 @@ export function mapFarmerDbToForm(db: any): FarmerOnboardingValues {
   const PREDEFINED_EQUIPMENTS = ["Mini Tractor", "Tractor", "Cultivation Equipments"];
   const PREDEFINED_INPUTS = ["DAP", "Urea", "NPK", "SSP", "MOP", "Compost"];
 
-  const dbSoil = db.farm_details?.soilType || [];
+  const dbSoil = Array.isArray(db.farm_details?.soilType) ? db.farm_details.soilType : [];
   const knownSoil = dbSoil.filter((s: string) => PREDEFINED_SOILS.includes(s));
   const otherSoil = dbSoil.find((s: string) => !PREDEFINED_SOILS.includes(s));
   if (otherSoil) knownSoil.push("Others");
 
-  const dbWater = db.farm_details?.waterSource || [];
+  const dbWater = Array.isArray(db.farm_details?.waterSource) ? db.farm_details.waterSource : [];
   const knownWater = dbWater.filter((w: string) => PREDEFINED_WATER.includes(w));
   const otherWater = dbWater.find((w: string) => !PREDEFINED_WATER.includes(w));
   if (otherWater) knownWater.push("Others");
 
-  const dbEquip = db.farm_details?.farmEquipments || [];
+  const dbEquip = Array.isArray(db.farm_details?.farmEquipments) ? db.farm_details.farmEquipments : [];
   const knownEquip = dbEquip.filter((e: string) => PREDEFINED_EQUIPMENTS.includes(e));
   const otherEquip = dbEquip.find((e: string) => !PREDEFINED_EQUIPMENTS.includes(e));
   if (otherEquip) knownEquip.push("Others");
@@ -349,7 +348,7 @@ export function mapFarmerDbToForm(db: any): FarmerOnboardingValues {
     totalLand: db.farm_details?.totalLand || "",
     irrigatedLand: db.farm_details?.irrigatedLand || "",
     rainFedLand: db.farm_details?.rainFedLand || "",
-    majorCrops: db.farm_details?.majorCrops || [],
+    majorCrops: Array.isArray(db.farm_details?.majorCrops) ? db.farm_details.majorCrops : [],
     soilType: knownSoil,
     otherSoilType: otherSoil || "",
     waterSource: knownWater,
@@ -360,10 +359,10 @@ export function mapFarmerDbToForm(db: any): FarmerOnboardingValues {
     otherFarmEquipment: otherEquip || "",
     biofertilizer: db.farm_details?.biofertilizer || "",
     isIntercropping: db.farm_details?.isIntercropping || undefined,
-    sideTrees: db.farm_details?.sideTrees || [],
-    cattles: db.farm_details?.cattles || [],
+    sideTrees: Array.isArray(db.farm_details?.sideTrees) ? db.farm_details.sideTrees : [],
+    cattles: Array.isArray(db.farm_details?.cattles) ? db.farm_details.cattles : [],
     pastCrops:
-      (db.history_details?.pastCrops || []).length > 0
+      Array.isArray(db.history_details?.pastCrops) && db.history_details.pastCrops.length > 0
         ? db.history_details.pastCrops.map((c: any) => {
             const dbInputs = Array.isArray(c.inputUsed) ? c.inputUsed : c.inputUsed ? [c.inputUsed] : [];
             const knownInputs = dbInputs.filter((i: string) => PREDEFINED_INPUTS.includes(i));
@@ -373,10 +372,10 @@ export function mapFarmerDbToForm(db: any): FarmerOnboardingValues {
               ...c,
               inputUsed: knownInputs,
               otherInputUsed: otherInputs.join(", "),
-              yieldUnit: c.yieldUnit || "Quintals",
+              yieldUnit: c.yieldUnit || "Kg",
             };
           })
-        : [{ cropName: "", area: "", areaUnit: "Acres", inputUsed: [], otherInputUsed: "", yield: "", yieldUnit: "Quintals", problemsFaced: "" }],
+        : [{ cropName: "", area: "", areaUnit: "Acres", inputUsed: [], otherInputUsed: "", yield: "", yieldUnit: "Kg", problemsFaced: "" }],
     dealerId: db.dealer_id || "",
     agreementAccepted: true,
     farmerSignature: db.farmer_signature || "",
@@ -389,20 +388,14 @@ export async function updateFarmerPdfUrl(id: string, pdfUrl: string) {
   if (error) throw error;
 }
 
-
-
-
-// ---------------------------------------------------------
-// DISTRIBUTOR ONBOARDING SERVICES
-// ---------------------------------------------------------
-
 export async function saveDistributorOnboarding(
   payload: DistributorOnboardingValues,
   status: "DRAFT" | "SUBMITTED",
   totalScore: number,
   recommendation: string,
   seId: string,
-  existingId?: string
+  existingId?: string,
+  dirtyFields: string[] = []
 ) {
   const dbPayload = {
     se_id: seId,
@@ -459,13 +452,21 @@ export async function saveDistributorOnboarding(
     business_scope: {
       appliedTerritory: payload.appliedTerritory,
       turnoverPotential: payload.turnoverPotential,
-      currentSuppliers: payload.currentSuppliers,
+      turnoverPotentialUnit: payload.turnoverPotentialUnit || 'Cr',
+      currentSuppliers: payload.currentSuppliers.filter(supplier => supplier !== 'Others'),
       demoFarmersCommitment: payload.demoFarmersCommitment,
       godownCapacity: payload.godownCapacity,
-      coldChainFacility: payload.coldChainFacility
+      coldChainFacility: payload.coldChainFacility,
+      proposed_status: payload.proposedStatus,
     },
 
-    dealer_network: payload.topDealers || [],
+    dealer_network: (payload.topDealers || []).map(dealer => {
+      const { turnoverUnit, ...rest } = dealer as any;
+      return {
+        ...rest,
+        turnover: dealer.turnover ? `${dealer.turnover} ${turnoverUnit || 'Lacs'}` : ""
+      };
+    }),
 
     commitments: {
       glsCommitments: payload.glsCommitments,
@@ -474,7 +475,6 @@ export async function saveDistributorOnboarding(
 
     documents: payload.documents || {},
     
-    // Custom handling matching the structure required for parsing mapDistributorDbToForm
     annexures: {
       territories: payload.anxTerritories,
       principalSuppliers: payload.anxPrincipalSuppliers,
@@ -491,9 +491,9 @@ export async function saveDistributorOnboarding(
     },
 
     total_score: totalScore,
-    band: recommendation, // Table schema uses 'band'
+    band: recommendation,
     status: status,
-    distributor_signature: payload.distributorSignature, // Table schema uses 'distributor_signature'
+    distributor_signature: payload.distributorSignature,
     se_signature: payload.seSignature,
     updated_at: new Date().toISOString()
   };
@@ -502,6 +502,13 @@ export async function saveDistributorOnboarding(
   let result;
 
   if (existingId) {
+    const { data: existing } = await supabase.from("distributors").select("update_history").eq("id", existingId).single();
+    
+    const history = existing?.update_history || [];
+    if (dirtyFields.length > 0) {
+      history.push({ updated_by: seId, updated_at: new Date().toISOString(), modified_fields: dirtyFields });
+      (dbPayload as any).update_history = history; 
+    }
     result = await query.update(dbPayload).eq("id", existingId).select("id").single();
   } else {
     result = await query.insert([dbPayload]).select("id").single();
@@ -531,9 +538,9 @@ export function mapDistributorDbToForm(db: any): DistributorOnboardingValues {
     panNumber: db.pan_number || "",
     estYear: db.est_year || "",
     firmType: db.firm_type || "",
-    bankAccounts: db.bank_details || [{ accountName: '', accountNumber: '', bankIfsc: '', bankNameBranch: '' }],
+    // 🚀 CRITICAL FIX: Safe Array mapping
+    bankAccounts: Array.isArray(db.bank_details) ? db.bank_details : [{ isActive: true, accountName: '', accountNumber: '', bankIfsc: '', bankNameBranch: '' }],
 
-    // Scoring & Evaluation
     scoreFinancial: db.scoring?.financial || 5,
     remFinancial: db.scoring?.remarks?.financial || "",
     audioFinancial: db.scoring?.audio?.financial || "",
@@ -561,27 +568,50 @@ export function mapDistributorDbToForm(db: any): DistributorOnboardingValues {
     redFlags: db.scoring?.redFlags || "",
     audioRedFlags: db.scoring?.audio?.redFlags || "",
 
-    // Business Scope & Infra
     appliedTerritory: Array.isArray(sourceScope.appliedTerritory) ? sourceScope.appliedTerritory : [],
     turnoverPotential: sourceScope.turnoverPotential || "",
+    turnoverPotentialUnit: sourceScope.turnoverPotentialUnit || "Cr",
     currentSuppliers: Array.isArray(sourceScope.currentSuppliers) ? sourceScope.currentSuppliers : [""],
-    proposedStatus: db.proposed_status || sourceScope.proposedStatus || "",
+    proposedStatus: db.proposed_status || sourceScope.proposed_status || sourceScope.proposedStatus || "",
     demoFarmersCommitment: sourceScope.demoFarmersCommitment || "",
     godownCapacity: sourceScope.godownCapacity || "",
     coldChainFacility: sourceScope.coldChainFacility || "No",
 
-    // Network
-    topDealers: db.dealer_network || [],
+    topDealers: Array.isArray(db.dealer_network) ? db.dealer_network.map((dealer: any) => {
+      let tAmt = dealer.turnover || "";
+      let tUnit = "Lacs";
+      
+      if (typeof tAmt === 'string') {
+        if (tAmt.endsWith(" Cr")) {
+          tAmt = tAmt.replace(" Cr", "").trim();
+          tUnit = "Cr";
+        } else if (tAmt.endsWith(" Lacs")) {
+          tAmt = tAmt.replace(" Lacs", "").trim();
+          tUnit = "Lacs";
+        }
+      }
+      
+      let parsedProducts = dealer.products;
+      if (typeof parsedProducts === 'string') {
+        parsedProducts = parsedProducts.trim() ? parsedProducts.split(',').map((s: string) => s.trim()) : [];
+      } else if (!Array.isArray(parsedProducts)) {
+        parsedProducts = [];
+      }
+      
+      return {
+        ...dealer,
+        turnover: tAmt,
+        turnoverUnit: tUnit,
+        products: parsedProducts 
+      };
+    }) : [],
 
-    // Checklists
-    glsCommitments: db.commitments?.glsCommitments || [],
-    complianceChecklist: db.commitments?.complianceChecklist || [],
+    glsCommitments: Array.isArray(db.commitments?.glsCommitments) ? db.commitments.glsCommitments : [],
+    complianceChecklist: Array.isArray(db.commitments?.complianceChecklist) ? db.commitments.complianceChecklist : [],
 
-    // Storage and Documents
     documents: db.documents || {},
     storageLocations: sourceAnnexures.storageLocations || {},
 
-    // Dynamic Annexures Arrays
     anxTerritories: Array.isArray(sourceAnnexures.territories) 
       ? sourceAnnexures.territories.map((t: any) => ({
           state: t.state || "",
@@ -614,4 +644,33 @@ export function mapDistributorDbToForm(db: any): DistributorOnboardingValues {
 export async function updateDistributorPdfUrl(id: string, pdfUrl: string) {
   const { error } = await supabase.from("distributors").update({ pdf_url: pdfUrl }).eq("id", id);
   if (error) throw error;
+}
+
+export async function fetchProfileByMobile(entityType: 'farmer' | 'dealer' | 'distributor', mobile: string) {
+  const mobileKey = entityType === 'farmer' ? 'mobile' : 'contactMobile';
+  const { data: draftData } = await supabase
+    .from('drafts')
+    .select('*')
+    .eq('entity_type', entityType)
+    .eq(`draft_data->>${mobileKey}`, mobile)
+    .order('updated_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (draftData) return { source: 'draft', data: draftData };
+
+  const tableName = entityType === 'farmer' ? 'farmers' : entityType === 'dealer' ? 'dealers' : 'distributors';
+  const dbMobileCol = entityType === 'farmer' ? 'mobile' : 'contact_mobile';
+
+  const { data: mainData } = await supabase
+    .from(tableName)
+    .select('*')
+    .eq(dbMobileCol, mobile)
+    .order('updated_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (mainData) return { source: 'db', data: mainData };
+
+  return null;
 }

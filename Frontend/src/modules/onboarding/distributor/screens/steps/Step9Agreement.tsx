@@ -8,9 +8,10 @@ import { DistributorOnboardingValues } from '../../schema';
 interface Props {
   form: UseFormReturn<DistributorOnboardingValues>;
   t: any;
+  isLocked: boolean;
 }
 
-export const Step9Agreement = ({ form, t }: Props) => {
+export const Step9Agreement = ({ form, t, isLocked }: Props) => {
   const { control, watch } = form;
 
   const renderSectionHeader = (title: string) => (
@@ -23,7 +24,7 @@ export const Step9Agreement = ({ form, t }: Props) => {
   const hasUploadedDealerList = !!watch('documents')?.['dealer_network_list'];
 
   return (
-    <View>
+    <View pointerEvents={isLocked ? "none" : "auto"} style={{ opacity: isLocked ? 0.5 : 1 }}>
       <Text style={{ fontSize: 20, fontWeight: '800', marginBottom: spacing.sm }}>{t("Distributor Agreement")}</Text>
       
       <ScrollView 
@@ -189,7 +190,7 @@ export const Step9Agreement = ({ form, t }: Props) => {
           name="distributorSignature" 
           render={({field}) => (
             <View>
-              <Text style={{ fontWeight: '700', marginBottom: spacing.sm, color: colors.text }}>{t("Signature & Stamp of Distributor *")}</Text>
+              <Text style={{ fontWeight: '700', marginBottom: spacing.sm, color: colors.text }}>{t("Signature of Distributor *")}</Text>
               <SignaturePad height={250} value={field.value} onChange={(has, data) => field.onChange(has ? data : '')} />
             </View>
           )} 

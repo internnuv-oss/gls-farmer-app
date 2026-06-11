@@ -8,9 +8,10 @@ import { useTranslation } from 'react-i18next';
 
 interface Props {
   form: UseFormReturn<DealerOnboardingValues>;
+  isLocked: boolean;
 }
 
-export const Step8Agreement = ({ form }: Props) => {
+export const Step8Agreement = ({ form, isLocked }: Props) => {
   const { control, watch } = form;
   const { t } = useTranslation();
 
@@ -21,7 +22,7 @@ export const Step8Agreement = ({ form }: Props) => {
   );
 
   return (
-    <View>
+    <View pointerEvents={isLocked ? "none" : "auto"} style={{ opacity: isLocked ? 0.5 : 1 }}>
       <Text style={{ fontSize: 20, fontWeight: '800', marginBottom: spacing.sm }}>{t("Dealer Agreement")}</Text>
       
       <ScrollView style={{ backgroundColor: '#FFFFFF', padding: spacing.md, borderRadius: radius.md, marginBottom: spacing.lg, maxHeight: 500, borderWidth: 1, borderColor: colors.border }} nestedScrollEnabled={true}>

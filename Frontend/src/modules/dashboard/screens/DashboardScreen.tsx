@@ -150,8 +150,10 @@ export const DashboardScreen = ({ navigation, route }: any) => {
       ]);
 
       const mappedDistributors = distributorsData.map((d: any) => ({
-        id: d.id, name: d.firm_name, type: "Distributor", city: d.raw_data?.city || 'N/A',
-        state: d.raw_data?.state || 'N/A', score: d.total_score || 0, raw: d, isDraft: false
+        id: d.id, name: d.firm_name, type: "Distributor", 
+        city: d.city || 'N/A', // 🚀 FIX: Directly access city and state columns
+        state: d.state || 'N/A', 
+        score: d.total_score || 0, raw: d, isDraft: false
       }));
 
       const mappedDealers = dealersData.map((d: any) => ({
@@ -480,7 +482,7 @@ export const DashboardScreen = ({ navigation, route }: any) => {
       infoBlocks = [
         { icon: 'phone', value: phone, isPhone: true },
         { icon: 'landscape', value: land ? `${land} Acres` : null, isPhone: false },
-        { icon: 'eco', value: crops, isPhone: false, translate: true },
+        { icon: 'grass', value: crops, isPhone: false, translate: true },
         { icon: 'water-drop', value: water, isPhone: false, translate: true },
       ];
     }
@@ -706,7 +708,7 @@ export const DashboardScreen = ({ navigation, route }: any) => {
             value={searchQuery}
             onChangeText={setSearchQuery}
             // 🚀 Updated placeholder text
-            placeholder={t("Search by name, location, or phone...")}
+            placeholder={t("Search by name, phone, or location...")}
             placeholderTextColor={colors.textMuted}
             style={{ flex: 1, marginLeft: spacing.sm, fontSize: 13, fontWeight: "500", color: colors.text }}
           />

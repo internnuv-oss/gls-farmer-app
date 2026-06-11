@@ -16,7 +16,7 @@ const LAND_UNITS = ["Acres", "Bigha"];
 
 // 🚀 NEW CONSTANTS
 const FARM_EQUIPMENTS = ["Mini Tractor", "Tractor", "Cultivation Equipments", "Others"];
-const BIOFERTILIZER_OPTS = ["Don't Know", "He knows", "Using"];
+const BIOFERTILIZER_OPTS = ["Don't Know", "He/She knows", "Using"];
 
 export const Step2FarmDetails = ({ control, errors, t, watch }: any) => {
   const selectedSoilType = watch('soilType') || [];
@@ -31,7 +31,7 @@ export const Step2FarmDetails = ({ control, errors, t, watch }: any) => {
       <View style={{ flexDirection: 'row', gap: spacing.sm, alignItems: 'flex-start' }}>
         <View style={{ flex: 2 }}>
           <Controller control={control} name="totalLand" render={({field}) => (
-            <Input label={t("Total Land Holding *")} value={field.value} onChangeText={field.onChange} keyboardType="numeric" error={errors.totalLand?.message} />
+            <Input label={t("Total Land Holding *")} placeholder="e.g., 15" value={field.value} onChangeText={field.onChange} keyboardType="numeric" error={errors.totalLand?.message} />
           )} />
         </View>
         <View style={{ flex: 1 }}>
@@ -44,7 +44,7 @@ export const Step2FarmDetails = ({ control, errors, t, watch }: any) => {
       <View style={{ flexDirection: 'row', gap: spacing.sm, alignItems: 'flex-start' }}>
         <View style={{ flex: 2 }}>
           <Controller control={control} name="irrigatedLand" render={({field}) => (
-            <Input label={t("Irrigated Land ")} value={field.value} onChangeText={field.onChange} keyboardType="numeric" />
+            <Input label={t("Irrigated Land ")} placeholder="e.g., 10" value={field.value} onChangeText={field.onChange} keyboardType="numeric" />
           )} />
         </View>
         <View style={{ flex: 1 }}>
@@ -55,9 +55,9 @@ export const Step2FarmDetails = ({ control, errors, t, watch }: any) => {
       </View>
 
       <View style={{ flexDirection: 'row', gap: spacing.sm, alignItems: 'flex-start' }}>
-        <View style={{ flex: 2 }}>
+      <View style={{ flex: 2 }}>
           <Controller control={control} name="rainFedLand" render={({field}) => (
-            <Input label={t("Rain-fed Land ")} value={field.value} onChangeText={field.onChange} keyboardType="numeric" />
+            <Input label={t("Rain-fed Land ")} placeholder="e.g., 5" value={field.value} onChangeText={field.onChange} keyboardType="numeric" />
           )} />
         </View>
         <View style={{ flex: 1 }}>
@@ -72,7 +72,7 @@ export const Step2FarmDetails = ({ control, errors, t, watch }: any) => {
       
       {selectedSoilType.includes('Others') && (
         <Controller control={control} name="otherSoilType" render={({field}) => (
-          <Input label={t("Specify Other Soil Type *")} value={field.value} onChangeText={field.onChange} error={errors.otherSoilType?.message} />
+          <Input label={t("Specify Other Soil Type *")} placeholder={t("e.g., Alluvial")} value={field.value} onChangeText={field.onChange} error={errors.otherSoilType?.message} />
         )} />
       )}
 
@@ -80,7 +80,7 @@ export const Step2FarmDetails = ({ control, errors, t, watch }: any) => {
       
       {selectedWaterSource.includes('Others') && (
         <Controller control={control} name="otherWaterSource" render={({field}) => (
-          <Input label={t("Specify Other Water Source *")} value={field.value} onChangeText={field.onChange} error={errors.otherWaterSource?.message} />
+          <Input label={t("Specify Other Water Source *")} placeholder={t("e.g., Spring")} value={field.value} onChangeText={field.onChange} error={errors.otherWaterSource?.message} />
         )} />
       )}
 
@@ -99,7 +99,7 @@ export const Step2FarmDetails = ({ control, errors, t, watch }: any) => {
       {/* Conditional input if 'Others' is selected in Farm Equipments */}
       {selectedEquipments.includes('Others') && (
         <Controller control={control} name="otherFarmEquipment" render={({field}) => (
-          <Input label={t("Specify Other Equipment *")} value={field.value} onChangeText={field.onChange} error={errors.otherFarmEquipment?.message} />
+          <Input label={t("Specify Other Equipment *")} placeholder={t("e.g., Harvester")} value={field.value} onChangeText={field.onChange} error={errors.otherFarmEquipment?.message} />
         )} />
       )}
 
@@ -143,7 +143,7 @@ export const Step2FarmDetails = ({ control, errors, t, watch }: any) => {
                    />
                 </View>
                 <View style={{ flex: 1 }}>
-                   <Input label={t("Qty")} keyboardType="numeric" value={tree.quantity} onChangeText={(val: string) => {
+                <Input label={t("Qty")} placeholder="e.g., 5" keyboardType="numeric" value={tree.quantity} onChangeText={(val: string) => {
                        const newTrees = [...trees];
                        newTrees[index].quantity = val;
                        field.onChange(newTrees);
@@ -185,7 +185,7 @@ export const Step2FarmDetails = ({ control, errors, t, watch }: any) => {
                    />
                 </View>
                 <View style={{ flex: 1 }}>
-                   <Input label={t("Qty")} keyboardType="numeric" value={cattle.quantity} onChangeText={(val: string) => {
+                <Input label={t("Qty")} placeholder="e.g., 10" keyboardType="numeric" value={cattle.quantity} onChangeText={(val: string) => {
                        const newList = [...cattleList];
                        newList[index].quantity = val;
                        field.onChange(newList);

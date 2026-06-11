@@ -2,7 +2,7 @@ import React from 'react';
 import { View, Text, Pressable } from 'react-native';
 import { Controller, UseFormReturn } from 'react-hook-form';
 import { MaterialIcons } from '@expo/vector-icons';
-import { Input, TextArea, SelectField, UploadTile } from '../../../../../design-system/components';
+import { Input, TextArea, SelectField, UploadTile, TagsInput } from '../../../../../design-system/components';
 import { colors, radius, spacing, shadows } from '../../../../../design-system/tokens';
 import { DistributorOnboardingValues } from '../../schema';
 
@@ -105,16 +105,66 @@ export const Step4Dealers = ({ form, uploading, handleUpload, t }: Props) => {
                   {t("Performance Metrics")}
                 </Text>
                 
-                <Controller 
-                  control={control} 
-                  name={`topDealers.${index}.turnover`} 
-                  render={({field}) => <Input label={t("Annual Turnover")} value={field.value} onChangeText={field.onChange} keyboardType="numeric" prefix="₹" suffix={t("Lacs")} placeholder="e.g. 50" />} 
-                />
+                <View style={{ flexDirection: 'row', gap: 8 }}>
+                  <View style={{ flex: 2 }}>
+                    <Controller 
+                      control={control} 
+                      name={`topDealers.${index}.turnover`} 
+                      render={({field}) => (
+                        <Input 
+                          label={t("Annual Turnover")} 
+                          value={field.value} 
+                          onChangeText={field.onChange} 
+                          keyboardType="numeric" 
+                          prefix="₹" 
+                          placeholder="e.g. 50" 
+                        />
+                      )} 
+                    />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Controller 
+                      control={control} 
+                      name={`topDealers.${index}.turnoverUnit`} 
+                      render={({field}) => (
+                        <SelectField 
+                          label={t("Unit")} 
+                          options={['Lacs', 'Cr']} 
+                          value={field.value || 'Lacs'} 
+                          onChange={field.onChange} 
+                        />
+                      )} 
+                    />
+                  </View>
+                </View>
                 
                 <Controller 
                   control={control} 
                   name={`topDealers.${index}.products`} 
-                  render={({field}) => <Input label={t("Major Products Sold")} value={field.value} onChangeText={field.onChange} placeholder={t("e.g. Urea, DAP, Seeds")} />} 
+                  render={({field}) => {
+                    // Extract exact error for this specific dealer row
+                    const dealerErrors = form.formState.errors.topDealers?.[index] as any;
+                    const errorMsg = dealerErrors?.products?.message;
+                    
+                    // Safely ensure it is an array
+                    const currentTags = Array.isArray(field.value) ? field.value : [];
+
+                    return (
+                      <TagsInput 
+                        label={t("Major Products Sold")} 
+                        value={currentTags} 
+                        // 🚀 ULTIMATE FIX: Force the array directly into the form state instead of relying on field.onChange
+                        onChange={(newTags: string[]) => {
+                          setValue(`topDealers.${index}.products`, newTags, { 
+                            shouldValidate: true, 
+                            shouldDirty: true 
+                          });
+                        }} 
+                        placeholder={t("Type and press Enter")} 
+                        error={errorMsg}
+                      />
+                    );
+                  }} 
                 />
                 
                 <Controller 
@@ -133,8 +183,8 @@ export const Step4Dealers = ({ form, uploading, handleUpload, t }: Props) => {
           ))}
 
           <Pressable 
-            // 🚀 FIX: TypeScript is happy here too because we casted topDealers
-            onPress={() => setValue('topDealers', [...topDealers, { name: '', address: '', contact: '', turnover: '', products: '', farmersServed: '', bioExperience: '' }])} 
+            // 🚀 FIX: Initialize products as [] instead of '' so TagsInput works!
+            onPress={() => setValue('topDealers', [...topDealers, { name: '', address: '', contact: '', turnover: '', turnoverUnit: 'Lacs', products: [], farmersServed: '', bioExperience: '' }])} 
             style={{ padding: 14, borderWidth: 1.5, borderStyle: 'dashed', borderColor: colors.primary, borderRadius: radius.md, alignItems: 'center', marginBottom: spacing.xl, backgroundColor: '#F8FAFC' }}
           >
             <Text style={{ color: colors.primary, fontWeight: '800', fontSize: 14 }}>+ {t("Add Another Dealer")}</Text>

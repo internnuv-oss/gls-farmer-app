@@ -19,7 +19,7 @@ import { Step8Agreement } from './steps/Step8Agreement';
 import { Step9Review } from './steps/Step9Review';
 
 export const DealerOnboardingScreen = ({ navigation, route }: any) => {
-  const { form, step, setStep, saveDraft, submit, scoreData, handleUpload, handleAudioUpload, uploading, isSubmitting, isNextEnabled, showSuccess, setShowSuccess, generatePDF, isEditing } = useDealerOnboarding(navigation, route);
+  const { form, step, setStep, saveDraft, submit, scoreData, handleUpload, handleAudioUpload, uploading, isSubmitting, isNextEnabled, showSuccess, setShowSuccess, generatePDF, isEditing, isLocked } = useDealerOnboarding(navigation, route);
   const { watch } = form;
   const [jumpBackTo, setJumpBackTo] = React.useState<number | null>(null);
   const { t } = useTranslation();
@@ -147,14 +147,14 @@ export const DealerOnboardingScreen = ({ navigation, route }: any) => {
         </View>
       }
     >
-      {step === 1 && <Step1BasicInfo form={form} cities={cities} talukas={talukas} villages={villages} loadingLoc={loadingLoc} />}
+      {step === 1 && <Step1BasicInfo form={form} cities={cities} talukas={talukas} villages={villages} loadingLoc={loadingLoc} isEditing={isEditing} isLocked={isLocked} />}
       {step === 2 && <Step2Profiling form={form} scoreData={scoreData} uploading={uploading} handleAudioUpload={handleAudioUpload} getCategoryBg={getCategoryBg} getCategoryColor={getCategoryColor} />}
       {step === 3 && <Step3Business form={form} uploading={uploading} handleUpload={handleUpload} />}
-      {step === 4 && <Step4Commitments form={form} />}
-      {step === 5 && <Step5Compliance form={form} />}
+      {step === 4 && <Step4Commitments form={form} isLocked={isLocked} />}
+      {step === 5 && <Step5Compliance form={form} isLocked={isLocked} />}
       {step === 6 && <Step6Documents form={form} uploading={uploading} handleUpload={handleUpload} />}
       {step === 7 && <Step7Annexures form={form} uploading={uploading} handleAudioUpload={handleAudioUpload} handleUpload={handleUpload} WEST_INDIA_CROPS={WEST_INDIA_CROPS} DEMO_SUPPLIERS={DEMO_SUPPLIERS} DEMO_CHEMICALS={DEMO_CHEMICALS} DEMO_BIOS={DEMO_BIOS} DEMO_OTHERS={DEMO_OTHERS} talukas={talukas} stateData={stateData} selectedCity={selectedCity} />}
-      {step === 8 && <Step8Agreement form={form} />}
+      {step === 8 && <Step8Agreement form={form} isLocked={isLocked} />}
       {step === 9 && <Step9Review form={form} scoreData={scoreData} setJumpBackTo={setJumpBackTo} setStep={setStep} getCategoryColor={getCategoryColor} />}
     </WizardFlowTemplate>
   );

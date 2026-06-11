@@ -1,3 +1,5 @@
+// Frontend/src/modules/onboarding/farmer/screens/steps/Step1PersonalDetails.tsx
+
 import React, { useState, useEffect } from 'react';
 import { View, Text, Pressable, ActivityIndicator, Image } from 'react-native';
 import { Controller } from 'react-hook-form';
@@ -24,7 +26,7 @@ const GUJARAT_DISTRICTS = [
   "Patan", "Porbandar", "Rajkot", "Sabarkantha", "Surat", "Surendranagar", "Tapi", "Vadodara", "Valsad"
 ];
 
-export const Step1PersonalDetails = ({ control, errors, t, watch, setValue, uploading, handleUpload }: any) => {
+export const Step1PersonalDetails = ({ control, errors, t, watch, setValue, uploading, handleUpload, isLocked }: any) => {
   const profilePhoto = watch('profilePhoto');
   
   // 🚀 Watch all three levels to trigger cascading effects
@@ -136,12 +138,12 @@ export const Step1PersonalDetails = ({ control, errors, t, watch, setValue, uplo
         </Text>
       </View>
 
-      <Controller control={control} name="fullName" render={({field}) => <Input label={t("Farmer Full Name *")} value={field.value} onChangeText={field.onChange} error={errors.fullName?.message} />} />
-      <Controller control={control} name="fatherName" render={({field}) => <Input label={t("Father/Husband Name *")} value={field.value} onChangeText={field.onChange} error={errors.fatherName?.message} />} />
-      <Controller control={control} name="mobile" render={({field}) => <Input label={t("Mobile Number *")} value={field.value} onChangeText={field.onChange} keyboardType="phone-pad" maxLength={10} prefix="+91" error={errors.mobile?.message} />} />
-      <Controller control={control} name="alternateMobile" render={({field}) => <Input label={t("Alternate Mobile Number (Optional)")} value={field.value} onChangeText={field.onChange} keyboardType="phone-pad" maxLength={10} prefix="+91" />} />
-      
-      {/* 🚀 Dynamic Cascading Dropdowns */}
+      <Controller control={control} name="mobile" render={({field}) => <Input label={t("Mobile Number *")} placeholder="9876543210" value={field.value} onChangeText={field.onChange} keyboardType="phone-pad" maxLength={10} prefix="+91" error={errors.mobile?.message} />} />
+      <Controller control={control} name="alternateMobile" render={({field}) => <Input label={t("Alternate Mobile Number (Optional)")} placeholder="9876543210" value={field.value} onChangeText={field.onChange} keyboardType="phone-pad" maxLength={10} prefix="+91" />} />
+      <View pointerEvents={isLocked ? "none" : "auto"} style={{ opacity: isLocked ? 0.5 : 1 }}>
+        <Controller control={control} name="fullName" render={({field}) => <Input label={t("Farmer Full Name *")} placeholder={t("e.g., Ramesh Patel")} value={field.value} onChangeText={field.onChange} error={errors.fullName?.message} />} />
+        <Controller control={control} name="fatherName" render={({field}) => <Input label={t("Father/Husband Name *")} placeholder={t("e.g., Suresh Patel")} value={field.value} onChangeText={field.onChange} error={errors.fatherName?.message} />} />
+        {/* 🚀 Dynamic Cascading Dropdowns */}
       <Controller 
         control={control} 
         name="state" 
@@ -239,7 +241,8 @@ export const Step1PersonalDetails = ({ control, errors, t, watch, setValue, uplo
         <Controller control={control} name="village" render={({field}) => <Input label={t("Village *")} value={field.value} onChangeText={field.onChange} error={errors.village?.message} />} />
       )}
 
-      <Controller control={control} name="pincode" render={({field}) => <Input label={t("Pincode (Optional)")} value={field.value} onChangeText={field.onChange} keyboardType="numeric" maxLength={6} error={errors.pincode?.message} />} />
+      <Controller control={control} name="pincode" render={({field}) => <Input label={t("Pincode (Optional)")} placeholder="e.g., 390001" value={field.value} onChangeText={field.onChange} keyboardType="numeric" maxLength={6} error={errors.pincode?.message} />} />
+      </View>
     </View>
   );
 };

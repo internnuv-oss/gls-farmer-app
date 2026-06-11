@@ -1,3 +1,4 @@
+// src/modules/onboarding/distributor/screens/DistributorOnboardingScreen.tsx
 import React from 'react';
 import { View, BackHandler } from 'react-native';
 import { useTranslation } from 'react-i18next';
@@ -20,10 +21,11 @@ import { Step10Review } from './steps/Step10Review';
 export const DistributorOnboardingScreen = ({ navigation, route }: any) => {
   const { t } = useTranslation();
   
+  // 🚀 FIX: Destructure isLocked from the hook, NOT from component props
   const { 
     form, step, setStep, jumpBackTo, setJumpBackTo, saveDraft, submit, 
     scoreData, handleUpload, handleAudioUpload, uploading, isSubmitting, 
-    isNextEnabled, showSuccess, setShowSuccess, generatePDF, isEditing 
+    isNextEnabled, showSuccess, setShowSuccess, generatePDF, isEditing, isLocked 
   } = useDistributorOnboarding(navigation, route);
 
   React.useEffect(() => {
@@ -67,15 +69,15 @@ export const DistributorOnboardingScreen = ({ navigation, route }: any) => {
 
   const renderCurrentStep = () => {
     switch (step) {
-      case 1: return <Step1BasicInfo form={form} t={t} />;
+      case 1: return <Step1BasicInfo form={form} t={t} isEditing={isEditing} isLocked={isLocked} />;
       case 2: return <Step2Scoring form={form} scoreData={scoreData} uploading={uploading} handleAudioUpload={handleAudioUpload} t={t} />;
       case 3: return <Step3Business form={form} t={t} />;
       case 4: return <Step4Dealers form={form} uploading={uploading} handleUpload={handleUpload} t={t} />;
-      case 5: return <Step5Commitments form={form} t={t} />;
-      case 6: return <Step6Regulatory form={form} t={t} />;
+      case 5: return <Step5Commitments form={form} t={t} isLocked={isLocked} />;
+      case 6: return <Step6Regulatory form={form} t={t} isLocked={isLocked} />;
       case 7: return <Step7Documents form={form} uploading={uploading} handleUpload={handleUpload} t={t} />;
       case 8: return <Step8Annexures form={form} uploading={uploading} handleAudioUpload={handleAudioUpload} handleUpload={handleUpload} setStep={setStep} t={t} />;
-      case 9: return <Step9Agreement form={form} t={t} />;
+      case 9: return <Step9Agreement form={form} t={t} isLocked={isLocked} />;
       case 10: return <Step10Review form={form} scoreData={scoreData} setStep={setStep} setJumpBackTo={setJumpBackTo} t={t} />;
       default: return null;
     }

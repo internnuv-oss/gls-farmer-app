@@ -18,7 +18,7 @@ export const FarmerOnboardingScreen = ({ navigation, route }: any) => {
   const { 
     form, step, setStep, jumpBackTo, setJumpBackTo, saveDraft, submit, isSubmitting, 
     isNextEnabled, showSuccess, setShowSuccess, dealers, 
-    isEditing, generatePDF, uploading, handleUpload // 🚀 Extracting uploading & handleUpload
+    isEditing, generatePDF, uploading, handleUpload, isLocked // 🚀 Extracting uploading & handleUpload
   } = useFarmerOnboarding(navigation, route);
   
   const { control, formState: { errors } ,watch, setValue} = form;
@@ -97,10 +97,10 @@ export const FarmerOnboardingScreen = ({ navigation, route }: any) => {
       }
     >
       {/* 🚀 Pass uploading and handleUpload down */}
-      {step === 1 && <Step1PersonalDetails control={control} errors={errors} t={t} watch={watch} setValue={setValue} uploading={uploading} handleUpload={handleUpload} />}
-      {step === 2 && <Step2FarmDetails control={control} errors={errors} t={t} watch={watch} />}
-      {step === 3 && <Step3History control={control} errors={errors} t={t} dealers={dealers} watch={watch} />}
-      {step === 4 && <Step4Signatures control={control} t={t} />}
+      {step === 1 && <Step1PersonalDetails control={control} errors={errors} t={t} watch={watch} setValue={setValue} uploading={uploading} handleUpload={handleUpload} isLocked={isLocked} />}
+      {step === 2 && <Step2FarmDetails control={control} errors={errors} t={t} watch={watch} isLocked={isLocked} />}
+      {step === 3 && <Step3History control={control} errors={errors} t={t} dealers={dealers} watch={watch} isLocked={isLocked} />}
+      {step === 4 && <Step4Signatures control={control} t={t} isLocked={isLocked} />}
       {step === 5 && <Step5Review form={form} setStep={setStep} setJumpBackTo={setJumpBackTo} dealers={dealers} t={t} />}
     </WizardFlowTemplate>
   );

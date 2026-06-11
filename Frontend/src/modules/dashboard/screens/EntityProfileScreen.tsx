@@ -1,3 +1,4 @@
+// src/modules/dashboard/screens/EntityProfileScreen.tsx
 import React, { useState } from 'react';
 import { View, Text, Alert, Pressable, ActivityIndicator, Modal, Image, Platform, ScrollView, Linking } from 'react-native';
 import { useTranslation } from 'react-i18next';
@@ -15,12 +16,11 @@ import { colors, radius, spacing, shadows } from '../../../design-system/tokens'
 import { useAlertStore } from '../../../store/alertStore';
 
 const SectionCard = ({ title, icon, children }: { title: string, icon?: any, children: React.ReactNode }) => {
-  const { t } = useTranslation(); // 🚀 Added hook
+  const { t } = useTranslation();
   return (
     <View style={{ backgroundColor: colors.surface, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.border, ...shadows.soft, padding: spacing.lg, marginBottom: spacing.lg }}>
       <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: spacing.lg, borderBottomWidth: 1, borderBottomColor: colors.border, paddingBottom: spacing.sm }}>
         {icon && <MaterialIcons name={icon} size={22} color={colors.primary} style={{ marginRight: 8 }} />}
-        {/* 🚀 Wrapped title in t() */}
         <Text style={{ fontSize: 16, fontWeight: '900', color: colors.primary }}>{t(title)}</Text>
       </View>
       {children}
@@ -29,13 +29,12 @@ const SectionCard = ({ title, icon, children }: { title: string, icon?: any, chi
 };
 
 const DetailRow = ({ label, value, isVertical = false }: { label: string, value: any, isVertical?: boolean }) => {
-  const { t } = useTranslation(); // 🚀 Added hook
+  const { t } = useTranslation();
   const displayValue = (!value || value === '' || (Array.isArray(value) && value.length === 0)) ? t('N/A') : value;
   
   if (isVertical) {
     return (
       <View style={{ marginBottom: spacing.md }}>
-        {/* 🚀 Wrapped label in t() */}
         <Text style={{ color: colors.textMuted, fontWeight: '700', marginBottom: 4 }}>{t(label)}</Text>
         <View>{typeof displayValue === 'string' ? <Text style={{ color: colors.text, fontWeight: '600', lineHeight: 20 }}>{displayValue}</Text> : displayValue}</View>
       </View>
@@ -44,7 +43,6 @@ const DetailRow = ({ label, value, isVertical = false }: { label: string, value:
 
   return (
     <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: spacing.md }}>
-      {/* 🚀 Wrapped label in t() */}
       <Text style={{ color: colors.textMuted, fontWeight: '700', flex: 1, marginRight: spacing.sm }}>{t(label)}</Text>
       <View style={{ flex: 1.5, alignItems: 'flex-end' }}>
         {typeof displayValue === 'string' ? <Text style={{ color: colors.text, fontWeight: '800', textAlign: 'right' }}>{displayValue}</Text> : displayValue}
@@ -54,7 +52,7 @@ const DetailRow = ({ label, value, isVertical = false }: { label: string, value:
 };
 
 const PillList = ({ items, align = 'flex-end' }: { items: any[], align?: 'flex-start' | 'flex-end' | 'center' }) => {
-  const { t } = useTranslation(); // 🚀 Added hook
+  const { t } = useTranslation();
   if (!items || items.length === 0) return <Text style={{ color: colors.text, fontWeight: '800' }}>{t('N/A')}</Text>;
   return (
     <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, justifyContent: align }}>
@@ -137,28 +135,15 @@ const ActionablePhone = ({ phone }: { phone: string }) => {
   );
 };
 
-const ActionableMap = ({ lat, lng, label }: { lat: number, lng: number, label: string }) => {
-  return (
-    <Pressable onPress={() => Linking.openURL(`https://maps.google.com/?q=${lat},${lng}`)} style={{ flexDirection: 'row', alignItems: 'center' }}>
-      <Text style={{ color: colors.primary, fontWeight: '800', marginRight: 6, textDecorationLine: 'underline' }}>{label}</Text>
-      <MaterialIcons name="map" size={16} color={colors.primary} />
-    </Pressable>
-  );
-};
-
 export const EntityProfileScreen = ({ navigation, route }: any) => {
   const { t } = useTranslation();
   const insets = useSafeAreaInsets();
   const { entity } = route.params;
   const raw = entity.raw; 
   
-  // Distinguish Entity Type
   const isDealer = entity.type === 'Dealer';
   const isFarmer = entity.type === 'Farmer';
   const isDistributor = entity.type === 'Distributor';
-  
-  // Safe extraction for Distributor Data which is stored entirely inside raw_data
-  const distData = isDistributor ? (raw.raw_data || {}) : {};
 
   const [refreshing, setRefreshing] = useState(false);
   const [downloading, setDownloading] = useState(false);
@@ -177,7 +162,6 @@ export const EntityProfileScreen = ({ navigation, route }: any) => {
   const ScoreRow = ({ label, score, remark, audio }: any) => (
     <View style={{ marginBottom: spacing.md, paddingBottom: spacing.sm, borderBottomWidth: 1, borderBottomColor: '#F1F5F9' }}>
       <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
-        {/* 🚀 Wrapped label in t() */}
         <Text style={{ color: colors.text, fontWeight: '700', fontSize: 14 }}>{t(label)}</Text>
         <Text style={{ color: getScoreColor(score), fontWeight: '900', fontSize: 16 }}>{score}/10</Text>
       </View>
@@ -195,14 +179,12 @@ export const EntityProfileScreen = ({ navigation, route }: any) => {
     if (isFarmer) {
       navigation.navigate("FarmerOnboarding", { editData: raw });
     } else if (isDistributor) {
-      // 🚀 FIXED: Now passing editData exactly like the others to trigger UPDATE instead of INSERT
       navigation.navigate("DistributorOnboarding", { editData: raw }); 
     } else {
       navigation.navigate("DealerOnboarding", { editData: raw });
     }
   };
 
-  // --- PDF & FILE VIEWING LOGIC --- //
   const downloadFile = async (url: string, defaultFileName: string) => {
     setDownloading(true);
     try {
@@ -240,7 +222,7 @@ export const EntityProfileScreen = ({ navigation, route }: any) => {
   const getEntityName = () => {
     if (entity.type === 'Dealer') return raw.primary_shop_name;
     if (entity.type === 'Farmer') return raw.full_name;
-    return raw.firm_name; // Distributor
+    return raw.firm_name; 
   };
 
   const handleDownloadPDF = () => {
@@ -313,16 +295,11 @@ export const EntityProfileScreen = ({ navigation, route }: any) => {
     }
   };
 
-  // Extract shared variables
-  const dealerBanks = raw.bank_details || [];
-  const distBanks = distData.bankAccounts || [];
-  const banks = isDistributor ? distBanks : dealerBanks;
-
+  const banks = Array.isArray(raw.bank_details) ? raw.bank_details : [];
   const annexures = raw.annexures || {};
-  const scoring = isDistributor ? (distData || {}) : (raw.scoring || {});
-  
-  // Safe extraction for documents
-  const documents = isDealer ? raw.documents : isDistributor ? distData.documents : {};
+  const scoring = raw.scoring || {};
+  const businessScope = raw.business_scope || {}; // 🚀 ADD THIS LINE
+  const documents = raw.documents || {};
 
   return (
     <SimpleScreenTemplate 
@@ -335,7 +312,6 @@ export const EntityProfileScreen = ({ navigation, route }: any) => {
           <Pressable onPress={() => setMenuVisible(true)} style={{ padding: spacing.xs, marginRight: -spacing.sm }}>
             <MaterialIcons name="more-vert" size={28} color={colors.text} />
           </Pressable>
-
           <Modal visible={menuVisible} transparent animationType="fade" onRequestClose={() => setMenuVisible(false)}>
             <Pressable style={{ flex: 1 }} onPress={() => setMenuVisible(false)}>
               <View style={{ position: 'absolute', top: Math.max(insets.top, 24) + 45, right: spacing.lg, backgroundColor: colors.surface, borderRadius: radius.md, borderWidth: 1, borderColor: colors.border, width: 170, ...shadows.medium, elevation: 5 }}>
@@ -398,12 +374,12 @@ export const EntityProfileScreen = ({ navigation, route }: any) => {
                 {isDealer 
                   ? (raw.primary_shop_location?.city && raw.primary_shop_location?.state ? `${raw.primary_shop_location.city}, ${raw.primary_shop_location.state}` : 'N/A')
                   : isDistributor
-                  ? (distData.city && distData.state ? `${distData.city}, ${distData.state}` : 'N/A')
+                  ? (raw.city && raw.state ? `${raw.city}, ${raw.state}` : 'N/A')
                   : (raw.personal_details?.city && raw.personal_details?.state ? `${raw.personal_details.city}, ${raw.personal_details.state}` : 'N/A')}
               </Text>
             </View>
             
-            {/* Interactive Map Button - DEALERS ONLY */}
+            {/* Interactive Map Button */}
             {isDealer && raw.primary_shop_location?.gps?.exterior?.lat ? (
               <Pressable onPress={() => Linking.openURL(`https://maps.google.com/?q=${raw.primary_shop_location.gps.exterior.lat},${raw.primary_shop_location.gps.exterior.lng}`)} style={{ flexDirection: 'row', alignItems: 'center', marginTop: 8, backgroundColor: '#EFF6FF', paddingHorizontal: 10, paddingVertical: 4, borderRadius: radius.pill, borderWidth: 1, borderColor: '#BFDBFE' }}>
                 <MaterialIcons name="map" size={14} color="#2563EB" style={{ marginRight: 4 }} />
@@ -418,8 +394,8 @@ export const EntityProfileScreen = ({ navigation, route }: any) => {
         {isDealer ? (
           <>
             {/* --- 1. BUSINESS PROFILE (DEALER) --- */}
-            <SectionCard title={t("1. Business Profile") }icon="business-center">
-              <DetailRow label={t("Primary Shop Name")} value={raw.primary_shop_name} />
+            <SectionCard title="1. Business Profile" icon="business-center">
+              <DetailRow label="Primary Shop Name" value={raw.primary_shop_name} />
               <DetailRow label="Contact Person" value={raw.contact_person} />
               <DetailRow label="Owner(s) / Partner(s)" value={<PillList items={raw.owners_list || []} />} />
               <DetailRow label="Mobile Number" value={raw.contact_mobile ? <ActionablePhone phone={raw.contact_mobile} /> : ''} />
@@ -466,7 +442,10 @@ export const EntityProfileScreen = ({ navigation, route }: any) => {
 
             {/* --- 4. BUSINESS INFRA & STATUS --- */}
             <SectionCard title="4. Business Infrastructure" icon="store">
-              <DetailRow label="Proposed Status" value={raw.proposed_status} />
+            <DetailRow 
+                label="Proposed Status" 
+                value={raw.proposed_status || raw.business_scope?.proposed_status || raw.business_scope?.proposedStatus} 
+              />
               <DetailRow label="Willing Demo Farmers" value={raw.demo_farmers_data?.willing} />
               
               <Text style={{ color: colors.textMuted, fontWeight: '700', marginTop: spacing.md, marginBottom: spacing.sm }}>Linked Distributors:</Text>
@@ -545,17 +524,17 @@ export const EntityProfileScreen = ({ navigation, route }: any) => {
           <>
             {/* --- 1. BUSINESS PROFILE (DISTRIBUTOR) --- */}
             <SectionCard title="1. Business Profile" icon="domain">
-              <DetailRow label="Firm Name" value={distData.firmName} />
-              <DetailRow label="Owner Name" value={distData.ownerName} />
-              <DetailRow label="Contact Person" value={`${distData.contactPerson} (${distData.contactDesignation})`} />
-              <DetailRow label="Mobile Number" value={distData.contactMobile ? <ActionablePhone phone={distData.contactMobile} /> : ''} />
-              <DetailRow label="Email ID" value={distData.email} />
-              <DetailRow label="Address" value={distData.address} isVertical />
-              <DetailRow label="Location" value={`${distData.taluka}, ${distData.city}, ${distData.state} - ${distData.pincode}`} />
-              <DetailRow label="Firm Type" value={distData.firmType} />
-              <DetailRow label="Established Year" value={distData.estYear} />
-              <DetailRow label="GST Number" value={distData.gstNumber} />
-              <DetailRow label="PAN Number" value={distData.panNumber} />
+              <DetailRow label="Firm Name" value={raw.firm_name} />
+              <DetailRow label="Owner Name" value={raw.owner_name} />
+              <DetailRow label="Contact Person" value={`${raw.contact_person} (${raw.contact_designation})`} />
+              <DetailRow label="Mobile Number" value={raw.contact_mobile ? <ActionablePhone phone={raw.contact_mobile} /> : ''} />
+              <DetailRow label="Email ID" value={raw.email} />
+              <DetailRow label="Address" value={raw.address} isVertical />
+              <DetailRow label="Location" value={`${raw.taluka}, ${raw.city}, ${raw.state} - ${raw.pincode}`} />
+              <DetailRow label="Firm Type" value={raw.firm_type} />
+              <DetailRow label="Established Year" value={raw.est_year} />
+              <DetailRow label="GST Number" value={raw.gst_number} />
+              <DetailRow label="PAN Number" value={raw.pan_number} />
             </SectionCard>
 
             {/* --- 2. BANK DETAILS --- */}
@@ -573,39 +552,48 @@ export const EntityProfileScreen = ({ navigation, route }: any) => {
 
             {/* --- 3. PROFILING & EVALUATION --- */}
             <SectionCard title="3. Profiling & Evaluation" icon="assignment-turned-in">
-              <ScoreRow label="Financial Health" score={scoring.scoreFinancial || 0} remark={scoring.remFinancial} audio={scoring.audioFinancial} />
-              <ScoreRow label="Market Reputation" score={scoring.scoreReputation || 0} remark={scoring.remReputation} audio={scoring.audioReputation} />
-              <ScoreRow label="Operations & Infra" score={scoring.scoreOperations || 0} remark={scoring.remOperations} audio={scoring.audioOperations} />
-              <ScoreRow label="Dealer Network" score={scoring.scoreDealerNetwork || 0} remark={scoring.remDealerNetwork} audio={scoring.audioDealerNetwork} />
-              <ScoreRow label="Team & Professionalism" score={scoring.scoreTeam || 0} remark={scoring.remTeam} audio={scoring.audioTeam} />
-              <ScoreRow label="Portfolio Alignment" score={scoring.scorePortfolio || 0} remark={scoring.remPortfolio} audio={scoring.audioPortfolio} />
-              <ScoreRow label="Experience" score={scoring.scoreExperience || 0} remark={scoring.remExperience} audio={scoring.audioExperience} />
-              <ScoreRow label="Growth Orientation" score={scoring.scoreGrowth || 0} remark={scoring.remGrowth} audio={scoring.audioGrowth} />
+              <ScoreRow label="Financial Health" score={scoring.financial || 0} remark={scoring.remarks?.financial} audio={scoring.audio?.financial} />
+              <ScoreRow label="Market Reputation" score={scoring.reputation || 0} remark={scoring.remarks?.reputation} audio={scoring.audio?.reputation} />
+              <ScoreRow label="Operations & Infra" score={scoring.operations || 0} remark={scoring.remarks?.operations} audio={scoring.audio?.operations} />
+              <ScoreRow label="Dealer Network" score={scoring.dealerNetwork || 0} remark={scoring.remarks?.dealerNetwork} audio={scoring.audio?.dealerNetwork} />
+              <ScoreRow label="Team & Professionalism" score={scoring.team || 0} remark={scoring.remarks?.team} audio={scoring.audio?.team} />
+              <ScoreRow label="Portfolio Alignment" score={scoring.portfolio || 0} remark={scoring.remarks?.portfolio} audio={scoring.audio?.portfolio} />
+              <ScoreRow label="Experience" score={scoring.experience || 0} remark={scoring.remarks?.experience} audio={scoring.audio?.experience} />
+              <ScoreRow label="Growth Orientation" score={scoring.growth || 0} remark={scoring.remarks?.growth} audio={scoring.audio?.growth} />
               
               <View style={{ backgroundColor: '#FEF2F2', padding: spacing.md, borderRadius: radius.md, borderWidth: 1, borderColor: '#FECACA', marginTop: spacing.sm }}>
                 <Text style={{ color: '#991B1B', fontWeight: '800', marginBottom: 4 }}>Red Flags Noted:</Text>
-                <Text style={{ color: '#991B1B', fontWeight: '600', fontSize: 13, marginBottom: scoring.audioRedFlags ? 8 : 0 }}>{scoring.redFlags || 'None Reported'}</Text>
-                <AudioPlayer url={scoring.audioRedFlags} title="Alert Audio" />
+                <Text style={{ color: '#991B1B', fontWeight: '600', fontSize: 13, marginBottom: scoring.audio?.redFlags ? 8 : 0 }}>{scoring.redFlags || 'None Reported'}</Text>
+                <AudioPlayer url={scoring.audio?.redFlags} title="Alert Audio" />
               </View>
             </SectionCard>
 
             {/* --- 4. BUSINESS SCOPE --- */}
             <SectionCard title="4. Business Scope & Targets" icon="store">
-              <DetailRow label="Applied Territory" value={distData.appliedTerritory?.join(', ')} isVertical />
-              <DetailRow label="Turnover Potential" value={distData.turnoverPotential ? `₹${distData.turnoverPotential} Cr` : 'N/A'} />
-              <DetailRow label="Major Suppliers" value={distData.currentSuppliers?.join(', ')} isVertical />
-              <DetailRow label="Proposed Status" value={distData.proposedStatus} />
-              <DetailRow label="Target Dealers" value={distData.demoFarmersCommitment} />
-              <DetailRow label="Godown Capacity" value={distData.godownCapacity ? `${distData.godownCapacity} Sq.ft` : 'N/A'} />
-              <DetailRow label="Cold Chain Facility" value={distData.coldChainFacility} />
+              <DetailRow label="Applied Territory" value={raw.business_scope?.appliedTerritory?.join(', ')} isVertical />
+              
+              {/* 🚀 FIX: Safely pull the dynamic potential value and unit from the business_scope column */}
+              <DetailRow 
+                label="Turnover Potential" 
+                value={raw.business_scope?.turnoverPotential ? `₹${raw.business_scope.turnoverPotential} ${raw.business_scope.turnoverPotentialUnit || 'Cr'}` : 'N/A'} 
+              />
+              
+              <DetailRow label="Major Suppliers" value={raw.business_scope?.currentSuppliers?.join(', ')} isVertical />
+              <DetailRow 
+                label="Proposed Status" 
+                value={raw.proposed_status || businessScope.proposed_status || businessScope.proposedStatus} 
+              />
+              <DetailRow label="Target Dealers" value={raw.business_scope?.demoFarmersCommitment} />
+              <DetailRow label="Godown Capacity" value={raw.business_scope?.godownCapacity ? `${raw.business_scope.godownCapacity} Sq.ft` : 'N/A'} />
+              <DetailRow label="Cold Chain Facility" value={raw.business_scope?.coldChainFacility} />
             </SectionCard>
 
             {/* --- 5. DEALER NETWORK --- */}
             <SectionCard title="5. Top Dealers" icon="groups">
-              {distData.documents?.['dealer_network_list'] ? (
+              {raw.documents?.['dealer_network_list'] ? (
                  <Text style={{ color: colors.success, fontWeight: '700' }}>{t('✓ Dealer List Document Uploaded')}</Text>
-              ) : distData.topDealers?.length > 0 ? (
-                distData.topDealers.map((d: any, i: number) => (
+              ) : raw.dealer_network?.length > 0 ? (
+                raw.dealer_network.map((d: any, i: number) => (
                   <View key={i} style={{ backgroundColor: '#F8FAFC', padding: spacing.sm, borderRadius: radius.sm, marginBottom: 8, borderWidth: 1, borderColor: '#E2E8F0' }}>
                     <Text style={{ fontWeight: '800', color: colors.text }}>{d.name} <Text style={{ fontWeight: '500', color: colors.textMuted }}>({d.contact})</Text></Text>
                     <Text style={{ fontSize: 12, color: colors.textMuted, marginTop: 2 }}>{d.address}</Text>
@@ -617,7 +605,7 @@ export const EntityProfileScreen = ({ navigation, route }: any) => {
             {/* --- 6. COMMERCIAL ANNEXURES --- */}
             <SectionCard title="6. Commercial Annexures" icon="request-quote">
               <Text style={{ color: colors.primary, fontWeight: '800', marginBottom: spacing.sm }}>{t('Territory Coverage')}</Text>
-              {distData.anxTerritories?.map((t: any, i: number) => (
+              {annexures.territories?.map((t: any, i: number) => (
                 <View key={i} style={{ backgroundColor: '#F8FAFC', padding: spacing.sm, borderRadius: radius.sm, marginBottom: spacing.md, borderWidth: 1, borderColor: '#E2E8F0' }}>
                   <Text style={{ fontWeight: '800', color: colors.text }}>{t.district}, {t.taluka}</Text>
                   <Text style={{ fontSize: 12, color: colors.textMuted, marginTop: 2 }}>Villages: {t.villages?.join(', ') || 'N/A'}</Text>
@@ -626,24 +614,24 @@ export const EntityProfileScreen = ({ navigation, route }: any) => {
               ))}
 
               <Text style={{ color: colors.primary, fontWeight: '800', marginBottom: spacing.sm }}>{t('Principal Suppliers')}</Text>
-              {distData.anxPrincipalSuppliers?.map((s: any, i: number) => (
+              {annexures.principalSuppliers?.map((s: any, i: number) => (
                 <Text key={i} style={{ color: colors.text, fontSize: 13, marginBottom: 4 }}>• {s.name} ({s.share}%)</Text>
               ))}
 
-              <DetailRow label="Chemical Range" value={<PillList items={distData.anxChemicalProducts || []} align="flex-start" />} isVertical />
-              <DetailRow label="Bio/Organic Range" value={<PillList items={distData.anxBioProducts || []} align="flex-start" />} isVertical />
-              <DetailRow label="Other Products" value={<PillList items={distData.anxOtherProducts || []} align="flex-start" />} isVertical />
+              <DetailRow label="Chemical Range" value={<PillList items={annexures.chemicalProducts || []} align="flex-start" />} isVertical />
+              <DetailRow label="Bio/Organic Range" value={<PillList items={annexures.bioProducts || []} align="flex-start" />} isVertical />
+              <DetailRow label="Other Products" value={<PillList items={annexures.otherProducts || []} align="flex-start" />} isVertical />
               
-              <DetailRow label="Will Share Sales Data?" value={distData.anxWillShareSales ? t('Yes, Confirmed') : t('Not Confirmed')} />
+              <DetailRow label="Will Share Sales Data?" value={annexures.willShareSales ? t('Yes, Confirmed') : t('Not Confirmed')} />
               
               <View style={{ marginBottom: spacing.md }}>
                 <Text style={{ color: colors.textMuted, fontWeight: '700', marginBottom: 4 }}>{t('2-Year Growth Vision')}</Text>
-                <Text style={{ color: colors.text, fontWeight: '600', fontStyle: 'italic', marginBottom: distData.anxGrowthVisionAudio ? 4 : 0 }}>"{distData.anxGrowthVision || 'N/A'}"</Text>
-                <AudioPlayer url={distData.anxGrowthVisionAudio} title="Vision Audio" />
+                <Text style={{ color: colors.text, fontWeight: '600', fontStyle: 'italic', marginBottom: annexures.growthVisionAudio ? 4 : 0 }}>"{annexures.growthVision || 'N/A'}"</Text>
+                <AudioPlayer url={annexures.growthVisionAudio} title="Vision Audio" />
               </View>
 
               <Text style={{ color: colors.textMuted, fontWeight: '700', marginBottom: spacing.sm, marginTop: spacing.md }}>{t('Credit References:')}</Text>
-              {distData.anxSupplierRefs?.length > 0 ? distData.anxSupplierRefs.map((ref: any, i: number) => (
+              {annexures.supplierRefs?.length > 0 ? annexures.supplierRefs.map((ref: any, i: number) => (
                 <View key={i} style={{ backgroundColor: '#F8FAFC', padding: spacing.sm, borderRadius: radius.sm, marginBottom: 8, borderWidth: 1, borderColor: '#E2E8F0' }}>
                   <Text style={{ fontWeight: '800', color: colors.text }}>{ref.name} <Text style={{ fontWeight: '500', color: colors.textMuted }}>({ref.contact})</Text></Text>
                   {ref.behavior && <Text style={{ fontSize: 12, color: colors.textMuted, marginTop: 4, fontStyle: 'italic' }}>"{ref.behavior}"</Text>}
@@ -651,8 +639,8 @@ export const EntityProfileScreen = ({ navigation, route }: any) => {
                 </View>
               )) : <Text style={{ color: colors.text, fontWeight: '700', marginBottom: spacing.md }}>N/A</Text>}
 
-              <DetailRow label="Security Deposit" value={distData.securityDeposit ? `₹ ${distData.securityDeposit}` : t('N/A')} />
-              <DetailRow label="Payment Reference / Cheque No." value={distData.paymentProofText} />
+              <DetailRow label="Security Deposit" value={annexures.securityDeposit ? `₹ ${annexures.securityDeposit}` : t('N/A')} />
+              <DetailRow label="Payment Reference / Cheque No." value={annexures.paymentProofText} />
             </SectionCard>
           </>
 
@@ -684,7 +672,6 @@ export const EntityProfileScreen = ({ navigation, route }: any) => {
                 <View key={index} style={{ backgroundColor: '#F8FAFC', padding: spacing.sm, borderRadius: radius.md, marginBottom: 8, borderWidth: 1, borderColor: '#E2E8F0' }}>
                   <Text style={{ fontWeight: '800', color: colors.primary }}>{crop.cropName || 'Unknown Crop'}</Text>
                   <Text style={{ fontSize: 12, color: colors.textMuted, marginTop: 4 }}>Area: {crop.area ? `${crop.area} ${crop.areaUnit || ''}` : 'N/A'}</Text>
-                  {/* 🚀 Safely join the inputUsed array */}
                   <Text style={{ fontSize: 12, color: colors.textMuted, marginTop: 2 }}>Input: {Array.isArray(crop.inputUsed) ? crop.inputUsed.join(', ') : (crop.inputUsed || 'N/A')}</Text>
                   <Text style={{ fontSize: 12, color: colors.textMuted, marginTop: 2 }}>Yield: {crop.yield ? `${crop.yield} ${crop.yieldUnit || ''}` : 'N/A'}</Text>
                   <Text style={{ fontSize: 12, color: colors.danger, marginTop: 2 }}>Problems: {crop.problemsFaced || 'None'}</Text>
@@ -701,36 +688,17 @@ export const EntityProfileScreen = ({ navigation, route }: any) => {
         {(isDealer || isDistributor) && (
           <SectionCard title="Compliance & Media Attachments" icon="verified-user">
             
-            {/* Commitments & Compliance Array Map */}
-            {isDealer ? (
-              <>
-                <Text style={{ color: colors.textMuted, fontWeight: '700', marginBottom: spacing.sm }}>GLS Commitments Accepted:</Text>
-                {raw.commitments?.glsCommitments?.length > 0 ? raw.commitments.glsCommitments.map((item: string, i: number) => (
-                  <Text key={i} style={{ color: colors.text, fontWeight: '600', marginBottom: 6 }}>✓ {item}</Text>
-                )) : <Text style={{ color: colors.text, fontWeight: '800', marginBottom: spacing.md }}>N/A</Text>}
+            <Text style={{ color: colors.textMuted, fontWeight: '700', marginBottom: spacing.sm }}>GLS Commitments Accepted:</Text>
+            {raw.commitments?.glsCommitments?.length > 0 ? raw.commitments.glsCommitments.map((item: string, i: number) => (
+              <Text key={i} style={{ color: colors.text, fontWeight: '600', marginBottom: 6 }}>✓ {item}</Text>
+            )) : <Text style={{ color: colors.text, fontWeight: '800', marginBottom: spacing.md }}>N/A</Text>}
 
-                <View style={{ height: 1, backgroundColor: colors.border, marginVertical: spacing.md }} />
+            <View style={{ height: 1, backgroundColor: colors.border, marginVertical: spacing.md }} />
 
-                <Text style={{ color: colors.textMuted, fontWeight: '700', marginBottom: spacing.sm }}>Regulatory Documents Verified:</Text>
-                {raw.commitments?.complianceChecklist?.length > 0 ? raw.commitments.complianceChecklist.map((item: string, i: number) => (
-                  <Text key={i} style={{ color: colors.text, fontWeight: '600', marginBottom: 6 }}>✓ {item}</Text>
-                )) : <Text style={{ color: colors.text, fontWeight: '800', marginBottom: spacing.md }}>N/A</Text>}
-              </>
-            ) : (
-              <>
-                <Text style={{ color: colors.textMuted, fontWeight: '700', marginBottom: spacing.sm }}>GLS Commitments Accepted:</Text>
-                {distData.glsCommitments?.length > 0 ? distData.glsCommitments.map((item: string, i: number) => (
-                  <Text key={i} style={{ color: colors.text, fontWeight: '600', marginBottom: 6 }}>✓ {item}</Text>
-                )) : <Text style={{ color: colors.text, fontWeight: '800', marginBottom: spacing.md }}>N/A</Text>}
-
-                <View style={{ height: 1, backgroundColor: colors.border, marginVertical: spacing.md }} />
-
-                <Text style={{ color: colors.textMuted, fontWeight: '700', marginBottom: spacing.sm }}>Regulatory Documents Verified:</Text>
-                {distData.complianceChecklist?.length > 0 ? distData.complianceChecklist.map((item: string, i: number) => (
-                  <Text key={i} style={{ color: colors.text, fontWeight: '600', marginBottom: 6 }}>✓ {item}</Text>
-                )) : <Text style={{ color: colors.text, fontWeight: '800', marginBottom: spacing.md }}>N/A</Text>}
-              </>
-            )}
+            <Text style={{ color: colors.textMuted, fontWeight: '700', marginBottom: spacing.sm }}>Regulatory Documents Verified:</Text>
+            {raw.commitments?.complianceChecklist?.length > 0 ? raw.commitments.complianceChecklist.map((item: string, i: number) => (
+              <Text key={i} style={{ color: colors.text, fontWeight: '600', marginBottom: 6 }}>✓ {item}</Text>
+            )) : <Text style={{ color: colors.text, fontWeight: '800', marginBottom: spacing.md }}>N/A</Text>}
 
             <View style={{ height: 1, backgroundColor: colors.border, marginVertical: spacing.md }} />
 
@@ -764,46 +732,44 @@ export const EntityProfileScreen = ({ navigation, route }: any) => {
         <SectionCard title="Signatures & Approvals" icon="draw">
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
             <View style={{ flex: 1, alignItems: 'center' }}>
-              <View style={{ width: 60, height: 60, borderRadius: 30, backgroundColor: (isDealer ? raw.dealer_signature : isDistributor ? distData.distributorSignature : raw.farmer_signature) ? '#DCFCE7' : '#FEE2E2', justifyContent: 'center', alignItems: 'center', marginBottom: 8 }}>
-                <MaterialIcons name={(isDealer ? raw.dealer_signature : isDistributor ? distData.distributorSignature : raw.farmer_signature) ? "check" : "close"} size={30} color={(isDealer ? raw.dealer_signature : isDistributor ? distData.distributorSignature : raw.farmer_signature) ? "#166534" : "#991B1B"} />
+              <View style={{ width: 60, height: 60, borderRadius: 30, backgroundColor: (isDealer ? raw.dealer_signature : isDistributor ? raw.distributor_signature : raw.farmer_signature) ? '#DCFCE7' : '#FEE2E2', justifyContent: 'center', alignItems: 'center', marginBottom: 8 }}>
+                <MaterialIcons name={(isDealer ? raw.dealer_signature : isDistributor ? raw.distributor_signature : raw.farmer_signature) ? "check" : "close"} size={30} color={(isDealer ? raw.dealer_signature : isDistributor ? raw.distributor_signature : raw.farmer_signature) ? "#166534" : "#991B1B"} />
               </View>
               <Text style={{ fontSize: 12, fontWeight: '800', color: colors.text, textAlign: 'center' }}>{entity.type}</Text>
-              <Text style={{ fontSize: 10, color: colors.textMuted, marginTop: 2 }}>{(isDealer ? raw.dealer_signature : isDistributor ? distData.distributorSignature : raw.farmer_signature) ? 'Digitally Signed' : 'Pending'}</Text>
+              <Text style={{ fontSize: 10, color: colors.textMuted, marginTop: 2 }}>{(isDealer ? raw.dealer_signature : isDistributor ? raw.distributor_signature : raw.farmer_signature) ? 'Digitally Signed' : 'Pending'}</Text>
             </View>
             
             <View style={{ height: 40, width: 1, backgroundColor: colors.border }} />
 
             <View style={{ flex: 1, alignItems: 'center' }}>
-              <View style={{ width: 60, height: 60, borderRadius: 30, backgroundColor: (isDistributor ? distData.seSignature : raw.se_signature) ? '#DCFCE7' : '#FEE2E2', justifyContent: 'center', alignItems: 'center', marginBottom: 8 }}>
-                <MaterialIcons name={(isDistributor ? distData.seSignature : raw.se_signature) ? "check" : "close"} size={30} color={(isDistributor ? distData.seSignature : raw.se_signature) ? "#166534" : "#991B1B"} />
+              <View style={{ width: 60, height: 60, borderRadius: 30, backgroundColor: raw.se_signature ? '#DCFCE7' : '#FEE2E2', justifyContent: 'center', alignItems: 'center', marginBottom: 8 }}>
+                <MaterialIcons name={raw.se_signature ? "check" : "close"} size={30} color={raw.se_signature ? "#166534" : "#991B1B"} />
               </View>
               <Text style={{ fontSize: 12, fontWeight: '800', color: colors.text, textAlign: 'center' }}>Sales Executive</Text>
-              <Text style={{ fontSize: 10, color: colors.textMuted, marginTop: 2 }}>{(isDistributor ? distData.seSignature : raw.se_signature) ? 'Digitally Signed' : 'Pending'}</Text>
+              <Text style={{ fontSize: 10, color: colors.textMuted, marginTop: 2 }}>{raw.se_signature ? 'Digitally Signed' : 'Pending'}</Text>
             </View>
           </View>
         </SectionCard>
 
-        {/* --- PDF ACTIONS (Dealer Only currently, expand to Distributor later if needed) --- */}
-        
-          <View style={{ marginTop: spacing.lg }}>
-            {raw.pdf_url ? (
-              <View style={{ flexDirection: 'row', gap: spacing.md }}>
-                <Pressable onPress={handleDownloadPDF} disabled={downloading} style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', height: 50, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.primary, borderRadius: radius.md, ...shadows.soft }}>
-                  {downloading ? <ActivityIndicator color={colors.primary} /> : (
-                    <><MaterialIcons name="file-download" size={20} color={colors.primary} style={{ marginRight: 8 }} /><Text style={{ color: colors.primary, fontWeight: '800' }}>Download PDF</Text></>
-                  )}
-                </Pressable>
-                <Pressable onPress={handleSharePDF} disabled={sharing} style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', height: 50, backgroundColor: colors.primary, borderRadius: radius.md, ...shadows.soft }}>
-                  {sharing ? <ActivityIndicator color="#FFF" /> : (
-                    <><MaterialIcons name="share" size={20} color="#FFF" style={{ marginRight: 8 }} /><Text style={{ color: "#FFF", fontWeight: '800' }}>Share PDF</Text></>
-                  )}
-                </Pressable>
-              </View>
-            ) : (
-              <Button label="Generate PDF Dossier" variant="secondary" onPress={handleEdit} />
-            )}
-          </View>
-        
+        {/* --- PDF ACTIONS --- */}
+        <View style={{ marginTop: spacing.lg }}>
+          {raw.pdf_url ? (
+            <View style={{ flexDirection: 'row', gap: spacing.md }}>
+              <Pressable onPress={handleDownloadPDF} disabled={downloading} style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', height: 50, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.primary, borderRadius: radius.md, ...shadows.soft }}>
+                {downloading ? <ActivityIndicator color={colors.primary} /> : (
+                  <><MaterialIcons name="file-download" size={20} color={colors.primary} style={{ marginRight: 8 }} /><Text style={{ color: colors.primary, fontWeight: '800' }}>Download PDF</Text></>
+                )}
+              </Pressable>
+              <Pressable onPress={handleSharePDF} disabled={sharing} style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', height: 50, backgroundColor: colors.primary, borderRadius: radius.md, ...shadows.soft }}>
+                {sharing ? <ActivityIndicator color="#FFF" /> : (
+                  <><MaterialIcons name="share" size={20} color="#FFF" style={{ marginRight: 8 }} /><Text style={{ color: "#FFF", fontWeight: '800' }}>Share PDF</Text></>
+                )}
+              </Pressable>
+            </View>
+          ) : (
+            <Button label="Generate PDF Dossier" variant="secondary" onPress={handleEdit} />
+          )}
+        </View>
 
       </ScrollView>
 

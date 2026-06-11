@@ -4,9 +4,9 @@ import { Controller } from 'react-hook-form';
 import { CheckboxItem, SignaturePad } from '../../../../../design-system/components';
 import { colors, radius, spacing } from '../../../../../design-system/tokens';
 
-export const Step4Signatures = ({ control, t }: any) => {
+export const Step4Signatures = ({ control, t, isLocked }: any) => {
   return (
-    <View>
+    <View pointerEvents={isLocked ? "none" : "auto"} style={{ opacity: isLocked ? 0.5 : 1 }}>
       <Text style={{ fontSize: 20, fontWeight: '800', marginBottom: spacing.sm }}>{t("Declaration & Signatures")}</Text>
       <View style={{ backgroundColor: '#F1F5F9', padding: spacing.md, borderRadius: radius.md, marginBottom: spacing.lg, borderWidth: 1, borderColor: colors.border }}>
          <Text style={{ fontSize: 13, lineHeight: 22, color: colors.textMuted }}>

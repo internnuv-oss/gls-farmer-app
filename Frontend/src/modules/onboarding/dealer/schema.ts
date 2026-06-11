@@ -34,6 +34,7 @@ export const dealerOnboardingSchema = z.object({
   panNumber: z.string().regex(/^[A-Z]{5}[0-9]{4}[A-Z]{1}$/, "Invalid PAN Format"),
 
   bankAccounts: z.array(z.object({
+    isActive: z.boolean().optional(),
     accountType: z.string().min(2, "Account Type required"),
     bankName: z.string().min(2, "Bank Name required"),
     bankBranch: z.string().min(2, "Branch Name required"),

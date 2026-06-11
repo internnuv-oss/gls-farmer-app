@@ -42,6 +42,7 @@ export const distributorOnboardingSchema = z.object({
   firmType: z.string().min(1, "Firm Type is required"),
   
   bankAccounts: z.array(z.object({
+    isActive: z.boolean().optional(),
     accountName: z.string().min(2, "Account Name required"),
     accountNumber: z.string().regex(/^\d{9,18}$/, "Must be 9-18 digits"), 
     bankIfsc: z.string().regex(/^[A-Z]{4}0[A-Z0-9]{6}$/, "Invalid IFSC Format"),
@@ -64,6 +65,7 @@ redFlags: z.string().optional(), audioRedFlags: z.string().optional(),
   // ---> STEP 3: Onboarding & Infra <---
   appliedTerritory: z.array(z.string()).min(1, "At least one district is required"),
   turnoverPotential: z.string().min(1, "Turnover Potential is required"),
+  turnoverPotentialUnit: z.string().optional(),
   currentSuppliers: z.array(z.string().min(2, "Supplier name required")).min(1, "At least one supplier is required"),
   proposedStatus: z.string().min(1, "Status required"),
   demoFarmersCommitment: z.string().min(1, "Required"),
@@ -76,7 +78,8 @@ redFlags: z.string().optional(), audioRedFlags: z.string().optional(),
     address: z.string().optional(),
     contact: z.string().optional(),
     turnover: z.string().optional(),
-    products: z.string().optional(),
+    turnoverUnit: z.string().optional(),
+    products: z.array(z.string()).optional(),
     farmersServed: z.string().optional(),
     bioExperience: z.string().optional()
   })).optional(),

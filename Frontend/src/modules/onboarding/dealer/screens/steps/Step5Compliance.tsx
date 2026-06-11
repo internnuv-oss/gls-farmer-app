@@ -10,13 +10,14 @@ export const COMPLIANCE_ITEMS = ["Valid FCO Authorization / Fertilizer Dealer Re
 
 interface Props {
   form: UseFormReturn<DealerOnboardingValues>;
+  isLocked: boolean;
 }
 
-export const Step5Compliance = ({ form }: Props) => {
+export const Step5Compliance = ({ form, isLocked }: Props) => {
   const { control } = form;
   const { t } = useTranslation();
   return (
-    <View>
+    <View pointerEvents={isLocked ? "none" : "auto"} style={{ opacity: isLocked ? 0.5 : 1 }}>
       <Text style={{ fontSize: 20, fontWeight: '800', marginBottom: spacing.sm }}>{t("Regulatory Compliance")}</Text>
       <Text style={{ color: colors.textMuted, marginBottom: spacing.lg }}>{t("Verify dealer documentation availability.")}</Text>
       <Controller control={control} name="complianceChecklist" render={({field}) => (

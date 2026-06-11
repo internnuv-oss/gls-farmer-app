@@ -15,7 +15,7 @@ import { supabase } from '../../../core/supabase';
 import { requestMediaPermission, requestCameraPermission } from "../../../core/permissions";
 import { useAuthStore } from "../../../store/authStore";
 import { uploadFileToCloudinary } from "../services/cloudinaryService";
-import { saveDealerOnboarding, mapDealerDbToForm, updateDealerPdfUrl } from "../services/onboardingService";
+import { saveDealerOnboarding, mapDealerDbToForm, updateDealerPdfUrl, fetchProfileByMobile } from "../services/onboardingService";
 import { dealerOnboardingSchema, DealerOnboardingValues, GLS_COMMITMENTS } from "./schema";
 import { useAlertStore } from "../../../store/alertStore";
 
@@ -43,7 +43,7 @@ export function useDealerOnboarding(navigation: any, route: any) {
         shopName: '', firmType: '', estYear: '', state: '', city: '', taluka: '', village: [], address: '', landmark: '',
         contactMobile: '', landlineNumber: '', gstNumber: '', panNumber: '',
         owners: [{ name: '' }], 
-        bankAccounts: [{ accountType: '', bankName: '', bankBranch: '', accountName: '', accountNumber: '', bankIfsc: '' }],
+        bankAccounts: [{ isActive: true, accountType: '', bankName: '', bankBranch: '', accountName: '', accountNumber: '', bankIfsc: '' }],
         scoreFinancial: 5, scoreReputation: 5, scoreOperations: 5, scoreFarmerNetwork: 5,
         scoreTeam: 5, scorePortfolio: 5, scoreExperience: 5, scoreGrowth: 5,
         hasAdditionalLocations: undefined, additionalShops: [], godowns: [], 
@@ -63,28 +63,81 @@ export function useDealerOnboarding(navigation: any, route: any) {
     mode: 'onChange'
   });
 
-  const { watch } = form;
+  const { watch, reset } = form;
   const values = watch();
 
-  // 🚀 DB CRUD: Direct Save Function
-  const saveDraftToDB = async () => {
+  // 🚀 NEW: Auto-Fetch tracking states
+  const mobileNumber = watch('contactMobile');
+  const [isFetchingProfile, setIsFetchingProfile] = useState(false);
+  const [fetchedRecordId, setFetchedRecordId] = useState<string | undefined>(undefined);
+  const [isLocked, setIsLocked] = useState(editData?.status === 'SUBMITTED');
+
+  useEffect(() => {
+    const fetchExistingProfile = async () => {
+      if (editData || draftData || mobileNumber?.length !== 10) return;
+
+      setIsFetchingProfile(true);
+      try {
+        const existingProfile = await fetchProfileByMobile('dealer', mobileNumber); 
+        
+        if (existingProfile) {
+          useAlertStore.getState().showAlert("Profile Found", "An existing profile was found and has been loaded.");
+          
+          if (existingProfile.source === 'draft') {
+            reset(existingProfile.data.draft_data);
+            draftIdRef.current = existingProfile.data.entity_id;
+            setStep(existingProfile.data.current_step || 1);
+            setIsLocked(false);
+          } else {
+            const mappedData = mapDealerDbToForm(existingProfile.data);
+            reset(mappedData);
+            setFetchedRecordId(existingProfile.data.id);
+            if (existingProfile.data.status === 'SUBMITTED') setIsLocked(true);
+          }
+        }
+      } catch (error) {
+        console.error("Failed to check existing profiles:", error);
+      } finally {
+        setIsFetchingProfile(false);
+      }
+    };
+
+    const timeout = setTimeout(fetchExistingProfile, 600);
+    return () => clearTimeout(timeout);
+  }, [mobileNumber, editData, draftData]);
+
+  const saveDraftToDB = async (isManualSave = false) => {
     if (editData || showSuccessRef.current) return; 
+
+    const dirtyKeys = Object.keys(form.formState.dirtyFields);
+    if (dirtyKeys.length === 0) return; // 🚀 Prevent unmount duplication
+
+    if (fetchedRecordId) { // 🚀 Prevent drafting completed profiles
+      if (isManualSave) useAlertStore.getState().showAlert("Cannot Save Draft", "This profile is already complete. Click 'Next' to the last step and click 'Save Changes' to update it directly.");
+      return;
+    }
     
     const currentValues = form.getValues();
-    if (!currentValues || !currentValues.shopName || !user?.id) return; 
+    if (!currentValues || !currentValues.shopName || !currentValues.contactMobile || !user?.id) return; 
 
-    // Generate a UUID if this is a brand new draft
-    if (!draftIdRef.current) {
-      draftIdRef.current = Crypto.randomUUID(); 
-    }
+    if (!draftIdRef.current) draftIdRef.current = Crypto.randomUUID(); 
 
     try {
+      const { data: existingDraft } = await supabase.from('drafts').select('update_history').eq('entity_id', draftIdRef.current).maybeSingle();
+      const history = existingDraft?.update_history || [];
+      
+      if (isManualSave && dirtyKeys.length > 0) {
+        history.push({ updated_by: user.id, updated_at: new Date().toISOString(), modified_fields: dirtyKeys });
+        form.reset(currentValues, { keepValues: true }); 
+      }
+
       await supabase.from('drafts').upsert({
         se_id: user.id,
         entity_type: 'dealer',
         entity_id: draftIdRef.current,
         draft_data: currentValues,
         current_step: step,
+        update_history: history,
         updated_at: new Date().toISOString()
       }, { onConflict: 'entity_id' });
     } catch (err) {
@@ -92,30 +145,49 @@ export function useDealerOnboarding(navigation: any, route: any) {
     }
   };
 
-  // 🚀 DB CRUD: Background Auto-Save
   useEffect(() => {
     const subscription = AppState.addEventListener("change", async (nextAppState) => {
       if (nextAppState === "inactive" || nextAppState === "background") {
-        if (!showSuccessRef.current) await saveDraftToDB();
+        if (!showSuccessRef.current) await saveDraftToDB(false);
       }
     });
     return () => {
       subscription.remove();
-      if (!showSuccessRef.current) saveDraftToDB(); 
+      if (!showSuccessRef.current) saveDraftToDB(false); 
     };
-  }, [step]); 
+  }, [step]);
+
+  const checkRestrictions = () => {
+    const dirtyKeys = Object.keys(form.formState.dirtyFields);
+    // 🚀 FIX: Prevent blocking users if they hit submit without modifying anything
+    if (dirtyKeys.length === 0) return { pass: true, error: "", dirtyKeys: [] };
+
+    if ((editData || fetchedRecordId) && isLocked) { 
+      const allowedEdits = [
+        'owners', 'contactMobile', 'bankAccounts', 'scoreFinancial', 'scoreReputation', 'scoreOperations', 'scoreFarmerNetwork', 'scoreTeam', 'scorePortfolio', 'scoreExperience', 'scoreGrowth', 'remFinancial', 'remReputation', 'remOperations', 'remFarmerNetwork', 'remTeam', 'remPortfolio', 'remExperience', 'remGrowth', 'audioFinancial', 'audioReputation', 'audioOperations', 'audioFarmerNetwork', 'audioTeam', 'audioPortfolio', 'audioExperience', 'audioGrowth', 'redFlags', 'audioRedFlags', 'proposedStatus', 'hasAdditionalLocations', 'additionalShops', 'godowns', 'isLinkedToDistributor', 'linkedDistributors', 'willingDemoFarmers', 'demoFarmers', 'seTerritories', 'sePrincipalSuppliers', 'seChemicalProducts', 'seBioProducts', 'seOtherProducts', 'seHasCreditReferences', 'seCreditReferences', 'seWillShareSales', 'seGrowthVision', 'seGrowthVisionAudio', 'seSecurityDeposit', 'sePaymentProofText', 'documents', 'dealerSignature', 'seSignature'
+      ];
+      const illegalEdits = dirtyKeys.filter(k => !allowedEdits.includes(k.split('.')[0]));
+      if (illegalEdits.length > 0) return { pass: false, error: "You are only authorized to edit Contact Person, Mobile, Banks, Scoring, Business Area, and Annexures for completed profiles.", dirtyKeys: [] };
+    }
+    return { pass: true, error: "", dirtyKeys };
+  };
 
   // 🚀 DB CRUD: Save & Exit Button
   const saveAndExit = async () => {
-    const values = form.getValues();
-    if (!values.shopName) {
-      useAlertStore.getState().showAlert("Cannot Save", "Please enter at least the Primary Shop Name to save a draft.");
-      return;
+    const check = checkRestrictions();
+    if (!check.pass) return useAlertStore.getState().showAlert("Cannot Save", check.error);
+
+    if (fetchedRecordId) {
+      return useAlertStore.getState().showAlert("Cannot Save Draft", "This profile is already complete. Click 'Next' to the last step and click 'Save Changes' to update it directly.");
     }
+
+    const values = form.getValues();
+    if (!values.shopName || !values.contactMobile) return useAlertStore.getState().showAlert("Cannot Save", "Please enter both the Shop Name and Mobile Number to save a draft.");
+
     useAlertStore.getState().showAlert("Saving...", "Syncing draft to database...");
-    await saveDraftToDB();
+    await saveDraftToDB(true);
     useAlertStore.getState().hideAlert();
-    navigation.navigate("MainTabs", { screen: "Drafts" }); 
+    navigation.navigate("MainTabs");
   };
 
   const saveDraft = () => saveAndExit();
@@ -127,36 +199,43 @@ export function useDealerOnboarding(navigation: any, route: any) {
     const panRegex = /^[A-Z]{5}[0-9]{4}[A-Z]{1}$/;
     const ifscRegex = /^[A-Z]{4}0[A-Z0-9]{6}$/;
     const bankAccRegex = /^\d{9,18}$/;
-    const areOwnersValid = values.owners?.every(o => o.name && o.name.length >= 2);
-    const areBanksValid = values.bankAccounts?.every(b => b.accountType && b.bankName && b.bankBranch && b.accountName && bankAccRegex.test(b.accountNumber || '') && ifscRegex.test(b.bankIfsc || ''));
+    
+    // 🚀 CRITICAL FIX: Prepended Array.isArray checks
+    const areOwnersValid = Array.isArray(values.owners) && values.owners.every(o => o.name && o.name.length >= 2);
+    const areBanksValid = Array.isArray(values.bankAccounts) && values.bankAccounts.every(b => b.accountType && b.bankName && b.bankBranch && b.accountName && bankAccRegex.test(b.accountNumber || '') && ifscRegex.test(b.bankIfsc || ''));
+    
     const isLandlineValid = !values.landlineNumber || landlineRegex.test(values.landlineNumber);
     const isStep1Valid = !!(values.shopName && values.shopName.length >= 2 && values.firmType && values.estYear && values.estYear.length === 4 && areOwnersValid && mobileRegex.test(values.contactMobile || '') && isLandlineValid && values.state && values.city && values.taluka && values.village && values.address && values.address.length >= 5 && gstRegex.test(values.gstNumber || '') && panRegex.test(values.panNumber || '') && areBanksValid);
     
-    const distValid = values.isLinkedToDistributor === 'No' || (values.isLinkedToDistributor === 'Yes' && values.linkedDistributors?.[0]?.name && /^\d{10}$/.test(values.linkedDistributors?.[0]?.contact || ''));
-    const hasAtLeastOneLocation = (values.additionalShops?.length || 0) > 0 || (values.godowns?.length || 0) > 0;
-    const additionalShopsValid = (values.additionalShops || []).every(s => s.shopName && s.estYear && s.state && s.city && s.taluka && s.village && s.address);
-    const godownsValid = (values.godowns || []).every(g => g.address && g.capacity && g.capacityUnit);
+    const distValid = values.isLinkedToDistributor === 'No' || (values.isLinkedToDistributor === 'Yes' && Array.isArray(values.linkedDistributors) && values.linkedDistributors?.[0]?.name && /^\d{10}$/.test(values.linkedDistributors?.[0]?.contact || ''));
+    
+    const hasAtLeastOneLocation = (Array.isArray(values.additionalShops) && values.additionalShops.length > 0) || (Array.isArray(values.godowns) && values.godowns.length > 0);
+    const additionalShopsValid = Array.isArray(values.additionalShops) && values.additionalShops.every(s => s.shopName && s.estYear && s.state && s.city && s.taluka && s.village && s.address);
+    const godownsValid = Array.isArray(values.godowns) && values.godowns.every(g => g.address && g.capacity && g.capacityUnit);
     const addLocValid = values.hasAdditionalLocations === 'No' || (values.hasAdditionalLocations === 'Yes' && hasAtLeastOneLocation && additionalShopsValid && godownsValid);
+    
     const hasFarmerFile = !!values.documents?.['demo_farmers_list'];
-    const manualFarmersValid = (values.demoFarmers || []).some(f => f.name && f.contact && f.address);
+    const manualFarmersValid = Array.isArray(values.demoFarmers) && values.demoFarmers.some(f => f.name && f.contact && f.address);
     const demoFarmersValid = values.willingDemoFarmers === 'No' || (values.willingDemoFarmers === 'Yes' && (hasFarmerFile || manualFarmersValid));
+    
     const isStep3Valid = !!(values.isLinkedToDistributor && distValid && values.hasAdditionalLocations && addLocValid && values.proposedStatus && values.willingDemoFarmers && demoFarmersValid);
     
     const isStep4Valid = Array.isArray(values.glsCommitments) && values.glsCommitments.length === GLS_COMMITMENTS.length; 
     
     const requiredKeys = ['gst certificate / shop establishment license', 'pan card', 'cancelled cheque', 'shop_exterior', 'selfie_with_owner'];
-    const dynamicKeys = (values.complianceChecklist || []).map((item: string) => item.replace(/[^a-zA-Z0-9]/g, '_').toLowerCase());
+    const dynamicKeys = Array.isArray(values.complianceChecklist) ? values.complianceChecklist.map((item: string) => item.replace(/[^a-zA-Z0-9]/g, '_').toLowerCase()) : [];
     const allRequired = [...requiredKeys, ...dynamicKeys];
     const isStep6Valid = allRequired.every(key => { const doc = values.documents?.[key]; return Array.isArray(doc) ? doc.length > 0 : !!doc; }) && !!values.shopLocations?.['shop_exterior']; 
     
-    const validCreditRefs = values.seHasCreditReferences !== 'Yes' || (values.seHasCreditReferences === 'Yes' && values.seCreditReferences && values.seCreditReferences.length > 0 && values.seCreditReferences.every(ref => (ref.name?.length ?? 0) >= 2 && (ref.contact?.length ?? 0) === 10));
-    const validTerritories = values.seTerritories?.length > 0 && values.seTerritories.every(t => t.taluka && t.village?.length > 0 && t.cultivableArea && t.majorCrops?.length > 0);
+    const validCreditRefs = values.seHasCreditReferences !== 'Yes' || (values.seHasCreditReferences === 'Yes' && Array.isArray(values.seCreditReferences) && values.seCreditReferences.length > 0 && values.seCreditReferences.every(ref => (ref.name?.length ?? 0) >= 2 && (ref.contact?.length ?? 0) === 10));
+    const validTerritories = Array.isArray(values.seTerritories) && values.seTerritories.length > 0 && values.seTerritories.every(t => t.taluka && Array.isArray(t.village) && t.village.length > 0 && t.cultivableArea && Array.isArray(t.majorCrops) && t.majorCrops.length > 0);
     const securityDepositVal = parseInt(values.seSecurityDeposit || '0');
     const hasPaymentProof = securityDepositVal === 0 || (securityDepositVal > 0 && (!!values.sePaymentProofText || !!values.documents?.['se_payment_proof']));
-    const isStep7Valid = !!(validTerritories && values.sePrincipalSuppliers?.length > 0 && values.seChemicalProducts?.length > 0 && values.seBioProducts?.length > 0 && values.seOtherProducts?.length > 0 && validCreditRefs && hasPaymentProof && (values.seWillShareSales !== undefined));
+    
+    const isStep7Valid = !!(validTerritories && Array.isArray(values.sePrincipalSuppliers) && values.sePrincipalSuppliers.length > 0 && Array.isArray(values.seChemicalProducts) && values.seChemicalProducts.length > 0 && Array.isArray(values.seBioProducts) && values.seBioProducts.length > 0 && Array.isArray(values.seOtherProducts) && values.seOtherProducts.length > 0 && validCreditRefs && hasPaymentProof && (values.seWillShareSales !== undefined));
     
     const isStep8Valid = !!(values.agreementAccepted && values.dealerSignature && values.seSignature);
-
+  
     return [
       { isValid: isStep1Valid, name: "Step 1: Basic Profile (Check PAN/GST/Bank formats)" },
       { isValid: isStep3Valid, name: "Step 3: Business Area (Check dropdown options)" },
@@ -648,6 +727,8 @@ export function useDealerOnboarding(navigation: any, route: any) {
 
   // 🚀 DB CRUD: Delete Draft from DB on Submit
   const submit = async () => {
+    const check = checkRestrictions();
+    if (!check.pass) return useAlertStore.getState().showAlert("Restricted Action", check.error);
     const missingSteps = validationStatus.filter(v => !v.isValid).map(v => v.name);
     
     if (missingSteps.length > 0) {
@@ -662,18 +743,25 @@ export function useDealerOnboarding(navigation: any, route: any) {
       if (!user?.id) return useAlertStore.getState().showAlert("Error", "User session not found.");
       setIsSubmitting(true);
       try {
-        const dbResult = await saveDealerOnboarding(data, "SUBMITTED", scoreData.percentage, scoreData.band, user.id, editData?.id);
-        const html = generateHTML();
-        const { uri } = await Print.printToFileAsync({ html });
-        const pdfUrl = await uploadFileToCloudinary(uri, 'raw');
-        await updateDealerPdfUrl(dbResult.id, pdfUrl);
+        const dbResult = await saveDealerOnboarding(data, "SUBMITTED", scoreData.percentage, scoreData.band, user.id, editData?.id || fetchedRecordId, check.dirtyKeys);
         
-        // 🚀 THE FIX: Delete from Supabase Drafts table ONLY
+        // 🚀 THE FIX: IMMEDIATELY Delete draft before attempting PDF generation
         if (draftIdRef.current) {
           await supabase.from('drafts').delete().eq('entity_id', draftIdRef.current);
           draftIdRef.current = undefined; 
         }
+        showSuccessRef.current = true; // Block auto-save logic
         
+        // Try PDF generation independently, so if it fails, it doesn't freeze the submission
+        try {
+            const html = generateHTML();
+            const { uri } = await Print.printToFileAsync({ html });
+            const pdfUrl = await uploadFileToCloudinary(uri, 'raw');
+            await updateDealerPdfUrl(dbResult.id, pdfUrl);
+        } catch(pdfErr) {
+            console.log("PDF Generation/Upload Failed", pdfErr);
+        }
+
         setShowSuccess(true);
       } catch (error: any) {
         useAlertStore.getState().showAlert("Submission Failed", error.message);
@@ -683,5 +771,5 @@ export function useDealerOnboarding(navigation: any, route: any) {
     })();
   };
 
-  return { form, step, setStep, jumpBackTo, setJumpBackTo, saveDraft, submit, scoreData, handleUpload, handleAudioUpload, uploading, isSubmitting, isNextEnabled, showSuccess, setShowSuccess, generatePDF, isEditing: !!editData, saveAndExit };
+  return { form, step, setStep, jumpBackTo, setJumpBackTo, saveDraft, submit, scoreData, handleUpload, handleAudioUpload, uploading, isSubmitting, isNextEnabled, showSuccess, setShowSuccess, generatePDF, isEditing: !!editData || !!fetchedRecordId, saveAndExit, isLocked };
 }

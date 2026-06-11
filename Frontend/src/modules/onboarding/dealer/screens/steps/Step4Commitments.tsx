@@ -8,13 +8,14 @@ import { useTranslation } from 'react-i18next';
 
 interface Props {
   form: UseFormReturn<DealerOnboardingValues>;
+  isLocked: boolean;
 }
 
-export const Step4Commitments = ({ form }: Props) => {
+export const Step4Commitments = ({ form, isLocked }: Props) => {
   const { control } = form;
   const { t } = useTranslation();
   return (
-    <View>
+    <View pointerEvents={isLocked ? "none" : "auto"} style={{ opacity: isLocked ? 0.5 : 1 }}>
       <Text style={{ fontSize: 20, fontWeight: '800', marginBottom: spacing.sm }}>{t("GLS Commitments")}</Text>
         <Text style={{ color: colors.textMuted, marginBottom: spacing.lg }}>{t("Tick to confirm acceptance from the dealer.")}</Text>
         <Controller control={control} name="glsCommitments" render={({field}) => (

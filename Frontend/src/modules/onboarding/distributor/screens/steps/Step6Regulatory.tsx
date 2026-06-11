@@ -8,13 +8,14 @@ import { DistributorOnboardingValues, DISTRIBUTOR_COMPLIANCE_ITEMS } from '../..
 interface Props {
   form: UseFormReturn<DistributorOnboardingValues>;
   t: any;
+  isLocked: boolean;
 }
 
-export const Step6Regulatory = ({ form, t }: Props) => {
+export const Step6Regulatory = ({ form, t, isLocked }: Props) => {
   const { control } = form;
 
   return (
-    <View>
+    <View pointerEvents={isLocked ? "none" : "auto"} style={{ opacity: isLocked ? 0.5 : 1 }}>
       <Text style={{ fontSize: 20, fontWeight: '800', marginBottom: spacing.sm }}>
         {t("Regulatory Compliance")}
       </Text>

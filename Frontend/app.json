@@ -27,7 +27,7 @@
         "android.permission.MODIFY_AUDIO_SETTINGS"
       ],
       "package": "com.intern_skilltelligent.fieldcommander",
-      "versionCode": 6
+      "versionCode": 8
     },
     "web": {
       "favicon": "./assets/icon.png"
@@ -52,7 +52,10 @@
       "policy": "appVersion"
     },
     "updates": {
-      "url": "https://u.expo.dev/08707ac9-bb2c-47d9-af37-10f640ecfbbf"
+      "url": "https://u.expo.dev/08707ac9-bb2c-47d9-af37-10f640ecfbbf",
+      "enabled": true,
+      "checkAutomatically": "ON_LOAD",
+      "fallbackToCacheTimeout": 5000
     }
   }
 }
