@@ -21,6 +21,7 @@ import { AlertModal } from '../design-system/components/AlertModal';
 import { useAlertStore } from '../store/alertStore';
 import { FarmerOnboardingScreen } from '../modules/onboarding/farmer/screens/FarmerOnboardingScreen';
 import { DistributorOnboardingScreen } from '../modules/onboarding/distributor/screens/DistributorOnboardingScreen';
+import { FPOOnboardingScreen } from '../modules/onboarding/fpo/screens/FPOOnboardingScreen';
 
 const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
@@ -127,6 +128,7 @@ export const AppNavigator = () => {
             <Stack.Screen name="SEOnboardingScreen" component={SEOnboardingScreen} />
             <Stack.Screen name="FarmerOnboarding" component={FarmerOnboardingScreen} />
             <Stack.Screen name="DistributorOnboarding" component={DistributorOnboardingScreen} />
+            <Stack.Screen name="FPOOnboarding" component={FPOOnboardingScreen} />
             <Stack.Screen name="ComingSoonScreen">
               {({ navigation }) => <ComingSoonScreen onBack={() => navigation.goBack()} />}
             </Stack.Screen>

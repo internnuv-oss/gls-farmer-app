@@ -3,6 +3,7 @@ import { supabase } from "../../../core/supabase";
 import { DealerOnboardingValues } from "../dealer/schema";
 import { FarmerOnboardingValues } from "../farmer/schema";
 import { DistributorOnboardingValues } from "../distributor/schema";
+import { FPOOnboardingValues } from "../fpo/schema";
 
 export async function saveDealerOnboarding(
   payload: DealerOnboardingValues, 
@@ -646,7 +647,8 @@ export async function updateDistributorPdfUrl(id: string, pdfUrl: string) {
   if (error) throw error;
 }
 
-export async function fetchProfileByMobile(entityType: 'farmer' | 'dealer' | 'distributor', mobile: string) {
+// 🚀 FIX: Added 'fpo' to the entityType union and updated the table logic
+export async function fetchProfileByMobile(entityType: 'farmer' | 'dealer' | 'distributor' | 'fpo', mobile: string) {
   const mobileKey = entityType === 'farmer' ? 'mobile' : 'contactMobile';
   const { data: draftData } = await supabase
     .from('drafts')
@@ -659,7 +661,7 @@ export async function fetchProfileByMobile(entityType: 'farmer' | 'dealer' | 'di
 
   if (draftData) return { source: 'draft', data: draftData };
 
-  const tableName = entityType === 'farmer' ? 'farmers' : entityType === 'dealer' ? 'dealers' : 'distributors';
+  const tableName = entityType === 'farmer' ? 'farmers' : entityType === 'dealer' ? 'dealers' : entityType === 'fpo' ? 'fpos' : 'distributors';
   const dbMobileCol = entityType === 'farmer' ? 'mobile' : 'contact_mobile';
 
   const { data: mainData } = await supabase
@@ -673,4 +675,183 @@ export async function fetchProfileByMobile(entityType: 'farmer' | 'dealer' | 'di
   if (mainData) return { source: 'db', data: mainData };
 
   return null;
+}
+export async function saveFPOOnboarding(
+  payload: FPOOnboardingValues,
+  status: "DRAFT" | "SUBMITTED",
+  totalScore: number,
+  recommendation: string,
+  seId: string,
+  existingId?: string,
+  dirtyFields: string[] = []
+) {
+  const dbPayload = {
+    se_id: seId,
+    fpo_name: payload.fpoName,
+    registration_number: payload.registrationNumber,
+    incorporation_year: payload.incorporationYear,
+    address: payload.address,
+    state: payload.state,
+    city: payload.city,
+    taluka: payload.taluka,
+    pincode: payload.pincode,
+    command_area: payload.commandArea,
+    ceo_name: payload.ceoName,
+    bod_president_name: payload.bodPresidentName,
+    contact_mobile: payload.contactMobile,
+    email: payload.email,
+    gst_number: payload.gstNumber,
+    pan_number: payload.panNumber,
+    promoting_agency: payload.promotingAgency,
+    bank_details: payload.bankAccounts,
+
+    scoring: {
+      memberBase: payload.scoreMemberBase,
+      financial: payload.scoreFinancial,
+      governance: payload.scoreGovernance,
+      infra: payload.scoreInfra,
+      distribution: payload.scoreDistribution,
+      aggregation: payload.scoreAggregation,
+      biologicals: payload.scoreBiologicals,
+      extension: payload.scoreExtension,
+      digital: payload.scoreDigital,
+      alignment: payload.scoreAlignment,
+      audio: { audioRedFlags: payload.audioRedFlags },
+      redFlags: payload.redFlags
+    },
+
+    business_scope: {
+      allottedTerritories: payload.allottedTerritories, // 🚀 UPDATED HERE
+      expectedOfftake: payload.expectedOfftake,
+      currentSuppliers: payload.currentSuppliers,
+      partnershipTier: payload.partnershipTier,
+      demoFarmersCommitment: payload.demoFarmersCommitment,
+      warehouseSpace: payload.warehouseSpace,
+      storageConditions: payload.storageConditions,
+      customMachinery: payload.customMachinery
+    },
+
+    member_base: {
+      totalMembers: payload.totalMembers,
+      activeMembers: payload.activeMembers,
+      majorCrops: payload.majorCrops,
+      kharifDemand: payload.kharifDemand,
+      rabiDemand: payload.rabiDemand
+      // 🚀 lrpNetwork REMOVED HERE
+    },
+
+    commitments: {
+      glsCommitments: payload.glsCommitments,
+      complianceChecklist: payload.complianceChecklist
+    },
+
+    documents: payload.documents || {},
+    storage_locations: payload.storageLocations || {},
+
+    agreement_accepted: payload.agreementAccepted,
+    fpo_signature: payload.fpoSignature,
+    se_signature: payload.seSignature,
+
+    total_score: totalScore,
+    band: recommendation,
+    status: status,
+    updated_at: new Date().toISOString()
+  };
+
+  let query = supabase.from("fpos");
+  let result;
+
+  if (existingId) {
+    const { data: existing } = await supabase.from("fpos").select("update_history").eq("id", existingId).single();
+    const history = existing?.update_history || [];
+    if (dirtyFields.length > 0) {
+      history.push({ updated_by: seId, updated_at: new Date().toISOString(), modified_fields: dirtyFields });
+      (dbPayload as any).update_history = history;
+    }
+    result = await query.update(dbPayload).eq("id", existingId).select("id").single();
+  } else {
+    result = await query.insert([dbPayload]).select("id").single();
+  }
+
+  if (result.error) throw result.error;
+  return result.data;
+}
+
+export function mapFPODbToForm(db: any): FPOOnboardingValues {
+  const score = db.scoring || {};
+  const biz = db.business_scope || {};
+  const mem = db.member_base || {};
+  const com = db.commitments || {};
+
+  return {
+    fpoName: db.fpo_name || "",
+    registrationNumber: db.registration_number || "",
+    incorporationYear: db.incorporation_year || "",
+    address: db.address || "",
+    state: db.state || "",
+    city: db.city || "",
+    taluka: db.taluka || "",
+    pincode: db.pincode || "",
+    commandArea: db.command_area || "",
+    ceoName: db.ceo_name || "",
+    bodPresidentName: db.bod_president_name || "",
+    contactMobile: db.contact_mobile || "",
+    email: db.email || "",
+    gstNumber: db.gst_number || "",
+    panNumber: db.pan_number || "",
+    promotingAgency: db.promoting_agency || "",
+    bankAccounts: Array.isArray(db.bank_details) && db.bank_details.length > 0 
+      ? db.bank_details 
+      : [{ isActive: true, accountName: '', accountNumber: '', bankIfsc: '', bankNameBranch: '' }],
+
+    scoreMemberBase: score.memberBase || 5,
+    scoreFinancial: score.financial || 5,
+    scoreGovernance: score.governance || 5,
+    scoreInfra: score.infra || 5,
+    scoreDistribution: score.distribution || 5,
+    scoreAggregation: score.aggregation || 5,
+    scoreBiologicals: score.biologicals || 5,
+    scoreExtension: score.extension || 5,
+    scoreDigital: score.digital || 5,
+    scoreAlignment: score.alignment || 5,
+    redFlags: score.redFlags || "",
+    audioRedFlags: score.audio?.audioRedFlags || "",
+
+    // 🚀 UPDATED HERE
+    allottedTerritories: Array.isArray(biz.allottedTerritories) && biz.allottedTerritories.length > 0 
+      ? biz.allottedTerritories 
+      : [{ district: '', taluka: '', villages: [] }],
+      
+    expectedOfftake: biz.expectedOfftake || "",
+    currentSuppliers: Array.isArray(biz.currentSuppliers) ? biz.currentSuppliers : [],
+    partnershipTier: biz.partnershipTier || "",
+    demoFarmersCommitment: biz.demoFarmersCommitment || "",
+    warehouseSpace: biz.warehouseSpace || "",
+    storageConditions: biz.storageConditions || "",
+    customMachinery: biz.customMachinery || "",
+
+    totalMembers: mem.totalMembers || "",
+    activeMembers: mem.activeMembers || "",
+    majorCrops: Array.isArray(mem.majorCrops) && mem.majorCrops.length > 0 
+      ? mem.majorCrops 
+      : [{ name: '', acreage: '' }],
+    kharifDemand: mem.kharifDemand || "",
+    rabiDemand: mem.rabiDemand || "",
+    // 🚀 lrpNetwork REMOVED HERE
+
+    glsCommitments: Array.isArray(com.glsCommitments) ? com.glsCommitments : [],
+    complianceChecklist: Array.isArray(com.complianceChecklist) ? com.complianceChecklist : [],
+
+    documents: db.documents || {},
+    storageLocations: db.storage_locations || {},
+
+    agreementAccepted: db.agreement_accepted || false,
+    fpoSignature: db.fpo_signature || "",
+    seSignature: db.se_signature || ""
+  };
+}
+
+export async function updateFPOPdfUrl(id: string, pdfUrl: string) {
+  const { error } = await supabase.from("fpos").update({ pdf_url: pdfUrl }).eq("id", id);
+  if (error) throw error;
 }

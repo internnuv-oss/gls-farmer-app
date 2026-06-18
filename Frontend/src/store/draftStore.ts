@@ -8,14 +8,14 @@ import { useAuthStore } from './authStore'; // 🚀 IMPORT AUTH STORE
 export interface Draft {
   id: string;
   userId?: string; // 🚀 Link draft to a specific user
-  type: 'DEALER' | 'FARMER' | 'DISTRIBUTOR'; 
+  type: 'DEALER' | 'FARMER' | 'DISTRIBUTOR'|'FPO'; 
   data: any;
   updatedAt: number;
 }
 
 export interface DraftState {
   drafts: Draft[];
-  addDraft: (data: any, type: 'DEALER' | 'FARMER' | 'DISTRIBUTOR', customId?: string) => string;
+  addDraft: (data: any, type: 'DEALER' | 'FARMER' | 'DISTRIBUTOR'|'FPO', customId?: string) => string;
   removeDraft: (id: string) => void;
   updateDraft: (id: string, data: any, overrideUserId?: string) => void;
   clearDrafts: () => void; // 🚀 ADDED: Required for the one-time DB migration

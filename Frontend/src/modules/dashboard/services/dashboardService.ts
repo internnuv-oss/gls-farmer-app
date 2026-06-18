@@ -17,7 +17,7 @@ export const fetchMyFarmers = async (userId: string, page: number = 0, limit: nu
     .from('farmers')
     .select('*')
     .eq('se_id', userId)
-    .order('created_at', { ascending: false })
+    .order('updated_at', { ascending: false })
     .range(from, to);
 
   if (error) throw error;
@@ -32,7 +32,7 @@ export const fetchMyDealers = async (userId: string, page: number = 0, limit: nu
     .from('dealers') 
     .select('*')
     .eq('se_id', userId)
-    .order('created_at', { ascending: false })
+    .order('updated_at', { ascending: false })
     .range(from, to); 
 
   if (error) throw error;
@@ -54,6 +54,21 @@ export const fetchMyDealers = async (userId: string, page: number = 0, limit: nu
   return translatedData;
 };
 
+// Add this anywhere in the file
+export const fetchMyFPOs = async (userId: string, page: number = 0, limit: number = 5) => {
+  const from = page * limit;
+  const to = from + limit - 1;
+  const { data, error } = await supabase
+    .from('fpos')
+    .select('*')
+    .eq('se_id', userId)
+    .order('updated_at', { ascending: false })
+    .range(from, to);
+
+  if (error) throw error;
+  return data || [];
+};
+
 export const fetchMyDistributors = async (userId: string, page: number = 0, limit: number = 5) => {
   const from = page * limit;
   const to = from + limit - 1;
@@ -61,7 +76,7 @@ export const fetchMyDistributors = async (userId: string, page: number = 0, limi
     .from('distributors')
     .select('*')
     .eq('se_id', userId)
-    .order('created_at', { ascending: false })
+    .order('updated_at', { ascending: false })
     .range(from, to);
 
   if (error) throw error;
@@ -124,13 +139,15 @@ export async function fetchNetworkSummary(seId: string) {
     return count || 0;
   };
 
-  const [dealers, farmers, distributors] = await Promise.all([
+  // 🚀 FIX: Fetch fpos count as well
+  const [dealers, farmers, distributors, fpos] = await Promise.all([
     fetchCount("dealers", true),
     fetchCount("farmers"),
-    fetchCount("distributors")
+    fetchCount("distributors"),
+    fetchCount("fpos")
   ]);
 
-  return { dealers, farmers, distributors };
+  return { dealers, farmers, distributors, fpos };
 }
 
 export const deleteDraft = async (entityId: string) => {

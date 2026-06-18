@@ -144,6 +144,7 @@ export const EntityProfileScreen = ({ navigation, route }: any) => {
   const isDealer = entity.type === 'Dealer';
   const isFarmer = entity.type === 'Farmer';
   const isDistributor = entity.type === 'Distributor';
+  const isFPO = entity.type === 'FPO';
 
   const [refreshing, setRefreshing] = useState(false);
   const [downloading, setDownloading] = useState(false);
@@ -178,7 +179,10 @@ export const EntityProfileScreen = ({ navigation, route }: any) => {
   const handleEdit = () => {
     if (isFarmer) {
       navigation.navigate("FarmerOnboarding", { editData: raw });
-    } else if (isDistributor) {
+    }
+    else if (isFPO) {
+      navigation.navigate("FPOOnboarding", { editData: raw });
+     } else if (isDistributor) {
       navigation.navigate("DistributorOnboarding", { editData: raw }); 
     } else {
       navigation.navigate("DealerOnboarding", { editData: raw });
@@ -644,7 +648,99 @@ export const EntityProfileScreen = ({ navigation, route }: any) => {
             </SectionCard>
           </>
 
-        ) : (
+) : isFPO ? (
+  <>
+    {/* --- 1. BUSINESS PROFILE (FPO) --- */}
+    <SectionCard title="1. FPO Profile" icon="groups">
+      <DetailRow label="FPO Name" value={raw.fpo_name} />
+      <DetailRow label="CEO Name" value={raw.ceo_name} />
+      <DetailRow label="BoD President" value={raw.bod_president_name} />
+      <DetailRow label="Mobile Number" value={raw.contact_mobile ? <ActionablePhone phone={raw.contact_mobile} /> : ''} />
+      <DetailRow label="Email ID" value={raw.email} />
+      <DetailRow label="Command Area" value={raw.command_area} />
+      <DetailRow label="Address" value={raw.address} isVertical />
+      <DetailRow label="Location" value={`${raw.taluka}, ${raw.city}, ${raw.state} - ${raw.pincode}`} />
+      <DetailRow label="Promoting Agency" value={raw.promoting_agency} />
+      <DetailRow label="Reg Number" value={raw.registration_number} />
+      <DetailRow label="Incorporation Year" value={raw.incorporation_year} />
+      <DetailRow label="GST Number" value={raw.gst_number} />
+      <DetailRow label="PAN Number" value={raw.pan_number} />
+    </SectionCard>
+
+    {/* --- 2. BANK DETAILS --- */}
+    <SectionCard title="2. Bank Details" icon="account-balance">
+      {banks.length > 0 ? banks.map((bank: any, i: number) => (
+        <View key={i} style={{ backgroundColor: '#F8FAFC', padding: spacing.md, borderRadius: radius.md, borderWidth: 1, borderColor: '#E2E8F0', marginBottom: i !== banks.length - 1 ? spacing.md : 0 }}>
+          <Text style={{ fontSize: 14, fontWeight: '800', color: colors.text, marginBottom: spacing.sm }}>Account {i + 1}</Text>
+          <DetailRow label="Bank Name & Branch" value={bank.bankNameBranch} />
+          <DetailRow label="A/C Name" value={bank.accountName} />
+          <DetailRow label="A/C Number" value={bank.accountNumber} />
+          <DetailRow label="IFSC Code" value={bank.bankIfsc} />
+        </View>
+      )) : <Text style={{ color: colors.textMuted, fontWeight: '600', fontStyle: 'italic' }}>No bank details recorded.</Text>}
+    </SectionCard>
+
+    {/* --- 3. PROFILING & EVALUATION --- */}
+    <SectionCard title="3. Profiling & Evaluation" icon="assignment-turned-in">
+      <ScoreRow label="Member Base & Reach" score={scoring.memberBase || 0} />
+      <ScoreRow label="Financial Health" score={scoring.financial || 0} />
+      <ScoreRow label="Governance & Mgmt" score={scoring.governance || 0} />
+      <ScoreRow label="Infrastructure" score={scoring.infra || 0} />
+      <ScoreRow label="Input Distribution Exp" score={scoring.distribution || 0} />
+      <ScoreRow label="Output Aggregation" score={scoring.aggregation || 0} />
+      <ScoreRow label="Adoption of Bio" score={scoring.biologicals || 0} />
+      <ScoreRow label="Extension & Reach" score={scoring.extension || 0} />
+      <ScoreRow label="Digital Literacy" score={scoring.digital || 0} />
+      <ScoreRow label="Strategic Alignment" score={scoring.alignment || 0} />
+      
+      <View style={{ backgroundColor: '#FEF2F2', padding: spacing.md, borderRadius: radius.md, borderWidth: 1, borderColor: '#FECACA', marginTop: spacing.sm }}>
+        <Text style={{ color: '#991B1B', fontWeight: '800', marginBottom: 4 }}>Red Flags Noted:</Text>
+        <Text style={{ color: '#991B1B', fontWeight: '600', fontSize: 13, marginBottom: scoring.audio?.audioRedFlags ? 8 : 0 }}>{scoring.redFlags || 'None Reported'}</Text>
+        <AudioPlayer url={scoring.audio?.audioRedFlags} title="Alert Audio" />
+      </View>
+    </SectionCard>
+
+    {/* --- 4. BUSINESS SCOPE --- */}
+    <SectionCard title="4. Business Scope" icon="store">
+      <DetailRow label="Allotted Territory" value={raw.business_scope?.allottedTerritory} />
+      <DetailRow label="Expected Offtake" value={raw.business_scope?.expectedOfftake ? `₹${raw.business_scope.expectedOfftake}` : 'N/A'} />
+      <DetailRow label="Major Suppliers" value={raw.business_scope?.currentSuppliers?.join(', ')} isVertical />
+      <DetailRow label="Partnership Tier" value={raw.business_scope?.partnershipTier} />
+      <DetailRow label="Demo Commitments" value={raw.business_scope?.demoFarmersCommitment} />
+      <DetailRow label="Warehouse Space" value={raw.business_scope?.warehouseSpace ? `${raw.business_scope.warehouseSpace} Sq.ft` : 'N/A'} />
+      <DetailRow label="Storage Conditions" value={raw.business_scope?.storageConditions} />
+      <DetailRow label="Custom Machinery" value={raw.business_scope?.customMachinery} />
+    </SectionCard>
+
+    {/* --- 5. NETWORK --- */}
+    <SectionCard title="5. Member Base & Network" icon="nature-people">
+      <View style={{ flexDirection: 'row', gap: spacing.md, marginBottom: spacing.md }}>
+        <View style={{ flex: 1, backgroundColor: '#F1F5F9', padding: spacing.md, borderRadius: radius.md }}>
+          <Text style={{ color: colors.textMuted, fontWeight: '700', fontSize: 12 }}>Total Members</Text>
+          <Text style={{ color: colors.primary, fontWeight: '900', fontSize: 20 }}>{raw.member_base?.totalMembers || '0'}</Text>
+        </View>
+        <View style={{ flex: 1, backgroundColor: '#F1F5F9', padding: spacing.md, borderRadius: radius.md }}>
+          <Text style={{ color: colors.textMuted, fontWeight: '700', fontSize: 12 }}>Active Members</Text>
+          <Text style={{ color: colors.primary, fontWeight: '900', fontSize: 20 }}>{raw.member_base?.activeMembers || '0'}</Text>
+        </View>
+      </View>
+      
+      <Text style={{ color: colors.primary, fontWeight: '800', marginBottom: spacing.sm }}>Major Crops</Text>
+      {raw.member_base?.majorCrops?.map((c: any, i: number) => (
+        <Text key={i} style={{ color: colors.text, fontSize: 13, marginBottom: 4 }}>• {c.name} ({c.acreage} Acres)</Text>
+      ))}
+      
+      <Text style={{ color: colors.primary, fontWeight: '800', marginBottom: spacing.sm, marginTop: spacing.md }}>LRP / Village Network</Text>
+      {raw.member_base?.lrpNetwork?.map((l: any, i: number) => (
+        <View key={i} style={{ backgroundColor: '#F8FAFC', padding: spacing.sm, borderRadius: radius.sm, marginBottom: spacing.md, borderWidth: 1, borderColor: '#E2E8F0' }}>
+          <Text style={{ fontWeight: '800', color: colors.text }}>{l.clusterName}</Text>
+          <Text style={{ fontSize: 12, color: colors.textMuted, marginTop: 2 }}>Dominant Crop: {l.dominantCrop || 'N/A'} | Farmers: {l.estFarmers || 'N/A'}</Text>
+          <Text style={{ fontSize: 12, color: colors.textMuted, marginTop: 2 }}>Mitra: {l.coordinatorName} ({l.contactNo})</Text>
+        </View>
+      ))}
+    </SectionCard>
+  </>
+  ) : (
           <>
             {/* --- FARMER SPECIFIC SECTIONS --- */}
             <SectionCard title="1. Personal Details" icon="person">
@@ -685,7 +781,7 @@ export const EntityProfileScreen = ({ navigation, route }: any) => {
         )}
 
         {/* --- DOCUMENTS DIRECTORY (Shared for Dealer & Distributor) --- */}
-        {(isDealer || isDistributor) && (
+        {(isDealer || isDistributor || isFPO) && (
           <SectionCard title="Compliance & Media Attachments" icon="verified-user">
             
             <Text style={{ color: colors.textMuted, fontWeight: '700', marginBottom: spacing.sm }}>GLS Commitments Accepted:</Text>
@@ -728,19 +824,35 @@ export const EntityProfileScreen = ({ navigation, route }: any) => {
           </SectionCard>
         )}
 
-        {/* --- SIGNATURES (Shared for all 3) --- */}
+        {/* --- SIGNATURES (Shared for all Entities) --- */}
         <SectionCard title="Signatures & Approvals" icon="draw">
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+            
+            {/* Entity Signature */}
             <View style={{ flex: 1, alignItems: 'center' }}>
-              <View style={{ width: 60, height: 60, borderRadius: 30, backgroundColor: (isDealer ? raw.dealer_signature : isDistributor ? raw.distributor_signature : raw.farmer_signature) ? '#DCFCE7' : '#FEE2E2', justifyContent: 'center', alignItems: 'center', marginBottom: 8 }}>
-                <MaterialIcons name={(isDealer ? raw.dealer_signature : isDistributor ? raw.distributor_signature : raw.farmer_signature) ? "check" : "close"} size={30} color={(isDealer ? raw.dealer_signature : isDistributor ? raw.distributor_signature : raw.farmer_signature) ? "#166534" : "#991B1B"} />
+              <View style={{ 
+                width: 60, height: 60, borderRadius: 30, 
+                backgroundColor: (raw.fpo_signature || raw.dealer_signature || raw.distributor_signature || raw.farmer_signature) ? '#DCFCE7' : '#FEE2E2', 
+                justifyContent: 'center', alignItems: 'center', marginBottom: 8 
+              }}>
+                <MaterialIcons 
+                  name={(raw.fpo_signature || raw.dealer_signature || raw.distributor_signature || raw.farmer_signature) ? "check" : "close"} 
+                  size={30} 
+                  color={(raw.fpo_signature || raw.dealer_signature || raw.distributor_signature || raw.farmer_signature) ? "#166534" : "#991B1B"} 
+                />
               </View>
-              <Text style={{ fontSize: 12, fontWeight: '800', color: colors.text, textAlign: 'center' }}>{entity.type}</Text>
-              <Text style={{ fontSize: 10, color: colors.textMuted, marginTop: 2 }}>{(isDealer ? raw.dealer_signature : isDistributor ? raw.distributor_signature : raw.farmer_signature) ? 'Digitally Signed' : 'Pending'}</Text>
+              <Text style={{ fontSize: 12, fontWeight: '800', color: colors.text, textAlign: 'center', textTransform: 'uppercase' }}>
+                {entity.type}
+              </Text>
+              <Text style={{ fontSize: 10, color: colors.textMuted, marginTop: 2 }}>
+                {(raw.fpo_signature || raw.dealer_signature || raw.distributor_signature || raw.farmer_signature) ? 'Digitally Signed' : 'Pending'}
+              </Text>
             </View>
             
+            {/* Divider */}
             <View style={{ height: 40, width: 1, backgroundColor: colors.border }} />
 
+            {/* SE Signature */}
             <View style={{ flex: 1, alignItems: 'center' }}>
               <View style={{ width: 60, height: 60, borderRadius: 30, backgroundColor: raw.se_signature ? '#DCFCE7' : '#FEE2E2', justifyContent: 'center', alignItems: 'center', marginBottom: 8 }}>
                 <MaterialIcons name={raw.se_signature ? "check" : "close"} size={30} color={raw.se_signature ? "#166534" : "#991B1B"} />
@@ -748,6 +860,7 @@ export const EntityProfileScreen = ({ navigation, route }: any) => {
               <Text style={{ fontSize: 12, fontWeight: '800', color: colors.text, textAlign: 'center' }}>Sales Executive</Text>
               <Text style={{ fontSize: 10, color: colors.textMuted, marginTop: 2 }}>{raw.se_signature ? 'Digitally Signed' : 'Pending'}</Text>
             </View>
+            
           </View>
         </SectionCard>
 

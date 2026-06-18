@@ -12,7 +12,8 @@ import { useAuthStore } from "../../../store/authStore";
 import { useAlertStore } from "../../../store/alertStore";
 import { useDraftStore } from "../../../store/draftStore";
 import { supabase } from "../../../core/supabase";
-import { fetchMyDealers, fetchMyFarmers, fetchMyDistributors, fetchMyDrafts, deleteDraft } from "../services/dashboardService";
+import { fetchMyDealers, fetchMyFarmers, fetchMyDistributors, fetchMyDrafts, deleteDraft, fetchMyFPOs } from "../services/dashboardService";
+
 
 import { FloatingActionMenu, EmptyState } from "../../../design-system/components";
 import { colors, radius, spacing, shadows } from "../../../design-system/tokens";
@@ -43,7 +44,8 @@ export const DashboardScreen = ({ navigation, route }: any) => {
   const [distributors, setDistributors] = useState<any[]>([]);
   const [dealers, setDealers] = useState<any[]>([]);
   const [farmers, setFarmers] = useState<any[]>([]); 
-  const [dbDrafts, setDbDrafts] = useState<any[]>([]); // 🚀 State for DB Drafts
+  const [dbDrafts, setDbDrafts] = useState<any[]>([]);
+  const [fpos, setFpos] = useState<any[]>([]); // 🚀 State for DB Drafts
 
   // Migration to DB: Pull legacy local drafts to the cloud
   const localDrafts = useDraftStore((state) => state.drafts);
@@ -114,18 +116,26 @@ export const DashboardScreen = ({ navigation, route }: any) => {
     return {
       Distributors: dbDrafts.filter(d => d.entity_type === 'distributor').map(d => ({
         id: d.id, entityId: d.entity_id, name: d.draft_data?.firmName || d.draft_data?.firm_name || 'Incomplete Distributor', type: 'Distributor',
-        city: d.draft_data?.city || d.draft_data?.raw_data?.city || '', state: d.draft_data?.state || d.draft_data?.raw_data?.state || '', score: 0, raw: d.draft_data, step: d.current_step, isDraft: true
+        city: d.draft_data?.city || d.draft_data?.raw_data?.city || '', state: d.draft_data?.state || d.draft_data?.raw_data?.state || '', score: 0, raw: d.draft_data, step: d.current_step, isDraft: true,
+        updatedAt: d.updated_at 
       })),
       Dealers: dbDrafts.filter(d => d.entity_type === 'dealer').map(d => ({
         id: d.id, entityId: d.entity_id, name: d.draft_data?.primaryShopName || d.draft_data?.shopName || 'Incomplete Dealer', type: 'Dealer',
-        city: d.draft_data?.primaryShopLocation?.city || d.draft_data?.city || '', state: d.draft_data?.primaryShopLocation?.state || d.draft_data?.state || '', score: 0, raw: d.draft_data, step: d.current_step, isDraft: true
+        city: d.draft_data?.primaryShopLocation?.city || d.draft_data?.city || '', state: d.draft_data?.primaryShopLocation?.state || d.draft_data?.state || '', score: 0, raw: d.draft_data, step: d.current_step, isDraft: true,
+        updatedAt: d.updated_at 
       })),
       Farmers: dbDrafts.filter(d => d.entity_type === 'farmer').map(d => ({
         id: d.id, entityId: d.entity_id, name: d.draft_data?.fullName || d.draft_data?.full_name || 'Incomplete Farmer', type: 'Farmer',
         // 🚀 FIX: Map flat fields correctly for drafts so location shows up
         city: d.draft_data?.city || d.draft_data?.village || '', 
         state: d.draft_data?.state || '', 
-        score: 0, raw: d.draft_data, step: d.current_step, isDraft: true
+        score: 0, raw: d.draft_data, step: d.current_step, isDraft: true,updatedAt: d.updated_at 
+      })),
+      // 🚀 ADDED FPO MAPPING
+      FPOs: dbDrafts.filter(d => d.entity_type === 'fpo').map(d => ({
+        id: d.id, entityId: d.entity_id, name: d.draft_data?.fpoName || d.draft_data?.fpo_name || 'Incomplete FPO', type: 'FPO',
+        city: d.draft_data?.city || d.draft_data?.raw_data?.city || '', state: d.draft_data?.state || d.draft_data?.raw_data?.state || '', score: 0, raw: d.draft_data, step: d.current_step, isDraft: true,
+        updatedAt: d.updated_at 
       }))
     };
   }, [dbDrafts]);
@@ -142,42 +152,55 @@ export const DashboardScreen = ({ navigation, route }: any) => {
       const PAGE_LIMIT = 5;
       
       // 🚀 Fetch entities AND drafts
-      const [dealersData, farmersData, distributorsData, draftsData] = await Promise.all([
+      const [dealersData, farmersData, distributorsData, fposData, draftsData] = await Promise.all([
         fetchMyDealers(user.id, pageNumber, PAGE_LIMIT),
         fetchMyFarmers(user.id, pageNumber, PAGE_LIMIT),
         fetchMyDistributors(user.id, pageNumber, PAGE_LIMIT),
-        pageNumber === 0 ? fetchMyDrafts(user.id) : Promise.resolve([]) // Fetch drafts once on refresh/mount
+        fetchMyFPOs(user.id, pageNumber, PAGE_LIMIT), // 👈
+        pageNumber === 0 ? fetchMyDrafts(user.id) : Promise.resolve([])
       ]);
 
       const mappedDistributors = distributorsData.map((d: any) => ({
         id: d.id, name: d.firm_name, type: "Distributor", 
         city: d.city || 'N/A', // 🚀 FIX: Directly access city and state columns
         state: d.state || 'N/A', 
-        score: d.total_score || 0, raw: d, isDraft: false
+        score: d.total_score || 0, raw: d, isDraft: false,
+        updatedAt: d.updated_at || d.created_at
       }));
 
       const mappedDealers = dealersData.map((d: any) => ({
         id: d.id, name: d.primary_shop_name || d.shop_name, type: "Dealer", city: d.primary_shop_location?.city || d.city,
-        state: d.primary_shop_location?.state || d.state, score: d.total_score || 0, raw: d, isDraft: false
+        state: d.primary_shop_location?.state || d.state, score: d.total_score || 0, raw: d, isDraft: false,
+        updatedAt: d.updated_at || d.created_at
       }));
 
       const mappedFarmers = farmersData.map((f: any) => ({
         id: f.id, name: f.full_name, type: "Farmer", city: f.personal_details?.city || f.village,
-        state: f.personal_details?.state || "N/A", score: 0, raw: f, isDraft: false
+        state: f.personal_details?.state || "N/A", score: 0, raw: f, isDraft: false,
+        updatedAt: f.updated_at || f.created_at
+      }));
+
+      const mappedFPOs = fposData.map((f: any) => ({
+        id: f.id, name: f.fpo_name, type: "FPO", city: f.city || "N/A", state: f.state || "N/A", score: f.total_score || 0, raw: f, isDraft: false,
+        updatedAt: f.updated_at || f.created_at
       }));
 
       if (pageNumber === 0) {
         setDistributors(mappedDistributors);
         setDealers(mappedDealers);
         setFarmers(mappedFarmers);
-        setDbDrafts(draftsData); // Save drafts to state
+        setFpos(mappedFPOs); // 👈
+        setDbDrafts(draftsData);
       } else {
         setDistributors(prev => [...prev, ...mappedDistributors]);
         setDealers(prev => [...prev, ...mappedDealers]);
         setFarmers(prev => [...prev, ...mappedFarmers]);
+        setFpos(prev => [...prev, ...mappedFPOs]); // 👈
       }
 
-      setHasMore(dealersData.length === PAGE_LIMIT || farmersData.length === PAGE_LIMIT || distributorsData.length === PAGE_LIMIT);
+      setHasMore(dealersData.length === PAGE_LIMIT || farmersData.length === PAGE_LIMIT || distributorsData.length === PAGE_LIMIT || fposData.length === PAGE_LIMIT);
+
+     
       setPage(pageNumber);
     } catch (e) {
       console.error(e);
@@ -199,7 +222,11 @@ export const DashboardScreen = ({ navigation, route }: any) => {
 
   // --- DISTRIBUTOR FILTERING & SORTING ---
   const processedDistributors = useMemo(() => {
-    let result = [...mappedDrafts.Distributors, ...distributors]; // Mix drafts & completed
+    // 🚀 DEDUPLICATION: Remove drafts if a completed profile exists with the same phone
+    const completedPhones = new Set(distributors.map(d => d.raw?.contact_mobile));
+    const activeDrafts = mappedDrafts.Distributors.filter(d => !completedPhones.has(d.raw?.contactMobile));
+
+    let result = [...activeDrafts, ...distributors];
     
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase();
@@ -208,115 +235,79 @@ export const DashboardScreen = ({ navigation, route }: any) => {
         (d.city || "").toLowerCase().includes(query) ||
         (d.state || "").toLowerCase().includes(query) ||
         (d.raw?.raw_data?.contactPerson || d.raw?.contactPerson || "").toLowerCase().includes(query) ||
-        // 🚀 Added phone number search for Distributors (DB & Drafts)
         (d.raw?.contact_mobile || d.raw?.contactMobile || d.raw?.raw_data?.contactMobile || "").includes(query)
       );
     }
-
-    if (filters.completionStatus.length > 0) {
-      result = result.filter(d => filters.completionStatus.includes(d.isDraft ? "Incomplete" : "Completed"));
-    }
-
-    if (filters.distributorBand.length > 0) {
-      result = result.filter((d) => {
-        const band = d.raw?.band || "";
-        return filters.distributorBand.some(b => band.includes(b));
-      });
-    }
-
-    if (filters.distributorStatus.length > 0) {
-      result = result.filter((d) => filters.distributorStatus.includes(d.raw?.raw_data?.proposedStatus || d.raw?.proposedStatus));
-    }
-
-    if (filters.distributorColdChain.length > 0) {
-      result = result.filter((d) => filters.distributorColdChain.includes(d.raw?.raw_data?.coldChainFacility || d.raw?.coldChainFacility));
-    }
+    if (filters.completionStatus.length > 0) result = result.filter(d => filters.completionStatus.includes(d.isDraft ? "Incomplete" : "Completed"));
+    if (filters.distributorBand.length > 0) result = result.filter((d) => filters.distributorBand.some(b => (d.raw?.band || "").includes(b)));
+    if (filters.distributorStatus.length > 0) result = result.filter((d) => filters.distributorStatus.includes(d.raw?.raw_data?.proposedStatus || d.raw?.proposedStatus));
+    if (filters.distributorColdChain.length > 0) result = result.filter((d) => filters.distributorColdChain.includes(d.raw?.raw_data?.coldChainFacility || d.raw?.coldChainFacility));
 
     result.sort((a, b) => {
       if (filters.sortBy === "score_high") return b.score - a.score;
       if (filters.sortBy === "score_low") return a.score - b.score;
-      return 0; 
+      // 🚀 DEFAULT: Sort entirely by latest updated_at
+      return new Date(b.updatedAt || 0).getTime() - new Date(a.updatedAt || 0).getTime(); 
     });
-
     return result;
   }, [distributors, mappedDrafts.Distributors, searchQuery, filters]);
 
   // --- DEALER FILTERING & SORTING ---
   const processedDealers = useMemo(() => {
-    let result = [...mappedDrafts.Dealers, ...dealers]; // Mix drafts & completed
+    // 🚀 DEDUPLICATION: Remove drafts if a completed profile exists with the same phone
+    const completedPhones = new Set(dealers.map(d => d.raw?.contact_mobile));
+    const activeDrafts = mappedDrafts.Dealers.filter(d => !completedPhones.has(d.raw?.contactMobile));
+
+    let result = [...activeDrafts, ...dealers];
 
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase();
-      result = result.filter(
-        (d) =>
+      result = result.filter(d =>
           (d.name || "").toLowerCase().includes(query) ||
           (d.city || "").toLowerCase().includes(query) ||
           (d.state || "").toLowerCase().includes(query) ||
           (d.raw?.contact_person || d.raw?.contactPerson || "").toLowerCase().includes(query) ||
-          // 🚀 Added phone number search for Dealers (DB & Drafts)
           (d.raw?.contact_mobile || d.raw?.contactMobile || "").includes(query)
       );
     }
 
-    if (filters.completionStatus.length > 0) {
-      result = result.filter(d => filters.completionStatus.includes(d.isDraft ? "Incomplete" : "Completed"));
-    }
-
-    if (filters.category.length > 0) {
-      result = result.filter((d) => filters.category.includes(d.raw?.category));
-    }
-    if (filters.proposedStatus.length > 0) {
-      result = result.filter((d) => filters.proposedStatus.includes(d.raw?.proposed_status || d.raw?.proposedStatus));
-    }
-    if (filters.firmType.length > 0) {
-      result = result.filter((d) => filters.firmType.includes(d.raw?.firm_type || d.raw?.firmType));
-    }
-    if (filters.linkedStatus.length > 0) {
-      result = result.filter((item) => {
-        const isLinked = (item.raw?.distributor_links?.isLinked || item.raw?.distributorLinks?.isLinked) === 'Yes' ? 'Linked' : 'Unlinked';
-        return filters.linkedStatus.includes(isLinked);
-      });
-    }
-    if (filters.willingDemoFarmers.length > 0) {
-      result = result.filter((item) => {
-        const willing = (item.raw?.demo_farmers_data?.willing || item.raw?.demoFarmersData?.willing) === 'Yes' ? 'Yes' : 'No';
-        return filters.willingDemoFarmers.includes(willing);
-      });
-    }
+    if (filters.completionStatus.length > 0) result = result.filter(d => filters.completionStatus.includes(d.isDraft ? "Incomplete" : "Completed"));
+    if (filters.category.length > 0) result = result.filter((d) => filters.category.includes(d.raw?.category));
+    if (filters.proposedStatus.length > 0) result = result.filter((d) => filters.proposedStatus.includes(d.raw?.proposed_status || d.raw?.proposedStatus));
+    if (filters.firmType.length > 0) result = result.filter((d) => filters.firmType.includes(d.raw?.firm_type || d.raw?.firmType));
+    if (filters.linkedStatus.length > 0) result = result.filter((item) => filters.linkedStatus.includes((item.raw?.distributor_links?.isLinked || item.raw?.distributorLinks?.isLinked) === 'Yes' ? 'Linked' : 'Unlinked'));
+    if (filters.willingDemoFarmers.length > 0) result = result.filter((item) => filters.willingDemoFarmers.includes((item.raw?.demo_farmers_data?.willing || item.raw?.demoFarmersData?.willing) === 'Yes' ? 'Yes' : 'No'));
 
     result.sort((a, b) => {
       if (filters.sortBy === "score_high") return b.score - a.score;
       if (filters.sortBy === "score_low") return a.score - b.score;
-      return 0; 
+      // 🚀 DEFAULT: Sort entirely by latest updated_at
+      return new Date(b.updatedAt || 0).getTime() - new Date(a.updatedAt || 0).getTime();
     });
-
     return result;
   }, [dealers, mappedDrafts.Dealers, searchQuery, filters]);
 
-  const isFilterActive = JSON.stringify(filters) !== JSON.stringify(defaultFilters);
-
   // --- FARMER FILTERING & SORTING ---
   const processedFarmers = useMemo(() => {
-    let result = [...mappedDrafts.Farmers, ...farmers]; // Mix drafts & completed
+    // 🚀 DEDUPLICATION: Remove drafts if a completed profile exists with the same phone
+    const completedPhones = new Set(farmers.map(f => f.raw?.mobile));
+    const activeDrafts = mappedDrafts.Farmers.filter(f => !completedPhones.has(f.raw?.mobile));
+
+    let result = [...activeDrafts, ...farmers]; 
     
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase();
-      result = result.filter(
-        (f) =>
+      result = result.filter(f =>
           (f.name || "").toLowerCase().includes(query) ||
           (f.city || "").toLowerCase().includes(query) ||
           (f.state || "").toLowerCase().includes(query) ||
           (f.raw?.village || "").toLowerCase().includes(query) ||
           (f.raw?.personal_details?.fatherName || f.raw?.personalDetails?.fatherName || "").toLowerCase().includes(query) ||
-          // 🚀 Added/Enhanced phone number search for Farmers (DB & Drafts)
           (f.raw?.mobile || f.raw?.contactMobile || "").includes(query)
       );
     }
 
-    if (filters.completionStatus.length > 0) {
-      result = result.filter(d => filters.completionStatus.includes(d.isDraft ? "Incomplete" : "Completed"));
-    }
-
+    if (filters.completionStatus.length > 0) result = result.filter(d => filters.completionStatus.includes(d.isDraft ? "Incomplete" : "Completed"));
     if (filters.scale.length > 0) {
       result = result.filter((f) => {
         const land = parseFloat(f.raw?.farm_details?.totalLand || f.raw?.farmDetails?.totalLand || "0");
@@ -326,41 +317,58 @@ export const DashboardScreen = ({ navigation, route }: any) => {
         return filters.scale.includes(scale);
       });
     }
-    if (filters.farmerCrops.length > 0) {
-      result = result.filter((f) => {
-        const crops = f.raw?.farm_details?.majorCrops || f.raw?.farmDetails?.majorCrops || [];
-        return filters.farmerCrops.some((c) => crops.includes(c)); 
-      });
-    }
+    if (filters.farmerCrops.length > 0) result = result.filter((f) => filters.farmerCrops.some((c) => (f.raw?.farm_details?.majorCrops || f.raw?.farmDetails?.majorCrops || []).includes(c)));
     if (filters.farmerSoil.length > 0) {
       const PREDEFINED_SOILS = ["Black", "Sandy", "Red", "Loamy"];
-      result = result.filter((f) => {
-        const soils = f.raw?.farm_details?.soilType || f.raw?.farmDetails?.soilType || [];
-        return filters.farmerSoil.some((s) => {
-          if (s === "Others") return soils.some((soil: string) => !PREDEFINED_SOILS.includes(soil));
-          return soils.includes(s);
-        });
-      });
+      result = result.filter((f) => filters.farmerSoil.some((s) => s === "Others" ? (f.raw?.farm_details?.soilType || f.raw?.farmDetails?.soilType || []).some((soil: string) => !PREDEFINED_SOILS.includes(soil)) : (f.raw?.farm_details?.soilType || f.raw?.farmDetails?.soilType || []).includes(s)));
     }
     if (filters.farmerWater.length > 0) {
       const PREDEFINED_WATER = ["Canal", "Borewell", "Rain"];
-      result = result.filter((f) => {
-        const waters = f.raw?.farm_details?.waterSource || f.raw?.farmDetails?.waterSource || [];
-        return filters.farmerWater.some((w) => {
-          if (w === "Others") return waters.some((water: string) => !PREDEFINED_WATER.includes(water));
-          return waters.includes(w);
-        });
-      });
+      result = result.filter((f) => filters.farmerWater.some((w) => w === "Others" ? (f.raw?.farm_details?.waterSource || f.raw?.farmDetails?.waterSource || []).some((water: string) => !PREDEFINED_WATER.includes(water)) : (f.raw?.farm_details?.waterSource || f.raw?.farmDetails?.waterSource || []).includes(w)));
     }
 
     result.sort((a, b) => {
       if (filters.sortBy === "land_high") return parseFloat(b.raw?.farm_details?.totalLand || b.raw?.farmDetails?.totalLand || "0") - parseFloat(a.raw?.farm_details?.totalLand || a.raw?.farmDetails?.totalLand || "0");
       if (filters.sortBy === "land_low") return parseFloat(a.raw?.farm_details?.totalLand || a.raw?.farmDetails?.totalLand || "0") - parseFloat(b.raw?.farm_details?.totalLand || b.raw?.farmDetails?.totalLand || "0");
-      return 0; 
+      // 🚀 DEFAULT: Sort entirely by latest updated_at
+      return new Date(b.updatedAt || 0).getTime() - new Date(a.updatedAt || 0).getTime();
+    });
+    return result;
+  }, [farmers, mappedDrafts.Farmers, searchQuery, filters]);
+
+
+  // --- FPO FILTERING & SORTING ---
+  const processedFPOs = useMemo(() => {
+    // 🚀 DEDUPLICATION: Remove drafts if a completed profile exists with the same phone
+    const completedPhones = new Set(fpos.map(f => f.raw?.contact_mobile || f.raw?.contactMobile));
+    const activeDrafts = mappedDrafts.FPOs.filter(f => !completedPhones.has(f.raw?.contact_mobile || f.raw?.contactMobile));
+
+    let result = [...activeDrafts, ...fpos]; 
+    
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase();
+      result = result.filter((f) =>
+          (f.name || "").toLowerCase().includes(query) ||
+          (f.city || "").toLowerCase().includes(query) ||
+          (f.state || "").toLowerCase().includes(query) ||
+          (f.raw?.ceo_name || f.raw?.ceoName || "").toLowerCase().includes(query) ||
+          (f.raw?.contact_mobile || f.raw?.contactMobile || "").includes(query)
+      );
+    }
+
+    if (filters.completionStatus.length > 0) {
+      result = result.filter(d => filters.completionStatus.includes(d.isDraft ? "Incomplete" : "Completed"));
+    }
+
+    // 🚀 DEFAULT: Sort entirely by latest updated_at
+    result.sort((a, b) => {
+      return new Date(b.updatedAt || 0).getTime() - new Date(a.updatedAt || 0).getTime();
     });
 
     return result;
-  }, [farmers, mappedDrafts.Farmers, searchQuery, filters]);
+  }, [fpos, mappedDrafts.FPOs, searchQuery, filters]);
+
+  const isFilterActive = JSON.stringify(filters) !== JSON.stringify(defaultFilters);
 
   const tabPages = [
     {
@@ -389,6 +397,15 @@ export const DashboardScreen = ({ navigation, route }: any) => {
       actionId: "farmer",
       actionLabel: "Add Farmer",
       actionIcon: "agriculture",
+    },
+    {
+      key: "FPOs",
+      data: processedFPOs, 
+      emptyMsg: "Partner with Farmer Producer Organizations to scale your reach.",
+      icon: "groups",
+      actionId: "fpo",
+      actionLabel: "Add FPO",
+      actionIcon: "groups",
     },
   ];
 
@@ -438,6 +455,7 @@ export const DashboardScreen = ({ navigation, route }: any) => {
     const isDealer = item.type === 'Dealer';
     const isDistributor = item.type === 'Distributor';
     const isFarmer = item.type === 'Farmer';
+    const isFPO = item.type === 'FPO';
     const hasScore = !item.isDraft && (isDealer || isDistributor);
     
     // GPS Mapping
@@ -485,13 +503,25 @@ export const DashboardScreen = ({ navigation, route }: any) => {
         { icon: 'grass', value: crops, isPhone: false, translate: true },
         { icon: 'water-drop', value: water, isPhone: false, translate: true },
       ];
+    } else if (isFPO) {
+      const person = item.raw.ceo_name || item.raw.ceoName;
+      const phone = item.raw.contact_mobile || item.raw.contactMobile;
+      const agency = item.raw.promoting_agency || item.raw.promotingAgency;
+      const members = item.raw.member_base?.totalMembers || item.raw.totalMembers;
+
+      infoBlocks = [
+        { icon: 'person', value: person, isPhone: false },
+        { icon: 'phone', value: phone, isPhone: true },
+        { icon: 'handshake', value: agency, isPhone: false },
+        { icon: 'groups', value: members ? `${members} Members` : null, isPhone: false },
+      ];
     }
 
     // Filter out items that haven't been filled yet
     const validBlocks = infoBlocks.filter(b => b.value && String(b.value).trim() !== '');
 
-    const badgeBg = isDealer ? '#FEF3C7' : isDistributor ? '#FFEDD5' : '#E0E7FF';
-    const badgeColor = isDealer ? colors.warning : isDistributor ? colors.secondary : '#4F46E5';
+    const badgeBg = isDealer ? '#FEF3C7' : isDistributor ? '#FFEDD5' : isFPO ? '#F3E8FF' : '#E0E7FF';
+    const badgeColor = isDealer ? colors.warning : isDistributor ? colors.secondary : isFPO ? '#7E22CE' : '#4F46E5';
 
     const handleMenuPress = () => {
       if (menuVisible) {
@@ -579,8 +609,9 @@ export const DashboardScreen = ({ navigation, route }: any) => {
                           onPress={() => {
                             setMenuVisible(false);
                             if (item.type === 'Farmer') navigation.navigate("FarmerOnboarding", { editData: item.raw });
-                            else if (item.type === 'Distributor') navigation.navigate("DistributorOnboarding", { editData: item.raw });
-                            else navigation.navigate("DealerOnboarding", { editData: item.raw });
+    else if (item.type === 'FPO') navigation.navigate("FPOOnboarding", { editData: item.raw }); // 👈
+    else if (item.type === 'Distributor') navigation.navigate("DistributorOnboarding", { editData: item.raw });
+    else navigation.navigate("DealerOnboarding", { editData: item.raw });
                           }}
                           style={{ flexDirection: "row", alignItems: "center", padding: spacing.md }}
                         >
@@ -662,6 +693,7 @@ export const DashboardScreen = ({ navigation, route }: any) => {
             onPress={() => {
               if (item.isDraft) {
                 if (item.type === 'Farmer') navigation.navigate("FarmerOnboarding", { draftId: item.entityId, draftData: item.raw, initialStep: item.step });
+    else if (item.type === 'FPO') navigation.navigate("FPOOnboarding", { draftId: item.entityId, draftData: item.raw, initialStep: item.step });
                 else if (item.type === 'Distributor') navigation.navigate("DistributorOnboarding", { draftId: item.entityId, draftData: item.raw, initialStep: item.step });
                 else navigation.navigate("DealerOnboarding", { draftId: item.entityId, draftData: item.raw, initialStep: item.step });
               } else {
@@ -806,6 +838,7 @@ export const DashboardScreen = ({ navigation, route }: any) => {
                       if (item.actionId === "dealer") navigation.navigate("DealerOnboarding");
                       else if (item.actionId === "farmer") navigation.navigate("FarmerOnboarding");
                       else if (item.actionId === "distributor") navigation.navigate("DistributorOnboarding");
+                      else if (item.actionId === "fpo") navigation.navigate("FPOOnboarding");
                       else navigation.navigate("ComingSoonScreen");
                     }}
                   />
@@ -816,16 +849,18 @@ export const DashboardScreen = ({ navigation, route }: any) => {
         )}
       />
 
-      <FloatingActionMenu
+<FloatingActionMenu
         actions={[
           { id: "dealer", label: t("Add Dealer"), icon: "storefront" },
           { id: "farmer", label: t("Add Farmer"), icon: "agriculture" },
           { id: "distributor", label: t("Add Distributor"), icon: "domain" },
+          { id: "fpo", label: t("Add FPO"), icon: "groups" }, // 👈
         ]}
         onActionPress={(id) => {
           if (id === "dealer") navigation.navigate("DealerOnboarding");
           else if (id === "farmer") navigation.navigate("FarmerOnboarding");
           else if (id === "distributor") navigation.navigate("DistributorOnboarding");
+          else if (id === "fpo") navigation.navigate("FPOOnboarding"); // 👈
           else navigation.navigate("ComingSoonScreen");
         }}
       />
