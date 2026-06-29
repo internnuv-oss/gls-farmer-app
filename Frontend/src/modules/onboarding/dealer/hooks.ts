@@ -15,9 +15,11 @@ import { supabase } from '../../../core/supabase';
 import { requestMediaPermission, requestCameraPermission } from "../../../core/permissions";
 import { useAuthStore } from "../../../store/authStore";
 import { uploadFileToCloudinary } from "../services/cloudinaryService";
-import { saveDealerOnboarding, mapDealerDbToForm, updateDealerPdfUrl, fetchProfileByMobile } from "../services/onboardingService";
+import { saveDealerOnboarding, mapDealerDbToForm, fetchProfileByMobile } from "../services/onboardingService";
 import { dealerOnboardingSchema, DealerOnboardingValues, GLS_COMMITMENTS } from "./schema";
 import { useAlertStore } from "../../../store/alertStore";
+import { useShiftStore } from "../../../store/shiftStore";
+import { useDraftStore } from "../../../store/draftStore";
 
 export function useDealerOnboarding(navigation: any, route: any) {
   const user = useAuthStore((s) => s.user);
@@ -131,7 +133,7 @@ export function useDealerOnboarding(navigation: any, route: any) {
         form.reset(currentValues, { keepValues: true }); 
       }
 
-      await supabase.from('drafts').upsert({
+      const { error } = await supabase.from('drafts').upsert({
         se_id: user.id,
         entity_type: 'dealer',
         entity_id: draftIdRef.current,
@@ -140,8 +142,23 @@ export function useDealerOnboarding(navigation: any, route: any) {
         update_history: history,
         updated_at: new Date().toISOString()
       }, { onConflict: 'entity_id' });
+
+      if (error) throw error;
+
+      // 🚀 Remove from local offline drafts if sync is successful
+      useDraftStore.getState().removeDraft(draftIdRef.current);
+
     } catch (err) {
-      console.log("Failed to sync draft to DB", err);
+      console.log("Failed to sync draft to DB, saving locally", err);
+      // 🚀 OFFLINE / CRASH FALLBACK: Save locally with the current step
+      const fallbackData = { ...currentValues, _step: step };
+      const localDrafts = useDraftStore.getState().drafts;
+      
+      if (localDrafts.some(d => d.id === draftIdRef.current!)) {
+        useDraftStore.getState().updateDraft(draftIdRef.current!, fallbackData);
+      } else {
+        useDraftStore.getState().addDraft(fallbackData, 'DEALER', draftIdRef.current);
+      }
     }
   };
 
@@ -186,6 +203,8 @@ export function useDealerOnboarding(navigation: any, route: any) {
 
     useAlertStore.getState().showAlert("Saving...", "Syncing draft to database...");
     await saveDraftToDB(true);
+    await useShiftStore.getState().incrementActivity(); // 🚀 NEW: Log valid activity!
+    await useShiftStore.getState().logShiftEvent('activity', 'Saved Dealer Draft', form.getValues().shopName || 'Unknown Dealer');
     useAlertStore.getState().hideAlert();
     navigation.navigate("MainTabs");
   };
@@ -725,47 +744,56 @@ export function useDealerOnboarding(navigation: any, route: any) {
     }
   };
 
-  // 🚀 DB CRUD: Delete Draft from DB on Submit
+  // 🚀 HARD LOCK REFERENCE TO PREVENT DOUBLE TAPS
+  const submitLockedRef = useRef(false);
+
   const submit = async () => {
+    if (submitLockedRef.current) return;
+    
     const check = checkRestrictions();
     if (!check.pass) return useAlertStore.getState().showAlert("Restricted Action", check.error);
     const missingSteps = validationStatus.filter(v => !v.isValid).map(v => v.name);
     
     if (missingSteps.length > 0) {
-      useAlertStore.getState().showAlert(
-        "Missing Information", 
-        "Please complete the following sections before submitting:\n\n• " + missingSteps.join("\n• ")
-      );
+      useAlertStore.getState().showAlert("Missing Information", "Please complete the following sections before submitting:\n\n• " + missingSteps.join("\n• "));
       return; 
     }
 
     await form.handleSubmit(async (data) => {
       if (!user?.id) return useAlertStore.getState().showAlert("Error", "User session not found.");
+      
+      if (submitLockedRef.current) return;
+      submitLockedRef.current = true;
       setIsSubmitting(true);
+
       try {
-        const dbResult = await saveDealerOnboarding(data, "SUBMITTED", scoreData.percentage, scoreData.band, user.id, editData?.id || fetchedRecordId, check.dirtyKeys);
+        // 🚀 1. GENERATE PDF FIRST
+        useAlertStore.getState().showAlert("Processing", "Generating and securing PDF dossier...");
+        const html = generateHTML();
+        const { uri } = await Print.printToFileAsync({ html });
+        const pdfUrl = await uploadFileToCloudinary(uri, 'raw');
+
+        // 🚀 2. SAVE ATOMICALLY
+        useAlertStore.getState().showAlert("Saving", "Uploading complete profile to database...");
+        const dbResult = await saveDealerOnboarding(data, "SUBMITTED", scoreData.percentage, scoreData.band, user.id, editData?.id || fetchedRecordId, check.dirtyKeys, pdfUrl);
         
-        // 🚀 THE FIX: IMMEDIATELY Delete draft before attempting PDF generation
+        await useShiftStore.getState().incrementActivity(); // 🚀 NEW: Log valid activity!
+        await useShiftStore.getState().logShiftEvent('activity', (editData || fetchedRecordId) ? 'Updated Dealer Profile' : 'Onboarded Dealer', data.shopName || 'Unknown Dealer');
+        
+        // 🚀 3. DELETE DRAFT
         if (draftIdRef.current) {
           await supabase.from('drafts').delete().eq('entity_id', draftIdRef.current);
           draftIdRef.current = undefined; 
         }
-        showSuccessRef.current = true; // Block auto-save logic
-        
-        // Try PDF generation independently, so if it fails, it doesn't freeze the submission
-        try {
-            const html = generateHTML();
-            const { uri } = await Print.printToFileAsync({ html });
-            const pdfUrl = await uploadFileToCloudinary(uri, 'raw');
-            await updateDealerPdfUrl(dbResult.id, pdfUrl);
-        } catch(pdfErr) {
-            console.log("PDF Generation/Upload Failed", pdfErr);
-        }
 
+        showSuccessRef.current = true;
+        useAlertStore.getState().hideAlert();
         setShowSuccess(true);
       } catch (error: any) {
-        useAlertStore.getState().showAlert("Submission Failed", error.message);
+        console.error("Submission Error:", error);
+        useAlertStore.getState().showAlert("Submission Failed", error.message || "An error occurred during submission. Please check your connection and try again.");
       } finally {
+        submitLockedRef.current = false;
         setIsSubmitting(false);
       }
     })();

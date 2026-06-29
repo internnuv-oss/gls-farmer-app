@@ -1,9 +1,10 @@
 import React, { useEffect } from 'react';
-import { View, BackHandler } from 'react-native';
+import { View, Text, Pressable, BackHandler } from 'react-native';
 import { useTranslation } from 'react-i18next';
+import i18n from '../../../../core/i18n';
 import { WizardFlowTemplate, FeedbackScreenTemplate } from '../../../../design-system/templates';
 import { Button } from '../../../../design-system/components';
-import { spacing } from '../../../../design-system/tokens';
+import { colors, radius, spacing } from '../../../../design-system/tokens';
 import { useFarmerOnboarding } from '../hooks';
 
 import { Step1PersonalDetails } from './steps/Step1PersonalDetails';
@@ -14,6 +15,10 @@ import { Step5Review } from './steps/Step5Review';
 
 export const FarmerOnboardingScreen = ({ navigation, route }: any) => {
   const { t } = useTranslation();
+  const cycleLanguage = () => {
+    const next = i18n.language === 'en' ? 'hi' : i18n.language === 'hi' ? 'gu' : 'en';
+    i18n.changeLanguage(next);
+  };
   
   const { 
     form, step, setStep, jumpBackTo, setJumpBackTo, saveDraft, submit, isSubmitting, 
@@ -67,6 +72,11 @@ export const FarmerOnboardingScreen = ({ navigation, route }: any) => {
       headerTitle={t(isEditing ? "Edit Farmer Profile" : "Farmer Enrolment")} 
       stepLabel={t("STEP {{current}} OF 5", { current: step })} 
       progress01={step / 5}
+      headerRight={
+        <Pressable onPress={cycleLanguage} style={{ backgroundColor: colors.primarySoft, paddingHorizontal: 12, paddingVertical: 6, borderRadius: radius.pill }}>
+          <Text style={{ fontWeight: '900', color: colors.primary, fontSize: 12 }}>{i18n.language.toUpperCase()}</Text>
+        </Pressable>
+      }
       onBack={() => {
         if (jumpBackTo) {
           setStep(jumpBackTo);

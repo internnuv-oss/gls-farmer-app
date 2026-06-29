@@ -1,9 +1,10 @@
-import React from "react";
+import React, { useEffect, useRef } from "react";
 import {
   TouchableOpacity,
   Text,
   ActivityIndicator,
   ViewStyle,
+  Animated
 } from "react-native";
 import { colors, radius, spacing } from "../tokens";
 import { MaterialIcons } from "@expo/vector-icons";
@@ -17,6 +18,7 @@ type Props = {
   style?: ViewStyle;
   icon?: React.ComponentProps<typeof MaterialIcons>["name"];
   iconPosition?: "left" | "right"; // <-- Added iconPosition prop
+  bounceIcon?: boolean;
 };
 
 export const Button: React.FC<Props> = ({
@@ -28,7 +30,26 @@ export const Button: React.FC<Props> = ({
   style,
   icon,
   iconPosition = "left", // Defaults to left
+  bounceIcon = false,
 }) => {
+  // 🚀 ADD ANIMATION REF & EFFECT
+  const bounceAnim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    if (bounceIcon && !disabled && !loading) {
+      const loop = Animated.loop(
+        Animated.sequence([
+          Animated.timing(bounceAnim, { toValue: -4, duration: 400, useNativeDriver: true }),
+          Animated.timing(bounceAnim, { toValue: 0, duration: 400, useNativeDriver: true })
+        ])
+      );
+      loop.start();
+      return () => loop.stop();
+    } else {
+      bounceAnim.setValue(0);
+    }
+  }, [bounceIcon, disabled, loading]);
+
   const getBgColor = () => {
     if (disabled) return "#E2E8F0"; 
     if (variant === "secondary") return colors.primarySoft;
@@ -71,30 +92,32 @@ export const Button: React.FC<Props> = ({
         <ActivityIndicator color={getTextColor()} />
       ) : (
         <>
-          {/* Render icon on the LEFT */}
+          {/* 🚀 WRAPPED LEFT ICON IN ANIMATED VIEW */}
           {icon && iconPosition === "left" && (
-            <MaterialIcons
-              name={icon}
-              size={18}
-              color={getTextColor()}
-              style={{ marginRight: 8 }}
-            />
+            <Animated.View style={bounceIcon && !disabled ? { transform: [{ translateY: bounceAnim }] } : {}}>
+              <MaterialIcons
+                name={icon}
+                size={18}
+                color={getTextColor()}
+                style={{ marginRight: 8 }}
+              />
+            </Animated.View>
           )}
           
-          <Text
-            style={{ color: getTextColor(), fontWeight: "800", fontSize: 16 }}
-          >
+          <Text style={{ color: getTextColor(), fontWeight: "800", fontSize: 16 }}>
             {label}
           </Text>
 
-          {/* Render icon on the RIGHT */}
+          {/* 🚀 WRAPPED RIGHT ICON IN ANIMATED VIEW */}
           {icon && iconPosition === "right" && (
-            <MaterialIcons
-              name={icon}
-              size={18}
-              color={getTextColor()}
-              style={{ marginLeft: 8 }}
-            />
+            <Animated.View style={bounceIcon && !disabled ? { transform: [{ translateY: bounceAnim }] } : {}}>
+              <MaterialIcons
+                name={icon}
+                size={18}
+                color={getTextColor()}
+                style={{ marginLeft: 8 }}
+              />
+            </Animated.View>
           )}
         </>
       )}

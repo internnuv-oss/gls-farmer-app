@@ -1,3 +1,4 @@
+import '../core/locationTracker';
 import React, { useState, useEffect } from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
@@ -22,6 +23,10 @@ import { useAlertStore } from '../store/alertStore';
 import { FarmerOnboardingScreen } from '../modules/onboarding/farmer/screens/FarmerOnboardingScreen';
 import { DistributorOnboardingScreen } from '../modules/onboarding/distributor/screens/DistributorOnboardingScreen';
 import { FPOOnboardingScreen } from '../modules/onboarding/fpo/screens/FPOOnboardingScreen';
+import { ReportsHubScreen } from '../modules/reports/screens/ReportsHubScreen';
+import { AttendanceReportScreen } from '../modules/reports/screens/AttendanceReportScreen';
+import { ExpenseReportScreen } from '../modules/reports/screens/ExpenseReportScreen';
+import { AddExpenseScreen } from '../modules/reports/screens/AddExpenseScreen';
 
 const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
@@ -54,6 +59,7 @@ const MainTabs = () => (
       component={DashboardStackNavigator} 
       options={{ tabBarIcon: ({color}) => <MaterialIcons name="dashboard" size={24} color={color} /> }} 
     />
+    <Tab.Screen name="My Reports" component={ReportsHubScreen} options={{ tabBarIcon: ({color}) => <MaterialIcons name="assessment" size={24} color={color} /> }} />
     <Tab.Screen 
       name="Profile" 
       component={ProfileScreen} 
@@ -132,6 +138,9 @@ export const AppNavigator = () => {
             <Stack.Screen name="ComingSoonScreen">
               {({ navigation }) => <ComingSoonScreen onBack={() => navigation.goBack()} />}
             </Stack.Screen>
+            <Stack.Screen name="AttendanceReportScreen" component={AttendanceReportScreen} />
+            <Stack.Screen name="ExpenseReportScreen" component={ExpenseReportScreen} />
+            <Stack.Screen name="AddExpenseScreen" component={AddExpenseScreen} />
           </>
         ) : (
           <>

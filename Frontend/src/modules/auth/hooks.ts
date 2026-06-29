@@ -51,15 +51,40 @@ export function useLoginForm(
     defaultValues: { mobile: "", password: "" }
   });
 
+  // 🚀 HELPER: Translates technical Supabase errors into user-friendly messages
+  const getFriendlyErrorMessage = (rawMessage: string) => {
+    const msg = rawMessage.toLowerCase();
+    
+    if (msg.includes("invalid login credentials")) {
+      return "The mobile number or password you entered is incorrect.";
+    }
+    if (msg.includes("network request failed") || msg.includes("failed to fetch")) {
+      return "Network error. Please check your internet connection and try again.";
+    }
+    if (msg.includes("too many requests") || msg.includes("rate limit")) {
+      return "Too many failed attempts. Please wait a few minutes and try again.";
+    }
+    if (msg.includes("email not confirmed") || msg.includes("not verified")) {
+      return "Your account is pending activation. Please contact your manager.";
+    }
+    
+    // Fallback for any other unknown errors
+    return "An unexpected error occurred while logging in. Please try again.";
+  };
+
   const submit = form.handleSubmit(async (values) => {
     setLoading(true);
     try {
       const { error } = await loginUser(values);
       if (error) {
-        onError("Invalid mobile number or password.");
+        // Pass the translated, friendly error message to the UI
+        onError(getFriendlyErrorMessage(error.message));
       } else {
         onSuccess();
       }
+    } catch (err: any) {
+      // Catch unexpected crashes
+      onError(getFriendlyErrorMessage(err?.message || ""));
     } finally {
       setLoading(false);
     }

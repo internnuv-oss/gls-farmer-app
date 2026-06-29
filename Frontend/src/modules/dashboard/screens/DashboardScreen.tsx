@@ -12,6 +12,8 @@ import { useAuthStore } from "../../../store/authStore";
 import { useAlertStore } from "../../../store/alertStore";
 import { useDraftStore } from "../../../store/draftStore";
 import { supabase } from "../../../core/supabase";
+import { ActiveShiftWidget } from '../../shifts/components/ActiveShiftWidget';
+import { useShiftStore } from '../../../store/shiftStore'; // For the FAB logic
 import { fetchMyDealers, fetchMyFarmers, fetchMyDistributors, fetchMyDrafts, deleteDraft, fetchMyFPOs } from "../services/dashboardService";
 
 
@@ -30,6 +32,8 @@ export const DashboardScreen = ({ navigation, route }: any) => {
   const [refreshing, setRefreshing] = useState(false);
   const pagerRef = useRef<FlatList>(null);
   
+  const incrementActivity = useShiftStore((state) => state.incrementActivity);
+
   useEffect(() => {
     if (route?.params?.activeTab !== undefined) {
       const tabIndex = route.params.activeTab;
@@ -61,35 +65,27 @@ export const DashboardScreen = ({ navigation, route }: any) => {
         const myLocalDrafts = localDrafts.filter((d: any) => !d.userId || d.userId === user.id);
         
         if (myLocalDrafts.length > 0) {
-          // 1. Format payload for bulk insert
+          // 1. Formats the offline data for the database
           const migrationPayload = myLocalDrafts.map((draft: any) => {
-            let draftIdToSync = draft.id;
-            if (!draftIdToSync || draftIdToSync.length < 32) draftIdToSync = crypto.randomUUID(); // Fix legacy IDs
-            
             return {
               se_id: user.id,
-              entity_type: draft.type.toLowerCase(), // 'DEALER' -> 'dealer'
-              entity_id: draftIdToSync,
+              entity_type: draft.type.toLowerCase(), 
+              entity_id: draft.id,
               draft_data: draft.data,
-              current_step: 1, 
+              current_step: draft.data._step || 1, // Restores their exact step!
               updated_at: new Date(draft.updatedAt || Date.now()).toISOString()
             };
           });
 
-          // 2. Perform a single, fast bulk Upsert
+          // 2. Uploads all offline drafts to Supabase instantly
           const { error } = await supabase.from('drafts').upsert(migrationPayload, { onConflict: 'entity_id' });
 
           if (error) throw error;
 
-          // 3. Wipe local storage robustly so it never runs again
-          if (typeof clearLocalDrafts === 'function') {
-            clearLocalDrafts();
-          } else {
-            const store = useDraftStore.getState();
-            myLocalDrafts.forEach((d: any) => store.removeDraft(d.id));
-          }
+          // 3. Wipes the local storage so it doesn't run twice
+          clearLocalDrafts();
 
-          // 4. Refresh the dashboard lists to show the newly synced data
+          // 4. Refreshes the dashboard to show the newly uploaded cloud drafts
           loadData(0, true);
         }
       } catch (error) {
@@ -715,23 +711,28 @@ export const DashboardScreen = ({ navigation, route }: any) => {
   return (
     <View style={{ flex: 1, backgroundColor: colors.screen, paddingTop: 50 }}>
       <View
-        style={{
-          flexDirection: "row",
-          justifyContent: "space-between",
-          alignItems: "center",
-          paddingHorizontal: spacing.lg,
-          paddingBottom: spacing.md,
-        }}
-      >
-        <View style={{ flexDirection: "row", alignItems: "center" }}>
-          <View style={{ padding: 0, borderRadius: 12, marginRight: spacing.sm }}>
-            <Image 
-              source={require('../../../../assets/company-logo.jpeg')} 
-              style={{ width: 180, height: 52, resizeMode: 'contain', borderRadius: 8 }} 
-            />
-          </View>
-        </View>
+      style={{
+        flexDirection: "row",
+        justifyContent: "space-between",
+        alignItems: "center",
+        paddingHorizontal: spacing.lg,
+        paddingBottom: spacing.lg,
+        width: "100%"
+      }}
+    >
+      {/* Left side: Company Logo */}
+      <View style={{ flexShrink: 0, justifyContent: "center" }}>
+        <Image 
+          source={require('../../../../assets/company-logo.jpeg')} 
+          style={{ width: 140, height: 40, resizeMode: 'contain', borderRadius: 8 }} 
+        />
       </View>
+
+      {/* Right side: Active Shift Widget right-aligned */}
+      <View style={{ flex: 1, alignItems: "flex-end", justifyContent: "center" }}>
+        <ActiveShiftWidget />
+      </View>
+    </View>
 
       <View style={{ flexDirection: "row", paddingHorizontal: spacing.lg, marginBottom: spacing.md, gap: spacing.sm }}>
         <View style={{ flex: 1, flexDirection: "row", alignItems: "center", backgroundColor: colors.surface, borderRadius: radius.md, borderWidth: 1, borderColor: colors.border, paddingHorizontal: spacing.md, height: 48 }}>
@@ -851,18 +852,22 @@ export const DashboardScreen = ({ navigation, route }: any) => {
 
 <FloatingActionMenu
         actions={[
+          { id: "expense", label: t("Log Expense"), icon: "receipt" },
           { id: "dealer", label: t("Add Dealer"), icon: "storefront" },
           { id: "farmer", label: t("Add Farmer"), icon: "agriculture" },
           { id: "distributor", label: t("Add Distributor"), icon: "domain" },
           { id: "fpo", label: t("Add FPO"), icon: "groups" }, // 👈
         ]}
         onActionPress={(id) => {
-          if (id === "dealer") navigation.navigate("DealerOnboarding");
-          else if (id === "farmer") navigation.navigate("FarmerOnboarding");
-          else if (id === "distributor") navigation.navigate("DistributorOnboarding");
-          else if (id === "fpo") navigation.navigate("FPOOnboarding"); // 👈
-          else navigation.navigate("ComingSoonScreen");
-        }}
+          if (id === "expense") navigation.navigate("AddExpenseScreen"); // 🚀 NAVIGATE TO EXPENSE
+          else {
+            if (id === "dealer") navigation.navigate("DealerOnboarding");
+            else if (id === "farmer") navigation.navigate("FarmerOnboarding");
+            else if (id === "distributor") navigation.navigate("DistributorOnboarding");
+            else if (id === "fpo") navigation.navigate("FPOOnboarding");
+            else navigation.navigate("ComingSoonScreen");
+          }}
+        }
       />
 
       <FilterModal

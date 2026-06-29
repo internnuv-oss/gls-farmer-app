@@ -1,11 +1,12 @@
 // Frontend/src/modules/onboarding/fpo/screens/FPOOnboardingScreen.tsx
 import React from 'react';
-import { View, BackHandler } from 'react-native';
+import { View, Text, Pressable, BackHandler } from 'react-native';
 import { useTranslation } from 'react-i18next';
+import i18n from '../../../../core/i18n';
 import { WizardFlowTemplate, FeedbackScreenTemplate } from '../../../../design-system/templates';
 import { Button } from '../../../../design-system/components';
-import { spacing } from '../../../../design-system/tokens';
-import { useFPOOnboarding } from '../hooks'
+import { colors, radius, spacing } from '../../../../design-system/tokens';
+import { useFPOOnboarding } from '../hooks';
 
 // We will build these steps next
 import { Step1BasicInfo } from './steps/Step1BasicInfo';
@@ -20,6 +21,10 @@ import { Step9Review } from './steps/Step9Review';
 
 export const FPOOnboardingScreen = ({ navigation, route }: any) => {
   const { t } = useTranslation();
+  const cycleLanguage = () => {
+    const next = i18n.language === 'en' ? 'hi' : i18n.language === 'hi' ? 'gu' : 'en';
+    i18n.changeLanguage(next);
+  };
   
   const { form, step, setStep, jumpBackTo, setJumpBackTo, saveDraft, submit, scoreData, handleUpload, handleAudioUpload, uploading, isSubmitting, isNextEnabled, showSuccess, setShowSuccess, generatePDF, isEditing, isLocked } = useFPOOnboarding(navigation, route);
 
@@ -57,6 +62,11 @@ export const FPOOnboardingScreen = ({ navigation, route }: any) => {
       headerTitle={t(isEditing ? "Edit FPO" : "FPO Onboarding")} 
       stepLabel={t("STEP {{current}} OF 9", { current: step })} 
       progress01={step / 9}
+      headerRight={
+        <Pressable onPress={cycleLanguage} style={{ backgroundColor: colors.primarySoft, paddingHorizontal: 12, paddingVertical: 6, borderRadius: radius.pill }}>
+          <Text style={{ fontWeight: '900', color: colors.primary, fontSize: 12 }}>{i18n.language.toUpperCase()}</Text>
+        </Pressable>
+      }
       onBack={() => { jumpBackTo ? (setStep(jumpBackTo), setJumpBackTo(null)) : (step > 1 ? setStep(step - 1) : navigation.goBack()); }}
       footer={
         <View style={{ flexDirection: 'row', gap: spacing.sm }}>

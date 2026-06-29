@@ -12,7 +12,8 @@ export async function saveDealerOnboarding(
   recommendation: string,
   seId: string,
   existingId?: string,
-  dirtyFields: string[] = []
+  dirtyFields: string[] = [],
+  pdfUrl?: string
 ) {
 
   const dbPayload = {
@@ -114,6 +115,7 @@ export async function saveDealerOnboarding(
     dealer_signature: payload.dealerSignature,
     se_signature: payload.seSignature,
     status: status,
+    pdf_url: pdfUrl || null,
     updated_at: new Date().toISOString()
   };
 
@@ -236,16 +238,12 @@ export function mapDealerDbToForm(db: any): DealerOnboardingValues {
   };
 }
 
-export async function updateDealerPdfUrl(id: string, pdfUrl: string) {
-  const { error } = await supabase.from("dealers").update({ pdf_url: pdfUrl }).eq("id", id);
-  if (error) throw error;
-}
-
 export async function saveFarmerOnboarding(
   payload: FarmerOnboardingValues,
   seId: string,
   existingId?: string,
-  dirtyFields: string[] = []
+  dirtyFields: string[] = [],
+  pdfUrl?: string
 ) {
   const formattedPastCrops = (payload.pastCrops || []).map((c) => ({
     cropName: c.cropName,
@@ -292,6 +290,7 @@ export async function saveFarmerOnboarding(
     farmer_signature: payload.farmerSignature,
     se_signature: payload.seSignature,
     status: "SUBMITTED",
+    pdf_url: pdfUrl || null,
     updated_at: new Date().toISOString(),
   };
 
@@ -384,11 +383,6 @@ export function mapFarmerDbToForm(db: any): FarmerOnboardingValues {
   };
 }
 
-export async function updateFarmerPdfUrl(id: string, pdfUrl: string) {
-  const { error } = await supabase.from("farmers").update({ pdf_url: pdfUrl }).eq("id", id);
-  if (error) throw error;
-}
-
 export async function saveDistributorOnboarding(
   payload: DistributorOnboardingValues,
   status: "DRAFT" | "SUBMITTED",
@@ -396,7 +390,8 @@ export async function saveDistributorOnboarding(
   recommendation: string,
   seId: string,
   existingId?: string,
-  dirtyFields: string[] = []
+  dirtyFields: string[] = [],
+  pdfUrl?: string
 ) {
   const dbPayload = {
     se_id: seId,
@@ -494,6 +489,7 @@ export async function saveDistributorOnboarding(
     total_score: totalScore,
     band: recommendation,
     status: status,
+    pdf_url: pdfUrl || null,
     distributor_signature: payload.distributorSignature,
     se_signature: payload.seSignature,
     updated_at: new Date().toISOString()

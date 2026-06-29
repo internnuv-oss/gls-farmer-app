@@ -38,4 +38,4 @@ jobs:
           EXPO_PUBLIC_CLOUDINARY_CLOUD_NAME: ${{ secrets.EXPO_PUBLIC_CLOUDINARY_CLOUD_NAME }}
           EXPO_PUBLIC_CLOUDINARY_UPLOAD_PRESET: ${{ secrets.EXPO_PUBLIC_CLOUDINARY_UPLOAD_PRESET }}
         run: |
-          eas update --branch production --message "Auto-update: $COMMIT_MSG" --non-interactive --clear-cache
+          eas update --branch preview --message "Auto-update: $COMMIT_MSG" --non-interactive --clear-cache

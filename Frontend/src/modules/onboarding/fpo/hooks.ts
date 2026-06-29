@@ -18,7 +18,9 @@ import { uploadFileToCloudinary } from "../services/cloudinaryService";
 import { supabase } from "../../../core/supabase";
 import { useAlertStore } from "../../../store/alertStore";
 import { fpoOnboardingSchema, FPOOnboardingValues, FPO_GLS_COMMITMENTS } from "./schema";
-import { fetchProfileByMobile, saveFPOOnboarding, updateFPOPdfUrl, mapFPODbToForm } from '../services/onboardingService'; 
+import { fetchProfileByMobile, saveFPOOnboarding, updateFPOPdfUrl, mapFPODbToForm } from '../services/onboardingService';
+import { useShiftStore } from "../../../store/shiftStore";
+import { useDraftStore } from "../../../store/draftStore";
 
 export function useFPOOnboarding(navigation: any, route: any) {
   const user = useAuthStore((s) => s.user);
@@ -125,7 +127,7 @@ export function useFPOOnboarding(navigation: any, route: any) {
         form.reset(currentValues, { keepValues: true }); 
       }
 
-      await supabase.from('drafts').upsert({
+      const { error } = await supabase.from('drafts').upsert({
         se_id: user.id,
         entity_type: 'fpo',
         entity_id: draftIdRef.current,
@@ -134,8 +136,23 @@ export function useFPOOnboarding(navigation: any, route: any) {
         update_history: history,
         updated_at: new Date().toISOString()
       }, { onConflict: 'entity_id' });
+
+      if (error) throw error;
+
+      // 🚀 Remove from local offline drafts if sync is successful
+      useDraftStore.getState().removeDraft(draftIdRef.current);
+
     } catch (err) {
-      console.log("Failed to sync draft to DB", err);
+      console.log("Failed to sync draft to DB, saving locally", err);
+      // 🚀 OFFLINE / CRASH FALLBACK: Save locally with the current step
+      const fallbackData = { ...currentValues, _step: step };
+      const localDrafts = useDraftStore.getState().drafts;
+      
+      if (localDrafts.some(d => d.id === draftIdRef.current!)) {
+        useDraftStore.getState().updateDraft(draftIdRef.current!, fallbackData);
+      } else {
+        useDraftStore.getState().addDraft(fallbackData, 'FPO', draftIdRef.current);
+      }
     }
   };
 
@@ -181,6 +198,8 @@ export function useFPOOnboarding(navigation: any, route: any) {
     
     useAlertStore.getState().showAlert("Saving...", "Syncing draft...");
     await saveDraftToDB(true);
+    await useShiftStore.getState().incrementActivity(); // 🚀 NEW: Log valid activity!
+    await useShiftStore.getState().logShiftEvent('activity', 'Saved FPO Draft', form.getValues().fpoName || 'Unknown FPO');
     useAlertStore.getState().hideAlert();
     navigation.navigate("MainTabs");
   };
@@ -501,6 +520,9 @@ export function useFPOOnboarding(navigation: any, route: any) {
       setIsSubmitting(true);
       try {
         const dbResult = await saveFPOOnboarding(data, "SUBMITTED", scoreData.raw, scoreData.band, user.id, editData?.id || fetchedRecordId, check.dirtyKeys);
+        
+        await useShiftStore.getState().incrementActivity(); // 🚀 NEW: Log valid activity!
+        await useShiftStore.getState().logShiftEvent('activity', (editData || fetchedRecordId) ? 'Updated FPO' : 'Onboarded FPO', data.fpoName || 'Unknown FPO');
         
         if (draftIdRef.current) {
           await supabase.from('drafts').delete().eq('entity_id', draftIdRef.current);

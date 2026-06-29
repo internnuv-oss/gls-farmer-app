@@ -1,10 +1,11 @@
 // src/modules/onboarding/distributor/screens/DistributorOnboardingScreen.tsx
 import React from 'react';
-import { View, BackHandler } from 'react-native';
+import { View, Text, Pressable, BackHandler } from 'react-native';
 import { useTranslation } from 'react-i18next';
+import i18n from '../../../../core/i18n';
 import { WizardFlowTemplate, FeedbackScreenTemplate } from '../../../../design-system/templates';
 import { Button } from '../../../../design-system/components';
-import { spacing } from '../../../../design-system/tokens';
+import { colors, radius, spacing } from '../../../../design-system/tokens';
 import { useDistributorOnboarding } from '../hooks';
 
 import { Step1BasicInfo } from './steps/Step1BasicInfo';
@@ -20,6 +21,10 @@ import { Step10Review } from './steps/Step10Review';
 
 export const DistributorOnboardingScreen = ({ navigation, route }: any) => {
   const { t } = useTranslation();
+  const cycleLanguage = () => {
+    const next = i18n.language === 'en' ? 'hi' : i18n.language === 'hi' ? 'gu' : 'en';
+    i18n.changeLanguage(next);
+  };
   
   // 🚀 FIX: Destructure isLocked from the hook, NOT from component props
   const { 
@@ -88,6 +93,11 @@ export const DistributorOnboardingScreen = ({ navigation, route }: any) => {
       headerTitle={t(isEditing ? "Edit Distributor" : "Distributor Onboarding")} 
       stepLabel={t("STEP {{current}} OF 10", { current: step })} 
       progress01={step / 10}
+      headerRight={
+        <Pressable onPress={cycleLanguage} style={{ backgroundColor: colors.primarySoft, paddingHorizontal: 12, paddingVertical: 6, borderRadius: radius.pill }}>
+          <Text style={{ fontWeight: '900', color: colors.primary, fontSize: 12 }}>{i18n.language.toUpperCase()}</Text>
+        </Pressable>
+      }
       onBack={() => {
         if (jumpBackTo) {
           setStep(jumpBackTo);

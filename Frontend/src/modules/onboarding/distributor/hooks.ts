@@ -19,7 +19,9 @@ import { uploadFileToCloudinary } from "../services/cloudinaryService";
 import { supabase } from "../../../core/supabase";
 import { distributorOnboardingSchema, DistributorOnboardingValues, DISTRIBUTOR_GLS_COMMITMENTS } from "./schema";
 import { useAlertStore } from "../../../store/alertStore";
-import { saveDistributorOnboarding, mapDistributorDbToForm, updateDistributorPdfUrl, fetchProfileByMobile } from '../services/onboardingService';
+import { saveDistributorOnboarding, mapDistributorDbToForm, fetchProfileByMobile } from '../services/onboardingService';
+import { useShiftStore } from "../../../store/shiftStore";
+import { useDraftStore } from "../../../store/draftStore";
 
 export function useDistributorOnboarding(navigation: any, route: any) {
   const user = useAuthStore((s) => s.user);
@@ -160,7 +162,7 @@ export function useDistributorOnboarding(navigation: any, route: any) {
         form.reset(currentValues, { keepValues: true }); 
       }
 
-      await supabase.from('drafts').upsert({
+      const { error } = await supabase.from('drafts').upsert({
         se_id: user.id,
         entity_type: 'distributor',
         entity_id: draftIdRef.current,
@@ -169,8 +171,23 @@ export function useDistributorOnboarding(navigation: any, route: any) {
         update_history: history,
         updated_at: new Date().toISOString()
       }, { onConflict: 'entity_id' });
+
+      if (error) throw error;
+
+      // 🚀 Remove from local offline drafts if sync is successful
+      useDraftStore.getState().removeDraft(draftIdRef.current);
+
     } catch (err) {
-      console.log("Failed to sync draft to DB", err);
+      console.log("Failed to sync draft to DB, saving locally", err);
+      // 🚀 OFFLINE / CRASH FALLBACK: Save locally with the current step
+      const fallbackData = { ...currentValues, _step: step };
+      const localDrafts = useDraftStore.getState().drafts;
+      
+      if (localDrafts.some(d => d.id === draftIdRef.current!)) {
+        useDraftStore.getState().updateDraft(draftIdRef.current!, fallbackData);
+      } else {
+        useDraftStore.getState().addDraft(fallbackData, 'DISTRIBUTOR', draftIdRef.current);
+      }
     }
   };
 
@@ -221,6 +238,8 @@ export function useDistributorOnboarding(navigation: any, route: any) {
 
     useAlertStore.getState().showAlert("Saving...", "Syncing draft to database...");
     await saveDraftToDB(true);
+    await useShiftStore.getState().incrementActivity(); // 🚀 NEW: Log valid activity!
+    await useShiftStore.getState().logShiftEvent('activity', 'Saved Distributor Draft', form.getValues().firmName || 'Unknown Distributor');
     useAlertStore.getState().hideAlert();
     navigation.navigate("MainTabs");
   };
@@ -583,11 +602,36 @@ export function useDistributorOnboarding(navigation: any, route: any) {
 
 
   const generatePDF = async () => {
-    // (Keep your existing generatePDF logic exactly as it was)
+    const html = generateHTML();
+    const data = form.getValues();
+    
+    // Clean the firm name to create a valid file name
+    const rawFirmName = data.firmName ? data.firmName.replace(/[^a-zA-Z0-9]/g, '_') : 'Distributor';
+    const finalFileName = `${rawFirmName}_Dossier.pdf`;
+
+    try {
+      const { uri } = await Print.printToFileAsync({ html });
+      
+      if (Platform.OS !== 'web') {
+        // Rename the file using expo-file-system so it looks professional when sharing
+        const renamedUri = `${documentDirectory}${finalFileName}`;
+        await copyAsync({ from: uri, to: renamedUri });
+        await Sharing.shareAsync(renamedUri, { UTI: 'com.adobe.pdf', mimeType: 'application/pdf', dialogTitle: 'Share PDF' });
+      } else {
+        await Sharing.shareAsync(uri, { UTI: 'com.adobe.pdf', mimeType: 'application/pdf', dialogTitle: 'Share PDF' });
+      }
+    } catch (error) {
+      console.error("Error renaming or sharing PDF:", error);
+      useAlertStore.getState().showAlert("Error", "Could not generate or share the PDF file.");
+    }
   };
 
-  // 🚀 DB CRUD: Delete Draft from DB on Submit
+  // 🚀 HARD LOCK REFERENCE TO PREVENT DOUBLE TAPS
+  const submitLockedRef = useRef(false);
+
   const submit = async () => {
+    if (submitLockedRef.current) return;
+    
     const missingSteps = validationStatus.filter(v => !v.isValid).map(v => v.name);
     if (missingSteps.length > 0) {
       useAlertStore.getState().showAlert("Missing Information", "Please complete the following sections before submitting:\n\n• " + missingSteps.join("\n• "));
@@ -600,30 +644,38 @@ export function useDistributorOnboarding(navigation: any, route: any) {
       const check = checkRestrictions();
       if (!check.pass) return useAlertStore.getState().showAlert("Restricted Action", check.error);
 
+      if (submitLockedRef.current) return;
+      submitLockedRef.current = true;
       setIsSubmitting(true);
+
       try {
-        const result = await saveDistributorOnboarding(data, 'SUBMITTED', scoreData.raw, scoreData.band, user.id, editData?.id || fetchedRecordId, check.dirtyKeys);
+        // 🚀 1. GENERATE PDF FIRST
+        useAlertStore.getState().showAlert("Processing", "Generating and securing PDF dossier...");
+        const html = generateHTML();
+        const { uri } = await Print.printToFileAsync({ html });
+        const pdfUrl = await uploadFileToCloudinary(uri, 'raw');
+
+        // 🚀 2. SAVE ATOMICALLY
+        useAlertStore.getState().showAlert("Saving", "Uploading complete profile to database...");
+        const result = await saveDistributorOnboarding(data, 'SUBMITTED', scoreData.raw, scoreData.band, user.id, editData?.id || fetchedRecordId, check.dirtyKeys, pdfUrl);
         
-        // 🚀 THE FIX: IMMEDIATELY Delete draft before attempting PDF generation
+        await useShiftStore.getState().incrementActivity(); // 🚀 NEW: Log valid activity!
+        await useShiftStore.getState().logShiftEvent('activity', (editData || fetchedRecordId) ? 'Updated Distributor' : 'Onboarded Distributor', data.firmName || 'Unknown Distributor');
+        
+        // 🚀 3. DELETE DRAFT
         if (draftIdRef.current) {
            await supabase.from('drafts').delete().eq('entity_id', draftIdRef.current);
            draftIdRef.current = undefined; 
         }
-        showSuccessRef.current = true; // Block auto-save logic
 
-        try {
-            const html = generateHTML();
-            const { uri } = await Print.printToFileAsync({ html });
-            const pdfUrl = await uploadFileToCloudinary(uri, 'raw');
-            await updateDistributorPdfUrl(result.id, pdfUrl);
-        } catch(pdfErr) {
-            console.log("PDF Generation/Upload Failed", pdfErr);
-        }
-
+        showSuccessRef.current = true;
+        useAlertStore.getState().hideAlert();
         setShowSuccess(true);
       } catch (e: any) {
-        useAlertStore.getState().showAlert("Submission Failed", e.message);
+        console.error("Submission Error:", e);
+        useAlertStore.getState().showAlert("Submission Failed", e.message || "An error occurred during submission.");
       } finally {
+        submitLockedRef.current = false;
         setIsSubmitting(false);
       }
     })();

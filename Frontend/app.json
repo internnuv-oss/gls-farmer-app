@@ -13,7 +13,12 @@
       "backgroundColor": "#FCFBF7"
     },
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "infoPlist": {
+        "UIBackgroundModes": ["location", "fetch"],
+        "NSLocationAlwaysAndWhenInUseUsageDescription": "Field Commander needs your location to track your route during your active shift.",
+        "NSLocationAlwaysUsageDescription": "Field Commander needs your location to track your route during your active shift."
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -24,10 +29,15 @@
       "predictiveBackGestureEnabled": false,
       "permissions": [
         "android.permission.RECORD_AUDIO",
-        "android.permission.MODIFY_AUDIO_SETTINGS"
+        "android.permission.MODIFY_AUDIO_SETTINGS",
+        "ACCESS_COARSE_LOCATION",
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_BACKGROUND_LOCATION",
+        "FOREGROUND_SERVICE",
+        "FOREGROUND_SERVICE_LOCATION"
       ],
       "package": "com.intern_skilltelligent.fieldcommander",
-      "versionCode": 8
+      "versionCode": 12
     },
     "web": {
       "favicon": "./assets/icon.png"
@@ -39,6 +49,13 @@
         "expo-audio",
         {
           "microphonePermission": "Allow $(PRODUCT_NAME) to access your microphone to record dealer onboarding voice notes."
+        }
+      ],
+      [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "Allow $(PRODUCT_NAME) to use your location to track your route while punched in.",
+          "isAndroidBackgroundLocationEnabled": true
         }
       ],
       "@react-native-community/datetimepicker"

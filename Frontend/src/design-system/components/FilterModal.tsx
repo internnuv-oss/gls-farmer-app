@@ -169,8 +169,8 @@ export const FilterModal: React.FC<FilterModalProps> = ({ visible, entityType, c
                 selectedValues={localFilters.completionStatus} 
                 onToggleItem={(val) => toggleFilter('completionStatus', val)}
                 options={[
-                  { label: "Completed Profiles", value: "Completed" },
-                  { label: "Incomplete (Drafts)", value: "Incomplete" }
+                  { label: "Submitted Profiles", value: "Completed" },
+                  { label: "Draft Profiles", value: "Incomplete" }
                 ]} 
               />
 
