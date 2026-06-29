@@ -15,8 +15,8 @@ if (!API_KEY) {
 // Initialize Gemini SDK
 const genAI = new GoogleGenerativeAI(API_KEY);
 
-// 🚀 FIXED: Using the ultra-fast gemini-2.5-flash model available on your API key
-const model = genAI.getGenerativeModel({ model: "gemini-flash-latest" });
+// 🚀 FIX 1: Use the explicit, stable model version instead of the 'latest' alias
+const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
 
 const localesDir = path.resolve('./locales');
 const TARGET_LANGS = {
@@ -59,8 +59,7 @@ ${JSON.stringify(jsonBatch, null, 2)}
     
     return JSON.parse(cleanedText);
   } catch (error) {
-    console.error(`\n❌ Gemini API Error during translation:`, error.message);
-    throw error;
+    throw error; // Throw error up to be handled by the retry logic
   }
 }
 
@@ -108,21 +107,40 @@ async function run() {
     for (let i = 0; i < batches.length; i++) {
       console.log(`Translating batch ${i + 1} of ${batches.length}...`);
       
-      try {
-        const translatedBatch = await translateBatchWithGemini(batches[i], langName);
-        
-        // Merge the newly translated batch into our existing strings
-        existingStrings = { ...existingStrings, ...translatedBatch };
-        updated = true;
-        
-        // Save incrementally
-        fs.writeFileSync(langPath, JSON.stringify(existingStrings, null, 2));
-        
-        // 2.5 second pause to respect the 15 RPM free tier limit safely
-        await new Promise(resolve => setTimeout(resolve, 2500));
-        
-      } catch (err) {
-        console.error(`❌ Skipping batch ${i + 1} due to error.`);
+      // 🚀 FIX 2: Added Retry Logic for 503 Errors
+      let success = false;
+      let attempts = 0;
+      const MAX_ATTEMPTS = 3;
+
+      while (!success && attempts < MAX_ATTEMPTS) {
+        try {
+          const translatedBatch = await translateBatchWithGemini(batches[i], langName);
+          
+          // Merge the newly translated batch into our existing strings
+          existingStrings = { ...existingStrings, ...translatedBatch };
+          updated = true;
+          
+          // Save incrementally
+          fs.writeFileSync(langPath, JSON.stringify(existingStrings, null, 2));
+          success = true;
+          
+          // 2.5 second pause to respect the 15 RPM free tier limit safely
+          await new Promise(resolve => setTimeout(resolve, 2500));
+          
+        } catch (err) {
+          attempts++;
+          if (err.message.includes('503') || err.message.includes('429')) {
+            console.log(`⚠️ API busy (${err.message.substring(0, 3)}). Retrying attempt ${attempts}/${MAX_ATTEMPTS} in 5 seconds...`);
+            await new Promise(resolve => setTimeout(resolve, 5000));
+          } else {
+            console.error(`❌ Unexpected error on batch ${i + 1}:`, err.message);
+            break; // Break out of retry loop if it's a completely different error
+          }
+        }
+      }
+
+      if (!success) {
+        console.error(`❌ Skipping batch ${i + 1} after ${MAX_ATTEMPTS} failed attempts.`);
       }
     }
 
