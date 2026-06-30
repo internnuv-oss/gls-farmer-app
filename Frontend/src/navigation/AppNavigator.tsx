@@ -27,6 +27,7 @@ import { ReportsHubScreen } from '../modules/reports/screens/ReportsHubScreen';
 import { AttendanceReportScreen } from '../modules/reports/screens/AttendanceReportScreen';
 import { ExpenseReportScreen } from '../modules/reports/screens/ExpenseReportScreen';
 import { AddExpenseScreen } from '../modules/reports/screens/AddExpenseScreen';
+import { TravelReportScreen } from '../modules/reports/screens/TravelReportScreen';
 
 const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
@@ -141,6 +142,7 @@ export const AppNavigator = () => {
             <Stack.Screen name="AttendanceReportScreen" component={AttendanceReportScreen} />
             <Stack.Screen name="ExpenseReportScreen" component={ExpenseReportScreen} />
             <Stack.Screen name="AddExpenseScreen" component={AddExpenseScreen} />
+            <Stack.Screen name="TravelReportScreen" component={TravelReportScreen} options={{ headerShown: false }} />
           </>
         ) : (
           <>

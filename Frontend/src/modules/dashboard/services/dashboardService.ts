@@ -54,7 +54,6 @@ export const fetchMyDealers = async (userId: string, page: number = 0, limit: nu
   return translatedData;
 };
 
-// Add this anywhere in the file
 export const fetchMyFPOs = async (userId: string, page: number = 0, limit: number = 5) => {
   const from = page * limit;
   const to = from + limit - 1;
@@ -90,6 +89,18 @@ export const fetchMyDrafts = async (userId: string) => {
     .select('*')
     .eq('se_id', userId)
     .order('updated_at', { ascending: false });
+
+  if (error) throw error;
+  return data || [];
+};
+
+// 🚀 NEW: Fetch routes assigned to the SE
+export const fetchMyRoutes = async (userId: string) => {
+  const { data, error } = await supabase
+    .from('routes')
+    .select('*')
+    .eq('se_id', userId)
+    .order('created_at', { ascending: false });
 
   if (error) throw error;
   return data || [];
@@ -139,7 +150,6 @@ export async function fetchNetworkSummary(seId: string) {
     return count || 0;
   };
 
-  // 🚀 FIX: Fetch fpos count as well
   const [dealers, farmers, distributors, fpos] = await Promise.all([
     fetchCount("dealers", true),
     fetchCount("farmers"),

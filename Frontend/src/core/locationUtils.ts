@@ -1,3 +1,5 @@
+// Frontend/src/core/locationUtils.ts
+
 export const SHIFT_LOCATION_TASK = 'SHIFT_LOCATION_TASK';
 
 // Haversine formula to calculate distance between two GPS coordinates in KM

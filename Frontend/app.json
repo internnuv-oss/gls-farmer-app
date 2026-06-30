@@ -37,7 +37,12 @@
         "FOREGROUND_SERVICE_LOCATION"
       ],
       "package": "com.intern_skilltelligent.fieldcommander",
-      "versionCode": 12
+      "versionCode": 12,
+      "config": {
+        "googleMaps": {
+          "apiKey": "YOUR_ACTUAL_GOOGLE_MAPS_API_KEY_HERE"
+        }
+      }
     },
     "web": {
       "favicon": "./assets/icon.png"

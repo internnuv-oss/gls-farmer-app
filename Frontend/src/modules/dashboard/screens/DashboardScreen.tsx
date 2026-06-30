@@ -2,7 +2,7 @@ import React, { useRef, useState, useCallback, useMemo, useEffect } from "react"
 import * as crypto from 'expo-crypto';
 import {
   View, Text, FlatList, Pressable, Dimensions, TextInput,
-  ActivityIndicator, Modal, RefreshControl, Linking, Image
+  ActivityIndicator, Modal, RefreshControl, Linking, Image, ScrollView
 } from "react-native";
 import { useTranslation } from "react-i18next";
 import { Search, Filter } from "lucide-react-native";
@@ -13,9 +13,16 @@ import { useAlertStore } from "../../../store/alertStore";
 import { useDraftStore } from "../../../store/draftStore";
 import { supabase } from "../../../core/supabase";
 import { ActiveShiftWidget } from '../../shifts/components/ActiveShiftWidget';
-import { useShiftStore } from '../../../store/shiftStore'; // For the FAB logic
-import { fetchMyDealers, fetchMyFarmers, fetchMyDistributors, fetchMyDrafts, deleteDraft, fetchMyFPOs } from "../services/dashboardService";
-
+import { useShiftStore } from '../../../store/shiftStore';
+import { 
+  fetchMyDealers, 
+  fetchMyFarmers, 
+  fetchMyDistributors, 
+  fetchMyDrafts, 
+  deleteDraft, 
+  fetchMyFPOs, 
+  fetchMyRoutes 
+} from "../services/dashboardService";
 
 import { FloatingActionMenu, EmptyState } from "../../../design-system/components";
 import { colors, radius, spacing, shadows } from "../../../design-system/tokens";
@@ -49,7 +56,13 @@ export const DashboardScreen = ({ navigation, route }: any) => {
   const [dealers, setDealers] = useState<any[]>([]);
   const [farmers, setFarmers] = useState<any[]>([]); 
   const [dbDrafts, setDbDrafts] = useState<any[]>([]);
-  const [fpos, setFpos] = useState<any[]>([]); // 🚀 State for DB Drafts
+  const [fpos, setFpos] = useState<any[]>([]); 
+  const [routes, setRoutes] = useState<any[]>([]); 
+
+  // Drill-down states for Farmers Tab
+  const [farmerViewMode, setFarmerViewMode] = useState<'routes' | 'villages' | 'profiles'>('routes');
+  const [selectedRouteId, setSelectedRouteId] = useState<string | null>(null);
+  const [selectedVillageName, setSelectedVillageName] = useState<string | null>(null);
 
   // Migration to DB: Pull legacy local drafts to the cloud
   const localDrafts = useDraftStore((state) => state.drafts);
@@ -65,27 +78,20 @@ export const DashboardScreen = ({ navigation, route }: any) => {
         const myLocalDrafts = localDrafts.filter((d: any) => !d.userId || d.userId === user.id);
         
         if (myLocalDrafts.length > 0) {
-          // 1. Formats the offline data for the database
           const migrationPayload = myLocalDrafts.map((draft: any) => {
             return {
               se_id: user.id,
               entity_type: draft.type.toLowerCase(), 
               entity_id: draft.id,
               draft_data: draft.data,
-              current_step: draft.data._step || 1, // Restores their exact step!
+              current_step: draft.data._step || 1, 
               updated_at: new Date(draft.updatedAt || Date.now()).toISOString()
             };
           });
 
-          // 2. Uploads all offline drafts to Supabase instantly
           const { error } = await supabase.from('drafts').upsert(migrationPayload, { onConflict: 'entity_id' });
-
           if (error) throw error;
-
-          // 3. Wipes the local storage so it doesn't run twice
           clearLocalDrafts();
-
-          // 4. Refreshes the dashboard to show the newly uploaded cloud drafts
           loadData(0, true);
         }
       } catch (error) {
@@ -94,7 +100,6 @@ export const DashboardScreen = ({ navigation, route }: any) => {
         setIsMigrating(false);
       }
     };
-
     migrateLocalDrafts();
   }, [user?.id, localDrafts]);
 
@@ -107,7 +112,6 @@ export const DashboardScreen = ({ navigation, route }: any) => {
   const [isFilterModalOpen, setIsFilterModalOpen] = useState(false);
   const [filters, setFilters] = useState<FilterState>(defaultFilters);
 
-  // 🚀 Map Database Drafts into the UI structure
   const mappedDrafts = useMemo(() => {
     return {
       Distributors: dbDrafts.filter(d => d.entity_type === 'distributor').map(d => ({
@@ -122,12 +126,10 @@ export const DashboardScreen = ({ navigation, route }: any) => {
       })),
       Farmers: dbDrafts.filter(d => d.entity_type === 'farmer').map(d => ({
         id: d.id, entityId: d.entity_id, name: d.draft_data?.fullName || d.draft_data?.full_name || 'Incomplete Farmer', type: 'Farmer',
-        // 🚀 FIX: Map flat fields correctly for drafts so location shows up
         city: d.draft_data?.city || d.draft_data?.village || '', 
         state: d.draft_data?.state || '', 
         score: 0, raw: d.draft_data, step: d.current_step, isDraft: true,updatedAt: d.updated_at 
       })),
-      // 🚀 ADDED FPO MAPPING
       FPOs: dbDrafts.filter(d => d.entity_type === 'fpo').map(d => ({
         id: d.id, entityId: d.entity_id, name: d.draft_data?.fpoName || d.draft_data?.fpo_name || 'Incomplete FPO', type: 'FPO',
         city: d.draft_data?.city || d.draft_data?.raw_data?.city || '', state: d.draft_data?.state || d.draft_data?.raw_data?.state || '', score: 0, raw: d.draft_data, step: d.current_step, isDraft: true,
@@ -147,19 +149,18 @@ export const DashboardScreen = ({ navigation, route }: any) => {
     try {
       const PAGE_LIMIT = 5;
       
-      // 🚀 Fetch entities AND drafts
-      const [dealersData, farmersData, distributorsData, fposData, draftsData] = await Promise.all([
+      const [dealersData, farmersData, distributorsData, fposData, draftsData, routesData] = await Promise.all([
         fetchMyDealers(user.id, pageNumber, PAGE_LIMIT),
         fetchMyFarmers(user.id, pageNumber, PAGE_LIMIT),
         fetchMyDistributors(user.id, pageNumber, PAGE_LIMIT),
-        fetchMyFPOs(user.id, pageNumber, PAGE_LIMIT), // 👈
-        pageNumber === 0 ? fetchMyDrafts(user.id) : Promise.resolve([])
+        fetchMyFPOs(user.id, pageNumber, PAGE_LIMIT),
+        pageNumber === 0 ? fetchMyDrafts(user.id) : Promise.resolve([]),
+        pageNumber === 0 ? fetchMyRoutes(user.id) : Promise.resolve([]) 
       ]);
 
       const mappedDistributors = distributorsData.map((d: any) => ({
         id: d.id, name: d.firm_name, type: "Distributor", 
-        city: d.city || 'N/A', // 🚀 FIX: Directly access city and state columns
-        state: d.state || 'N/A', 
+        city: d.city || 'N/A', state: d.state || 'N/A', 
         score: d.total_score || 0, raw: d, isDraft: false,
         updatedAt: d.updated_at || d.created_at
       }));
@@ -185,18 +186,17 @@ export const DashboardScreen = ({ navigation, route }: any) => {
         setDistributors(mappedDistributors);
         setDealers(mappedDealers);
         setFarmers(mappedFarmers);
-        setFpos(mappedFPOs); // 👈
+        setFpos(mappedFPOs); 
         setDbDrafts(draftsData);
+        setRoutes(routesData); 
       } else {
         setDistributors(prev => [...prev, ...mappedDistributors]);
         setDealers(prev => [...prev, ...mappedDealers]);
         setFarmers(prev => [...prev, ...mappedFarmers]);
-        setFpos(prev => [...prev, ...mappedFPOs]); // 👈
+        setFpos(prev => [...prev, ...mappedFPOs]); 
       }
 
       setHasMore(dealersData.length === PAGE_LIMIT || farmersData.length === PAGE_LIMIT || distributorsData.length === PAGE_LIMIT || fposData.length === PAGE_LIMIT);
-
-     
       setPage(pageNumber);
     } catch (e) {
       console.error(e);
@@ -216,9 +216,25 @@ export const DashboardScreen = ({ navigation, route }: any) => {
   
   const onRefresh = () => loadData(0, true);
 
+  const extractVillages = (routeData: any) => {
+    let v: string[] = [];
+    let locs = routeData.locations;
+    
+    // Safety check in case Supabase returns JSONB as a string
+    if (typeof locs === 'string') {
+      try { locs = JSON.parse(locs); } catch (e) {}
+    }
+    
+    if (Array.isArray(locs)) {
+      locs.forEach((loc: any) => {
+        if (Array.isArray(loc.villages)) v.push(...loc.villages);
+      });
+    }
+    return v;
+  };
+
   // --- DISTRIBUTOR FILTERING & SORTING ---
   const processedDistributors = useMemo(() => {
-    // 🚀 DEDUPLICATION: Remove drafts if a completed profile exists with the same phone
     const completedPhones = new Set(distributors.map(d => d.raw?.contact_mobile));
     const activeDrafts = mappedDrafts.Distributors.filter(d => !completedPhones.has(d.raw?.contactMobile));
 
@@ -242,7 +258,6 @@ export const DashboardScreen = ({ navigation, route }: any) => {
     result.sort((a, b) => {
       if (filters.sortBy === "score_high") return b.score - a.score;
       if (filters.sortBy === "score_low") return a.score - b.score;
-      // 🚀 DEFAULT: Sort entirely by latest updated_at
       return new Date(b.updatedAt || 0).getTime() - new Date(a.updatedAt || 0).getTime(); 
     });
     return result;
@@ -250,7 +265,6 @@ export const DashboardScreen = ({ navigation, route }: any) => {
 
   // --- DEALER FILTERING & SORTING ---
   const processedDealers = useMemo(() => {
-    // 🚀 DEDUPLICATION: Remove drafts if a completed profile exists with the same phone
     const completedPhones = new Set(dealers.map(d => d.raw?.contact_mobile));
     const activeDrafts = mappedDrafts.Dealers.filter(d => !completedPhones.has(d.raw?.contactMobile));
 
@@ -277,7 +291,6 @@ export const DashboardScreen = ({ navigation, route }: any) => {
     result.sort((a, b) => {
       if (filters.sortBy === "score_high") return b.score - a.score;
       if (filters.sortBy === "score_low") return a.score - b.score;
-      // 🚀 DEFAULT: Sort entirely by latest updated_at
       return new Date(b.updatedAt || 0).getTime() - new Date(a.updatedAt || 0).getTime();
     });
     return result;
@@ -285,7 +298,6 @@ export const DashboardScreen = ({ navigation, route }: any) => {
 
   // --- FARMER FILTERING & SORTING ---
   const processedFarmers = useMemo(() => {
-    // 🚀 DEDUPLICATION: Remove drafts if a completed profile exists with the same phone
     const completedPhones = new Set(farmers.map(f => f.raw?.mobile));
     const activeDrafts = mappedDrafts.Farmers.filter(f => !completedPhones.has(f.raw?.mobile));
 
@@ -304,6 +316,20 @@ export const DashboardScreen = ({ navigation, route }: any) => {
     }
 
     if (filters.completionStatus.length > 0) result = result.filter(d => filters.completionStatus.includes(d.isDraft ? "Incomplete" : "Completed"));
+    
+    // 🚀 Inject Route Filtering
+    if (filters.routeId && filters.routeId.length > 0) {
+      const selectedRouteVillages = routes
+        .filter(r => filters.routeId.includes(r.id))
+        .flatMap(r => extractVillages(r))
+        .map(v => v.trim().toLowerCase()); // Lowercase for safety
+        
+      result = result.filter(f => {
+        const fVill = (f.raw?.village || f.raw?.personal_details?.village || '').trim().toLowerCase();
+        return selectedRouteVillages.includes(fVill);
+      });
+   }
+
     if (filters.scale.length > 0) {
       result = result.filter((f) => {
         const land = parseFloat(f.raw?.farm_details?.totalLand || f.raw?.farmDetails?.totalLand || "0");
@@ -326,16 +352,67 @@ export const DashboardScreen = ({ navigation, route }: any) => {
     result.sort((a, b) => {
       if (filters.sortBy === "land_high") return parseFloat(b.raw?.farm_details?.totalLand || b.raw?.farmDetails?.totalLand || "0") - parseFloat(a.raw?.farm_details?.totalLand || a.raw?.farmDetails?.totalLand || "0");
       if (filters.sortBy === "land_low") return parseFloat(a.raw?.farm_details?.totalLand || a.raw?.farmDetails?.totalLand || "0") - parseFloat(b.raw?.farm_details?.totalLand || b.raw?.farmDetails?.totalLand || "0");
-      // 🚀 DEFAULT: Sort entirely by latest updated_at
       return new Date(b.updatedAt || 0).getTime() - new Date(a.updatedAt || 0).getTime();
     });
     return result;
-  }, [farmers, mappedDrafts.Farmers, searchQuery, filters]);
+  }, [farmers, mappedDrafts.Farmers, searchQuery, filters, routes]);
+
+
+  // Generate UI data blocks for Route Views
+  const processedRoutes = useMemo(() => {
+    // 1. Sort the defined routes alphabetically by name
+    let routeCards = [...routes]
+      .sort((a, b) => (a.name || '').localeCompare(b.name || ''))
+      .map(r => {
+        const vills = extractVillages(r);
+        const villsLower = vills.map(v => v.trim().toLowerCase());
+        
+        const count = processedFarmers.filter(f => {
+          const fVill = (f.raw?.village || f.raw?.personal_details?.village || '').trim().toLowerCase();
+          return villsLower.includes(fVill);
+        }).length;
+        
+        return { id: r.id, name: r.name, villages: vills, count, isUnrouted: false };
+    });
+
+    // 2. Calculate Unrouted / Other Villages
+    const allRoutedVillagesLower = routeCards.flatMap(r => r.villages).map(v => v.trim().toLowerCase());
+    const unroutedFarmers = processedFarmers.filter(f => {
+       const fVill = (f.raw?.village || f.raw?.personal_details?.village || '').trim().toLowerCase();
+       return fVill && !allRoutedVillagesLower.includes(fVill);
+    });
+
+    // 3. Append Unrouted at the very end
+    if (unroutedFarmers.length > 0) {
+      const unroutedVills = Array.from(new Set(unroutedFarmers.map(f => f.raw?.village || f.raw?.personal_details?.village).filter(Boolean)));
+      routeCards.push({
+        id: 'unrouted',
+        name: t('Others'),
+        villages: unroutedVills as string[],
+        count: unroutedFarmers.length,
+        isUnrouted: true
+      });
+    }
+    return routeCards;
+ }, [routes, processedFarmers]);
+
+ const processedVillages = useMemo(() => {
+    if (!selectedRouteId) return [];
+    const route = processedRoutes.find(r => r.id === selectedRouteId);
+    if (!route) return [];
+
+    return route.villages.map(vName => {
+      const count = processedFarmers.filter(f => {
+        const fVill = (f.raw?.village || f.raw?.personal_details?.village || '').trim().toLowerCase();
+        return fVill === vName.trim().toLowerCase();
+      }).length;
+      return { name: vName, count };
+    }).filter(v => v.count > 0 || !route.isUnrouted); 
+ }, [selectedRouteId, processedRoutes, processedFarmers]);
 
 
   // --- FPO FILTERING & SORTING ---
   const processedFPOs = useMemo(() => {
-    // 🚀 DEDUPLICATION: Remove drafts if a completed profile exists with the same phone
     const completedPhones = new Set(fpos.map(f => f.raw?.contact_mobile || f.raw?.contactMobile));
     const activeDrafts = mappedDrafts.FPOs.filter(f => !completedPhones.has(f.raw?.contact_mobile || f.raw?.contactMobile));
 
@@ -356,7 +433,6 @@ export const DashboardScreen = ({ navigation, route }: any) => {
       result = result.filter(d => filters.completionStatus.includes(d.isDraft ? "Incomplete" : "Completed"));
     }
 
-    // 🚀 DEFAULT: Sort entirely by latest updated_at
     result.sort((a, b) => {
       return new Date(b.updatedAt || 0).getTime() - new Date(a.updatedAt || 0).getTime();
     });
@@ -425,7 +501,7 @@ export const DashboardScreen = ({ navigation, route }: any) => {
             setLoading(true);
             try {
               await deleteDraft(entityId);
-              loadData(0, true); // Refresh the list
+              loadData(0, true); 
             } catch (e) {
               console.error("Failed to delete draft:", e);
             } finally {
@@ -438,10 +514,10 @@ export const DashboardScreen = ({ navigation, route }: any) => {
   }, [t]);
 
   const renderDealerItem = useCallback(({ item }: any) => (
-    <EntityCard item={item} navigation={navigation} t={t} onDeleteDraft={handleDeleteDraft} /> // 👈 Pass down onDeleteDraft
+    <EntityCard item={item} navigation={navigation} t={t} onDeleteDraft={handleDeleteDraft} /> 
   ), [navigation, t, handleDeleteDraft]);
 
-  interface EntityCardProps { item: any; navigation: any; t: any; onDeleteDraft: (id: string) => void; } // 👈 Added onDeleteDraft type
+  interface EntityCardProps { item: any; navigation: any; t: any; onDeleteDraft: (id: string) => void; }
 
   const EntityCard = React.memo(({ item, navigation, t, onDeleteDraft }: EntityCardProps) => {
     const [menuVisible, setMenuVisible] = useState(false);
@@ -454,10 +530,8 @@ export const DashboardScreen = ({ navigation, route }: any) => {
     const isFPO = item.type === 'FPO';
     const hasScore = !item.isDraft && (isDealer || isDistributor);
     
-    // GPS Mapping
     const gps = isDealer ? (item.raw.primary_shop_location?.gps?.exterior || item.raw.primaryShopLocation?.gps?.exterior) : null;
     
-    // 🚀 Dynamic extraction for 4 most important attributes based on Entity Type + Draft status
     let infoBlocks: { icon: string, value: any, isPhone: boolean, translate?: boolean }[] = [];
 
     if (isDealer) {
@@ -485,7 +559,6 @@ export const DashboardScreen = ({ navigation, route }: any) => {
         { icon: 'account-balance-wallet', value: turnover ? `₹${turnover} Cr` : null, isPhone: false },
       ];
     } else if (isFarmer) {
-      // 🚀 FIX: Removed Father's Name, Added Water Source, Prioritized Phone Number
       const phone = item.raw.mobile || item.raw.contactMobile;
       const land = item.raw.farm_details?.totalLand || item.raw.totalLand;
       const rawCrops = item.raw.farm_details?.majorCrops || item.raw.majorCrops;
@@ -513,7 +586,6 @@ export const DashboardScreen = ({ navigation, route }: any) => {
       ];
     }
 
-    // Filter out items that haven't been filled yet
     const validBlocks = infoBlocks.filter(b => b.value && String(b.value).trim() !== '');
 
     const badgeBg = isDealer ? '#FEF3C7' : isDistributor ? '#FFEDD5' : isFPO ? '#F3E8FF' : '#E0E7FF';
@@ -551,7 +623,6 @@ export const DashboardScreen = ({ navigation, route }: any) => {
                 <Text style={{ fontSize: 18, fontWeight: "800", color: colors.text }}>
                   {item.name}
                 </Text>
-                {/* 🚀 Draft Tag Beside Name */}
                 {item.isDraft && (
                   <View style={{ backgroundColor: '#FEE2E2', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 4 }}>
                     <Text style={{ color: '#DC2626', fontSize: 10, fontWeight: "800", textTransform: 'uppercase' }}>{t("Draft")}</Text>
@@ -583,7 +654,6 @@ export const DashboardScreen = ({ navigation, route }: any) => {
 
             <View>
               {item.isDraft ? (
-                /* 🚀 Delete Bin Icon for Drafts */
                 <Pressable onPress={() => onDeleteDraft(item.entityId)} style={{ padding: spacing.xs }} hitSlop={10}>
                   <MaterialIcons name="delete-outline" size={24} color="#DC2626" />
                 </Pressable>
@@ -605,9 +675,9 @@ export const DashboardScreen = ({ navigation, route }: any) => {
                           onPress={() => {
                             setMenuVisible(false);
                             if (item.type === 'Farmer') navigation.navigate("FarmerOnboarding", { editData: item.raw });
-    else if (item.type === 'FPO') navigation.navigate("FPOOnboarding", { editData: item.raw }); // 👈
-    else if (item.type === 'Distributor') navigation.navigate("DistributorOnboarding", { editData: item.raw });
-    else navigation.navigate("DealerOnboarding", { editData: item.raw });
+                            else if (item.type === 'FPO') navigation.navigate("FPOOnboarding", { editData: item.raw }); 
+                            else if (item.type === 'Distributor') navigation.navigate("DistributorOnboarding", { editData: item.raw });
+                            else navigation.navigate("DealerOnboarding", { editData: item.raw });
                           }}
                           style={{ flexDirection: "row", alignItems: "center", padding: spacing.md }}
                         >
@@ -622,7 +692,6 @@ export const DashboardScreen = ({ navigation, route }: any) => {
             </View>
           </View>
 
-          {/* 🚀 Unified Grid Box */}
           <View style={{ 
              marginTop: spacing.md,
              backgroundColor: '#F8FAFC',
@@ -663,7 +732,6 @@ export const DashboardScreen = ({ navigation, route }: any) => {
               <View style={{ backgroundColor: badgeBg, paddingHorizontal: 10, paddingVertical: 4, borderRadius: radius.pill }}>
                 <Text style={{ color: badgeColor, fontSize: 12, fontWeight: "700" }}>{t(item.type)}</Text>
               </View>
-              {/* Only show Approved tag if it's NOT a draft */}
               {!item.isDraft && (
                 <View style={{ backgroundColor: item.raw.status === 'SUBMITTED' ? '#DCFCE7' : '#F1F5F9', paddingHorizontal: 10, paddingVertical: 4, borderRadius: radius.pill }}>
                   <Text style={{ color: item.raw.status === 'SUBMITTED' ? '#166534' : colors.textMuted, fontSize: 12, fontWeight: "700" }}>
@@ -689,7 +757,7 @@ export const DashboardScreen = ({ navigation, route }: any) => {
             onPress={() => {
               if (item.isDraft) {
                 if (item.type === 'Farmer') navigation.navigate("FarmerOnboarding", { draftId: item.entityId, draftData: item.raw, initialStep: item.step });
-    else if (item.type === 'FPO') navigation.navigate("FPOOnboarding", { draftId: item.entityId, draftData: item.raw, initialStep: item.step });
+                else if (item.type === 'FPO') navigation.navigate("FPOOnboarding", { draftId: item.entityId, draftData: item.raw, initialStep: item.step });
                 else if (item.type === 'Distributor') navigation.navigate("DistributorOnboarding", { draftId: item.entityId, draftData: item.raw, initialStep: item.step });
                 else navigation.navigate("DealerOnboarding", { draftId: item.entityId, draftData: item.raw, initialStep: item.step });
               } else {
@@ -720,7 +788,6 @@ export const DashboardScreen = ({ navigation, route }: any) => {
         width: "100%"
       }}
     >
-      {/* Left side: Company Logo */}
       <View style={{ flexShrink: 0, justifyContent: "center" }}>
         <Image 
           source={require('../../../../assets/company-logo.jpeg')} 
@@ -728,7 +795,6 @@ export const DashboardScreen = ({ navigation, route }: any) => {
         />
       </View>
 
-      {/* Right side: Active Shift Widget right-aligned */}
       <View style={{ flex: 1, alignItems: "flex-end", justifyContent: "center" }}>
         <ActiveShiftWidget />
       </View>
@@ -740,7 +806,6 @@ export const DashboardScreen = ({ navigation, route }: any) => {
           <TextInput
             value={searchQuery}
             onChangeText={setSearchQuery}
-            // 🚀 Updated placeholder text
             placeholder={t("Search by name, phone, or location...")}
             placeholderTextColor={colors.textMuted}
             style={{ flex: 1, marginLeft: spacing.sm, fontSize: 13, fontWeight: "500", color: colors.text }}
@@ -804,62 +869,199 @@ export const DashboardScreen = ({ navigation, route }: any) => {
         }}
         renderItem={({ item }) => (
           <View style={{ width }}>
-            <FlatList
-              data={item.data}
-              renderItem={renderDealerItem}
-              keyExtractor={(i) => i.id}
-              contentContainerStyle={{ padding: spacing.lg, paddingBottom: 100 }}
-              showsVerticalScrollIndicator={false}
-              onEndReached={() => {
-                if (hasMore && !loadingMore && !loading && !refreshing) {
-                  loadData(page + 1);
-                }
-              }}
-              onEndReachedThreshold={0.5}
-              ListFooterComponent={() => loadingMore ? <View style={{ paddingVertical: spacing.md }}><ActivityIndicator color={colors.primary} /></View> : null}
-              refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[colors.primary]} tintColor={colors.primary} />}
-              ListEmptyComponent={
-                (loading || isMigrating) && !refreshing ? (
-                  <View style={{ marginTop: 60, alignItems: 'center' }}>
-                    <ActivityIndicator size="large" color={colors.primary} />
-                    {isMigrating && (
-                       <Text style={{ marginTop: 10, color: colors.primary, fontWeight: '700' }}>
-                         {t("Syncing drafts...")}
-                       </Text>
-                    )}
-                  </View>
-                ) : (
-                  <EmptyState
-                    title={t(searchQuery ? "No Results Found" : `No ${item.key} Yet`)}
-                    description={t(searchQuery ? "Try adjusting your search criteria." : item.emptyMsg)}
-                    iconName={item.icon as any}
-                    actionLabel={t(item.actionLabel)}
-                    actionIcon={item.actionIcon as any}
-                    onAction={() => {
-                      if (item.actionId === "dealer") navigation.navigate("DealerOnboarding");
-                      else if (item.actionId === "farmer") navigation.navigate("FarmerOnboarding");
-                      else if (item.actionId === "distributor") navigation.navigate("DistributorOnboarding");
-                      else if (item.actionId === "fpo") navigation.navigate("FPOOnboarding");
-                      else navigation.navigate("ComingSoonScreen");
+            {item.key === 'Farmers' && !searchQuery && !isFilterActive ? (
+              farmerViewMode === 'routes' ? (
+                <FlatList
+                  data={processedRoutes}
+                  keyExtractor={r => r.id}
+                  contentContainerStyle={{ padding: spacing.lg, paddingBottom: 100 }}
+                  refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[colors.primary]} tintColor={colors.primary} />}
+                  renderItem={({ item: route }) => (
+                    <Pressable
+                      onPress={() => {
+                        setSelectedRouteId(route.id);
+                        setFarmerViewMode('villages');
+                      }}
+                      style={{ backgroundColor: colors.surface, padding: spacing.md, borderRadius: radius.md, borderWidth: 1, borderColor: colors.border, marginBottom: spacing.md, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', ...shadows.soft }}
+                    >
+                      <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
+                        <View style={{ backgroundColor: '#EFF6FF', padding: 12, borderRadius: radius.md, marginRight: spacing.md }}>
+                          <MaterialIcons name="route" size={24} color="#2563EB" />
+                        </View>
+                        <View style={{ flex: 1 }}>
+                          <Text style={{ fontSize: 16, fontWeight: '900', color: colors.text }} numberOfLines={1}>{route.name}</Text>
+                          <Text style={{ fontSize: 13, color: colors.textMuted, marginTop: 2, fontWeight: '600' }}>{route.villages.length} {t("Villages")}</Text>
+                        </View>
+                      </View>
+                      <View style={{ backgroundColor: colors.primarySoft, paddingHorizontal: 12, paddingVertical: 6, borderRadius: radius.pill, marginLeft: spacing.sm }}>
+                        <Text style={{ color: colors.primary, fontWeight: '800', fontSize: 13 }}>{route.count} {t("Profiles")}</Text>
+                      </View>
+                    </Pressable>
+                  )}
+                  ListEmptyComponent={
+                    (loading || isMigrating) && !refreshing ? (
+                      <View style={{ marginTop: 60, alignItems: 'center' }}>
+                        <ActivityIndicator size="large" color={colors.primary} />
+                        {isMigrating && (
+                           <Text style={{ marginTop: 10, color: colors.primary, fontWeight: '700' }}>
+                             {t("Syncing drafts...")}
+                           </Text>
+                        )}
+                      </View>
+                    ) : (
+                      <EmptyState
+                        title={t("No Routes Assigned")}
+                        description={t("No routes have been assigned to you yet.")}
+                        iconName="map"
+                        actionLabel={t("Add Farmer Manually")}
+                        onAction={() => navigation.navigate("FarmerOnboarding")}
+                      />
+                    )
+                  }
+                />
+              ) : farmerViewMode === 'villages' ? (
+                <View style={{ flex: 1 }}>
+                  <Pressable
+                    onPress={() => {
+                      setFarmerViewMode('routes');
+                      setSelectedRouteId(null);
                     }}
-                  />
-                )
-              }
-            />
+                    style={{ flexDirection: 'row', alignItems: 'center', padding: spacing.lg, paddingBottom: 0 }}
+                  >
+                    <MaterialIcons name="arrow-back" size={20} color={colors.primary} />
+                    <Text style={{ color: colors.primary, fontWeight: '800', marginLeft: 4 }}>{t("Back to Routes")}</Text>
+                  </Pressable>
+                  <Text style={{ fontSize: 22, fontWeight: '900', color: colors.text, paddingHorizontal: spacing.lg, marginTop: spacing.sm, marginBottom: spacing.md }}>
+                    {processedRoutes.find(r => r.id === selectedRouteId)?.name}
+                  </Text>
+                  <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: spacing.lg, paddingBottom: 100 }}>
+                    {processedVillages.map(v => (
+                      <Pressable
+                        key={v.name}
+                        onPress={() => {
+                          // Prevent navigation if there are no profiles
+                          if (v.count > 0) {
+                            setSelectedVillageName(v.name);
+                            setFarmerViewMode('profiles');
+                          }
+                        }}
+                        style={{ backgroundColor: colors.surface, padding: spacing.md, borderRadius: radius.md, borderWidth: 1, borderColor: colors.border, marginBottom: spacing.md, ...shadows.soft, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', opacity: v.count === 0 ? 0.7 : 1 }}
+                      >
+                        <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
+                          <View style={{ backgroundColor: v.count > 0 ? colors.primarySoft : '#F1F5F9', width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center', marginRight: spacing.md }}>
+                            <MaterialIcons name="location-city" size={22} color={v.count > 0 ? colors.primary : colors.textMuted} />
+                          </View>
+                          <View style={{ flex: 1 }}>
+                            <Text style={{ fontSize: 16, fontWeight: '900', color: colors.text }} numberOfLines={1}>{v.name}</Text>
+                            
+                            {/* Fallback Text for 0 Profiles */}
+                            {v.count > 0 ? (
+                              <Text style={{ fontSize: 13, color: colors.textMuted, marginTop: 2, fontWeight: '600' }}>{v.count} {t("Onboarded")}</Text>
+                            ) : (
+                              <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4 }}>
+                                <MaterialIcons name="info-outline" size={14} color={colors.textMuted} style={{ marginRight: 4 }} />
+                                <Text style={{ fontSize: 12, color: colors.textMuted, fontWeight: '600' }}>{t("No profiles in this village yet")}</Text>
+                              </View>
+                            )}
+                          </View>
+                        </View>
+                        
+                        {/* Only show the chevron arrow if it's clickable */}
+                        {v.count > 0 && (
+                          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                            <MaterialIcons name="chevron-right" size={24} color={colors.primary} />
+                          </View>
+                        )}
+                      </Pressable>
+                    ))}
+                  </ScrollView>
+                </View>
+              ) : (
+                <FlatList
+                  data={item.data.filter((f: any) => {
+                    const fVill = (f.raw?.village || f.raw?.personal_details?.village || '').trim().toLowerCase();
+                    return fVill === (selectedVillageName || '').trim().toLowerCase();
+                  })}
+                  renderItem={renderDealerItem}
+                  keyExtractor={(i) => i.id}
+              contentContainerStyle={{ padding: spacing.lg, paddingBottom: 100 }}
+              ListHeaderComponent={
+                    <View style={{ marginBottom: spacing.md }}>
+                      <Pressable
+                        onPress={() => {
+                          setFarmerViewMode('villages');
+                          setSelectedVillageName(null);
+                        }}
+                        style={{ flexDirection: 'row', alignItems: 'center', marginBottom: spacing.md }}
+                      >
+                        <MaterialIcons name="arrow-back" size={20} color={colors.primary} />
+                        <Text style={{ color: colors.primary, fontWeight: '800', marginLeft: 4 }}>{t("Back to Villages")}</Text>
+                      </Pressable>
+                      <Text style={{ fontSize: 20, fontWeight: '900', color: colors.text }}>
+                        {t("Farmers in")} {selectedVillageName}
+                      </Text>
+                    </View>
+                  }
+                />
+              )
+            ) : (
+              <FlatList
+                data={item.data}
+                renderItem={renderDealerItem}
+                keyExtractor={(i) => i.id}
+                contentContainerStyle={{ padding: spacing.lg, paddingBottom: 100 }}
+                showsVerticalScrollIndicator={false}
+                onEndReached={() => {
+                  if (hasMore && !loadingMore && !loading && !refreshing) {
+                    loadData(page + 1);
+                  }
+                }}
+                onEndReachedThreshold={0.5}
+                ListFooterComponent={() => loadingMore ? <View style={{ paddingVertical: spacing.md }}><ActivityIndicator color={colors.primary} /></View> : null}
+                refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[colors.primary]} tintColor={colors.primary} />}
+                ListEmptyComponent={
+                  (loading || isMigrating) && !refreshing ? (
+                    <View style={{ marginTop: 60, alignItems: 'center' }}>
+                      <ActivityIndicator size="large" color={colors.primary} />
+                      {isMigrating && (
+                         <Text style={{ marginTop: 10, color: colors.primary, fontWeight: '700' }}>
+                           {t("Syncing drafts...")}
+                         </Text>
+                      )}
+                    </View>
+                  ) : (
+                    <EmptyState
+                      title={t(searchQuery ? "No Results Found" : `No ${item.key} Yet`)}
+                      description={t(searchQuery ? "Try adjusting your search criteria." : item.emptyMsg)}
+                      iconName={item.icon as any}
+                      actionLabel={t(item.actionLabel)}
+                      actionIcon={item.actionIcon as any}
+                      onAction={() => {
+                        if (item.actionId === "dealer") navigation.navigate("DealerOnboarding");
+                        else if (item.actionId === "farmer") navigation.navigate("FarmerOnboarding");
+                        else if (item.actionId === "distributor") navigation.navigate("DistributorOnboarding");
+                        else if (item.actionId === "fpo") navigation.navigate("FPOOnboarding");
+                        else navigation.navigate("ComingSoonScreen");
+                      }}
+                    />
+                  )
+                }
+              />
+            )}
           </View>
         )}
       />
 
-<FloatingActionMenu
+      <FloatingActionMenu
         actions={[
           { id: "expense", label: t("Log Expense"), icon: "receipt" },
           { id: "dealer", label: t("Add Dealer"), icon: "storefront" },
           { id: "farmer", label: t("Add Farmer"), icon: "agriculture" },
           { id: "distributor", label: t("Add Distributor"), icon: "domain" },
-          { id: "fpo", label: t("Add FPO"), icon: "groups" }, // 👈
+          { id: "fpo", label: t("Add FPO"), icon: "groups" },
         ]}
         onActionPress={(id) => {
-          if (id === "expense") navigation.navigate("AddExpenseScreen"); // 🚀 NAVIGATE TO EXPENSE
+          if (id === "expense") navigation.navigate("AddExpenseScreen");
           else {
             if (id === "dealer") navigation.navigate("DealerOnboarding");
             else if (id === "farmer") navigation.navigate("FarmerOnboarding");
@@ -876,6 +1078,7 @@ export const DashboardScreen = ({ navigation, route }: any) => {
         currentFilters={filters}
         onApply={(newFilters) => setFilters(newFilters)}
         onClose={() => setIsFilterModalOpen(false)}
+        routesList={[...routes].sort((a, b) => (a.name || '').localeCompare(b.name || '')).map(r => ({ label: r.name, value: r.id }))} 
       />
     </View>
   );

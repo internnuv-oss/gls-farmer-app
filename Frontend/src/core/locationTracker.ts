@@ -14,8 +14,9 @@ TaskManager.defineTask(SHIFT_LOCATION_TASK, async ({ data, error }) => {
         lat: loc.coords.latitude,
         lng: loc.coords.longitude,
         timestamp: loc.timestamp,
-        speed: loc.coords.speed,
-        heading: loc.coords.heading
+        speed: loc.coords.speed ?? 0,
+        heading: loc.coords.heading ?? 0,
+        accuracy: loc.coords.accuracy ?? 999 // 🚀 Ensure accuracy is captured
       }));
       
       await useShiftStore.getState().addRoutePoints(newPoints);

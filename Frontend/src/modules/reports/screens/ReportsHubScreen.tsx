@@ -106,6 +106,18 @@ export const ReportsHubScreen = ({ navigation }: any) => {
         </Text>
       </View>
 
+      {/* 🚀 NEW: Strava-Style Travel Report Button */}
+      <Pressable onPress={() => navigation.navigate("TravelReportScreen")} style={{ backgroundColor: colors.surface, padding: spacing.lg, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.border, marginBottom: spacing.md, ...shadows.soft, flexDirection: 'row', alignItems: 'center' }}>
+        <View style={{ backgroundColor: '#ECFCCB', padding: 12, borderRadius: radius.md, marginRight: spacing.md }}>
+          <MaterialIcons name="map" size={28} color="#65A30D" />
+        </View>
+        <View style={{ flex: 1 }}>
+          <Text style={{ fontSize: 18, fontWeight: '800', color: colors.text }}>{t("Travel Report")}</Text>
+          <Text style={{ fontSize: 13, color: colors.textMuted, fontWeight: '500', marginTop: 2 }}>{t("View GPS route & calculated TA/DA")}</Text>
+        </View>
+        <MaterialIcons name="chevron-right" size={24} color={colors.textMuted} />
+      </Pressable>
+
       <Pressable onPress={() => navigation.navigate("AttendanceReportScreen")} style={{ backgroundColor: colors.surface, padding: spacing.lg, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.border, marginBottom: spacing.md, ...shadows.soft, flexDirection: 'row', alignItems: 'center' }}>
         <View style={{ backgroundColor: '#EFF6FF', padding: 12, borderRadius: radius.md, marginRight: spacing.md }}>
           <MaterialIcons name="rule" size={28} color="#2563EB" />

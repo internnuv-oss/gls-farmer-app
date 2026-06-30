@@ -40,7 +40,7 @@ export const ActiveShiftWidget = () => {
     if (activitiesLogged === 0 && transitMode !== 'No Travelling') {
       useAlertStore.getState().showAlert(
         t("Cannot Punch Out"), 
-        t("You must log at least one expense or activity (e.g. add a farmer) before closing your shift."),
+        t("You must log at least one activity (e.g. add a farmer) before closing your shift."),
         [{ text: t("OK") }]
       );
       return;

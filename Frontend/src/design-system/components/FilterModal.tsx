@@ -6,7 +6,8 @@ import { colors, radius, shadows, spacing, typography } from '../tokens';
 
 export type FilterState = {
   sortBy: string;
-  completionStatus: string[]; // 🚀 Added Completion Status
+  completionStatus: string[];
+  routeId: string[]; // 🚀 Added Route ID for Farmers
   category: string[];
   firmType: string[];
   linkedStatus: string[];
@@ -25,6 +26,7 @@ export type FilterState = {
 export const defaultFilters: FilterState = {
   sortBy: "latest",
   completionStatus: [],
+  routeId: [], // 🚀 Added Route ID
   category: [],
   firmType: [],
   linkedStatus: [],
@@ -46,6 +48,7 @@ type FilterModalProps = {
   currentFilters: FilterState;
   onApply: (filters: FilterState) => void;
   onClose: () => void;
+  routesList?: { label: string, value: string }[]; // 🚀 Added routesList Prop
 };
 
 const CheckboxRow = ({ label, isSelected, onToggle }: { label: string, isSelected: boolean, onToggle: () => void }) => (
@@ -91,7 +94,7 @@ const FilterAccordionGroup = ({ title, options, selectedValues, onToggleItem }: 
   );
 };
 
-export const FilterModal: React.FC<FilterModalProps> = ({ visible, entityType, currentFilters, onApply, onClose }) => {
+export const FilterModal: React.FC<FilterModalProps> = ({ visible, entityType, currentFilters, onApply, onClose, routesList }) => {
   const [localFilters, setLocalFilters] = useState<FilterState>(currentFilters);
 
   useEffect(() => {
@@ -163,7 +166,6 @@ export const FilterModal: React.FC<FilterModalProps> = ({ visible, entityType, c
               <View style={styles.divider} />
               <Text style={[styles.sectionLabel, { marginBottom: 0 }]}>Filter Parameters</Text>
 
-              {/* 🚀 New Completion Status applied to all entity types */}
               <FilterAccordionGroup 
                 title="Completion Status" 
                 selectedValues={localFilters.completionStatus} 
@@ -264,6 +266,15 @@ export const FilterModal: React.FC<FilterModalProps> = ({ visible, entityType, c
 
               {entityType === "Farmers" && (
                 <>
+                  {/* 🚀 New Route Filter logic */}
+                  {routesList && routesList.length > 0 && (
+                    <FilterAccordionGroup 
+                      title="Assigned Routes" 
+                      selectedValues={localFilters.routeId} 
+                      onToggleItem={(val) => toggleFilter('routeId', val)}
+                      options={routesList} 
+                    />
+                  )}
                   <FilterAccordionGroup 
                     title="Farm Scale" 
                     selectedValues={localFilters.scale} 

@@ -22,6 +22,7 @@ export interface PastShift {
   id: string;
   date: string;
   events: TimelineEvent[];
+  routePath?: any[]; // 🚀 Exposed for UI map rendering
 }
 
 interface ShiftState {
@@ -34,14 +35,20 @@ interface ShiftState {
   activitiesLogged: number;
   shiftHistory: PastShift[]; 
   routePath: any[];
+  pendingPoints: any[]; // 🚀 NEW: Queue for un-uploaded GPS points
   totalDistance: number;
+  
   hydrateShifts: () => Promise<void>;
   startShift: (isPersonal: boolean, km: string, transit: string, vehicleType: 'two-wheeler' | 'four-wheeler' | null, actualTime: number, editedTime: number | null, location: any, odoImageUrl: string | null) => Promise<void>;
   endShift: (endKm: string, actualTime: number, editedTime: number | null, location: any, odoImageUrl: string | null, comment?: string) => Promise<void>;
   incrementActivity: () => Promise<void>;
   logShiftEvent: (type: 'activity' | 'expense', title: string, description: string) => Promise<void>;
   addRoutePoints: (points: any[]) => Promise<void>;
+  syncPendingRoutePoints: () => Promise<void>; // 🚀 NEW: Batched Uploader
 }
+
+let syncInterval: NodeJS.Timeout | null = null;
+let isSyncing = false;
 
 export const useShiftStore = create<ShiftState>()(
   persist(
@@ -55,25 +62,87 @@ export const useShiftStore = create<ShiftState>()(
       activitiesLogged: 0,
       shiftHistory: [],
       routePath: [],
+      pendingPoints: [],
       totalDistance: 0,
+
+      // 🚀 NEW: Batched Syncing Logic
+      syncPendingRoutePoints: async () => {
+        if (isSyncing) return;
+        const { activeShiftId, pendingPoints, totalDistance } = get();
+        if (!activeShiftId || pendingPoints.length === 0) return;
+
+        isSyncing = true;
+        try {
+          // Clone to prevent race conditions during upload
+          const pointsToUpload = [...pendingPoints];
+          
+          const payload = pointsToUpload.map(p => ({
+            shift_id: activeShiftId,
+            lat: p.lat,
+            lng: p.lng,
+            timestamp: p.timestamp,
+            accuracy: p.accuracy || null,
+            speed: p.speed || null,
+            heading: p.heading || null
+          }));
+
+          // 1. Bulk insert to the new table
+          const { error: insertError } = await supabase.from('shift_locations').insert(payload);
+          if (insertError) throw insertError;
+
+          // 2. Sync the latest total_distance
+          const { error: updateError } = await supabase.from('shifts')
+            .update({ total_distance: parseFloat(totalDistance.toFixed(2)) })
+            .eq('id', activeShiftId);
+          if (updateError) throw updateError;
+
+          // 3. Clear ONLY the points that successfully uploaded
+          set((state) => ({
+            pendingPoints: state.pendingPoints.filter(p => !pointsToUpload.includes(p))
+          }));
+        } catch (e) {
+          console.log("Offline or sync failed: GPS points safely buffered.", e);
+        } finally {
+          isSyncing = false;
+        }
+      },
 
       hydrateShifts: async () => {
         const userId = useAuthStore.getState().user?.id;
         if (!userId) return;
 
-        const { data, error } = await supabase
+        const { data: shiftsData, error: shiftsError } = await supabase
           .from('shifts')
           .select('*')
           .eq('se_id', userId)
           .order('date', { ascending: false });
 
-        if (error || !data) return;
+        if (shiftsError || !shiftsData) return;
 
-        const activeShift = data.find(s => s.status === 'ACTIVE');
-        const formattedHistory = data.map(s => ({
+        // 🚀 Fetch all shift locations and group them by shift_id
+        const shiftIds = shiftsData.map(s => s.id);
+        const { data: allLocs } = await supabase
+          .from('shift_locations')
+          .select('shift_id, lat, lng, timestamp')
+          .in('shift_id', shiftIds)
+          .order('timestamp', { ascending: true });
+
+        const locsByShift: Record<string, any[]> = {};
+        if (allLocs) {
+          allLocs.forEach(l => {
+            if (!locsByShift[l.shift_id]) locsByShift[l.shift_id] = [];
+            locsByShift[l.shift_id].push({ lat: l.lat, lng: l.lng, timestamp: l.timestamp });
+          });
+        }
+
+        const activeShift = shiftsData.find(s => s.status === 'ACTIVE');
+        
+        const formattedHistory = shiftsData.map(s => ({
+          ...s,
           id: s.id,
           date: s.date,
-          events: s.events || []
+          events: s.events || [],
+          routePath: locsByShift[s.id] || []
         }));
 
         set({
@@ -85,9 +154,16 @@ export const useShiftStore = create<ShiftState>()(
           startKm: activeShift ? activeShift.start_km : '',
           transitMode: activeShift ? activeShift.transit_mode : '',
           activitiesLogged: activeShift ? activeShift.activities_logged : 0,
-          routePath: activeShift ? (activeShift.route_path || []) : [],
+          routePath: activeShift ? (locsByShift[activeShift.id] || []) : [],
+          pendingPoints: [], // Wipe pending queue on fresh load
           totalDistance: activeShift ? (activeShift.total_distance || 0) : 0
         });
+
+        // 🚀 Restore Auto-Sync Timer if active
+        if (syncInterval) clearInterval(syncInterval);
+        if (activeShift) {
+          syncInterval = setInterval(() => get().syncPendingRoutePoints(), 60000); 
+        }
       },
 
       startShift: async (isPersonal, km, transit, vehicleType, actualTime, editedTime, location, odoImageUrl) => {
@@ -104,20 +180,26 @@ export const useShiftStore = create<ShiftState>()(
           description: isPersonal ? `Personal Vehicle • Start KM: ${km}` : `Transit: ${transit}` 
         };
 
+        const initialPoint = location ? { lat: location.lat, lng: location.lng, timestamp: timeToUse, speed: 0, heading: 0, accuracy: 5 } : null;
+
         const payload = {
           se_id: userId, date: dateStr, status: 'ACTIVE',
           start_time: timeToUse, is_personal_vehicle: isPersonal,
           vehicle_type: vehicleType, start_km: km, transit_mode: transit,
           start_location: location, start_odo_image: odoImageUrl,
           events: [inEvent],
-          route_path: location ? [{ lat: location.lat, lng: location.lng, timestamp: timeToUse }] : [],
-          total_distance: 0
+          total_distance: 0 // No more route_path array here!
         };
 
         const { data, error } = await supabase.from('shifts').insert(payload).select('id').single();
         if (error) throw error;
 
-        // 🚀 START BACKGROUND TRACKING
+        if (initialPoint) {
+            await supabase.from('shift_locations').insert({
+               shift_id: data.id, ...initialPoint
+            });
+        }
+
         const hasStarted = await Location.hasStartedLocationUpdatesAsync(SHIFT_LOCATION_TASK);
         if (!hasStarted) {
           await Location.startLocationUpdatesAsync(SHIFT_LOCATION_TASK, {
@@ -133,7 +215,6 @@ export const useShiftStore = create<ShiftState>()(
           });
         }
 
-        // Update local state
         const newHistory = [...get().shiftHistory];
         const todayIndex = newHistory.findIndex(h => new Date(h.date).toDateString() === new Date(timeToUse).toDateString());
         if (todayIndex >= 0) newHistory[todayIndex].events.push(inEvent);
@@ -143,20 +224,20 @@ export const useShiftStore = create<ShiftState>()(
           activeShiftId: data.id, isActive: true, startTime: timeToUse, 
           isPersonalVehicle: isPersonal, startKm: km, transitMode: transit, 
           activitiesLogged: 0, shiftHistory: newHistory,
-          routePath: payload.route_path, totalDistance: 0 
+          routePath: initialPoint ? [initialPoint] : [], pendingPoints: [], totalDistance: 0 
         });
+
+        // 🚀 Start Batch Processing Interval
+        if (syncInterval) clearInterval(syncInterval);
+        syncInterval = setInterval(() => get().syncPendingRoutePoints(), 60000);
       },
 
       endShift: async (endKm, actualTime, editedTime, location, odoImageUrl, comment) => {
-        // 🚀 Extract routePath so we can append to it
-        const { activeShiftId, shiftHistory, totalDistance, routePath } = get();
+        const { activeShiftId, shiftHistory, totalDistance, activitiesLogged, routePath } = get();
         if (!activeShiftId) return;
 
-        // STOP BACKGROUND TRACKING
         const hasStarted = await Location.hasStartedLocationUpdatesAsync(SHIFT_LOCATION_TASK);
-        if (hasStarted) {
-          await Location.stopLocationUpdatesAsync(SHIFT_LOCATION_TASK);
-        }
+        if (hasStarted) await Location.stopLocationUpdatesAsync(SHIFT_LOCATION_TASK);
 
         const timeToUse = editedTime || actualTime || Date.now();
         
@@ -170,41 +251,63 @@ export const useShiftStore = create<ShiftState>()(
           type: 'punch-out', title: 'Punched Out', description: descriptionStr 
         };
 
-        // 🚀 FORCE CAPTURE: Ensure the final punch-out location is locked into the visual map array
-        const finalRoutePath = [...routePath];
+        // Guarantee final point maps
         if (location) {
-          finalRoutePath.push({ lat: location.lat, lng: location.lng, timestamp: timeToUse });
+          set((state) => ({ 
+            pendingPoints: [...state.pendingPoints, { lat: location.lat, lng: location.lng, timestamp: timeToUse }],
+            routePath: [...state.routePath, { lat: location.lat, lng: location.lng, timestamp: timeToUse }]
+          }));
+        }
+
+        // 🚀 Final flush before ending shift
+        await get().syncPendingRoutePoints();
+        if (syncInterval) {
+          clearInterval(syncInterval);
+          syncInterval = null;
+        }
+
+        // 🚀 CALCULATE ALLOWANCE STATUS
+        let allowanceStatus = 'Pending';
+        if (get().isPersonalVehicle && endKm) {
+          const startVal = parseFloat(get().startKm || '0');
+          const endVal = parseFloat(endKm);
+          if (!isNaN(startVal) && !isNaN(endVal)) {
+            const manualDistance = Math.max(0, endVal - startVal);
+            if (manualDistance < 50) {
+              allowanceStatus = 'Approved';
+            }
+          }
+        } else if (!get().isPersonalVehicle) {
+          // If no personal vehicle was used, TA/DA is effectively 0, so auto-approve
+          allowanceStatus = 'Approved'; 
         }
 
         const payload = {
           end_time: timeToUse, end_km: endKm, end_location: location,
           end_odo_image: odoImageUrl, status: 'COMPLETED', updated_at: new Date().toISOString(),
-          total_distance: parseFloat(totalDistance.toFixed(2)),
-          route_path: finalRoutePath // 🚀 Save the updated array to Supabase
+          total_distance: parseFloat(get().totalDistance.toFixed(2)),
+          activities_logged: activitiesLogged,
+          allowance_status: allowanceStatus // 🚀 Keep this
         };
 
-        // Find existing events from local state to append to
         const currentShiftRecord = shiftHistory.find(h => h.id === activeShiftId);
         const updatedEvents = currentShiftRecord ? [...currentShiftRecord.events, outEvent] : [outEvent];
 
         const { error } = await supabase.from('shifts').update({ ...payload, events: updatedEvents }).eq('id', activeShiftId);
         if (error) throw error;
 
-        // Update local state
         const newHistory = [...shiftHistory];
         const shiftIndex = newHistory.findIndex(h => h.id === activeShiftId);
         if (shiftIndex >= 0) newHistory[shiftIndex].events = updatedEvents;
 
-        set({ activeShiftId: null, isActive: false, startTime: null, shiftHistory: newHistory, routePath: [], totalDistance: 0 });
+        set({ activeShiftId: null, isActive: false, startTime: null, shiftHistory: newHistory, routePath: [], pendingPoints: [], totalDistance: 0 });
       },
 
       logShiftEvent: async (type, title, description) => {
         const { activeShiftId, shiftHistory } = get();
         if (!activeShiftId) return;
 
-        const event: TimelineEvent = {
-          id: Date.now().toString(), time: Date.now(), type, title, description
-        };
+        const event: TimelineEvent = { id: Date.now().toString(), time: Date.now(), type, title, description };
 
         const currentShiftRecord = shiftHistory.find(h => h.id === activeShiftId);
         if (!currentShiftRecord) return;
@@ -230,44 +333,47 @@ export const useShiftStore = create<ShiftState>()(
       },
 
       addRoutePoints: async (newPoints: any[]) => {
-        const { activeShiftId, routePath, totalDistance } = get();
+        const { activeShiftId, routePath, pendingPoints, totalDistance } = get();
         if (!activeShiftId) return;
 
         let addedDistance = 0;
-        const lastPoint = routePath.length > 0 ? routePath[routePath.length - 1] : null;
+        let lastPoint = routePath.length > 0 ? routePath[routePath.length - 1] : null;
+        const validPoints = [];
 
-        let prevPoint = lastPoint;
-        newPoints.forEach(point => {
-          if (prevPoint) {
-            addedDistance += calculateDistance(prevPoint.lat, prevPoint.lng, point.lat, point.lng);
+        // 🚀 Advanced GPS Filtering Engine (runs entirely locally)
+        for (const point of newPoints) {
+          if (!point.timestamp || point.timestamp > Date.now() + 60000) continue;
+          if (point.accuracy && point.accuracy > 30) continue;
+          if (point.speed && point.speed > 33.33) continue;
+
+          if (lastPoint) {
+            const distInKm = calculateDistance(lastPoint.lat, lastPoint.lng, point.lat, point.lng);
+            const distInMeters = distInKm * 1000;
+
+            if (distInMeters < 10) continue;
+            if (distInMeters > 50 && point.speed === 0 && lastPoint.speed === 0) continue;
+
+            addedDistance += distInKm;
           }
-          prevPoint = point;
-        });
 
-        // 🚀 1. SAVE LOCALLY FIRST (This is what makes it offline-proof)
-        const updatedPath = [...routePath, ...newPoints];
+          validPoints.push(point);
+          lastPoint = point;
+        }
+
+        if (validPoints.length === 0) return;
+
+        // 🚀 Append to local structures only
+        const updatedPath = [...routePath, ...validPoints];
+        const updatedPending = [...pendingPoints, ...validPoints];
         const updatedDistance = totalDistance + addedDistance;
 
-        set({ routePath: updatedPath, totalDistance: updatedDistance });
-
-        // 🚀 2. ATTEMPT CLOUD SYNC (Self-healing approach)
-        try {
-          const { error } = await supabase.from('shifts')
-            .update({ 
-              route_path: updatedPath, 
-              total_distance: parseFloat(updatedDistance.toFixed(2)) 
-            })
-            .eq('id', activeShiftId);
-
-          if (error) throw error;
-        } catch (error) {
-          // If network is off, it simply fails silently.
-          // Because the local 'updatedPath' array is still growing, the missing points
-          // will automatically hitch a ride on the next successful upload when internet returns!
-          console.log("Offline: Route points safely buffered to local storage.");
-        }
+        set({ 
+          routePath: updatedPath, 
+          pendingPoints: updatedPending, 
+          totalDistance: updatedDistance 
+        });
       }
     }),
-    { name: 'shift-storage-v3', storage: createJSONStorage(() => AsyncStorage) }
+    { name: 'shift-storage-v5', storage: createJSONStorage(() => AsyncStorage) }
   )
 );
