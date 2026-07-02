@@ -2,7 +2,7 @@ import React, { useState, useRef, useMemo } from 'react';
 import { View, Text, ScrollView, Pressable, StyleSheet } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
-import MapView, { Polyline, Marker } from 'react-native-maps';
+import MapView, { Polyline, Marker, PROVIDER_GOOGLE } from 'react-native-maps';
 import ViewShot, { captureRef } from 'react-native-view-shot';
 import * as Sharing from 'expo-sharing';
 import * as FileSystem from 'expo-file-system/legacy';
@@ -285,12 +285,19 @@ export const TravelReportScreen = ({ navigation }: any) => {
                                     {reportData.routeCoordinates.length > 0 ? (
                                         <MapView
                                             ref={mapRef}
+                                            provider={PROVIDER_GOOGLE} // 🚀 FORCE GOOGLE MAPS ENGINE
                                             style={{ flex: 1 }}
                                             onLayout={handleMapLayout}
                                             scrollEnabled={false}
                                             zoomEnabled={false}
                                         >
-                                            <Polyline coordinates={reportData.routeCoordinates} strokeColor={colors.primary} strokeWidth={4} />
+                                            <Polyline 
+                                                coordinates={reportData.routeCoordinates} 
+                                                strokeColor={colors.primary} 
+                                                strokeWidth={5} // 🚀 Make it slightly thicker like Strava
+                                                lineCap="round" // 🚀 Smooth out the ends of the line
+                                                lineJoin="round" // 🚀 Smooth out sharp 90-degree turns
+                                            />
                                             <Marker coordinate={reportData.routeCoordinates[0]} pinColor="green" title="Start" />
                                             <Marker coordinate={reportData.routeCoordinates[reportData.routeCoordinates.length - 1]} pinColor="red" title="End" />
                                         </MapView>

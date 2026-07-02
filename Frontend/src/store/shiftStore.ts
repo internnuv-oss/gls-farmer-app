@@ -209,13 +209,28 @@ export const useShiftStore = create<ShiftState>()(
         const hasStarted = await Location.hasStartedLocationUpdatesAsync(SHIFT_LOCATION_TASK);
         if (!hasStarted) {
           await Location.startLocationUpdatesAsync(SHIFT_LOCATION_TASK, {
-            accuracy: Location.Accuracy.Balanced,
-            distanceInterval: 50,
-            deferredUpdatesInterval: 60000,
+            // 🚀 The Sweet Spot: Uses real GPS but allows the OS hardware to rest
+            accuracy: Location.Accuracy.High, 
+            
+            // 🚀 Distance: 50 meters captures road curves beautifully without spamming the CPU
+            distanceInterval: 50, 
+            
+            // 🚀 Time: Only ping every 1 minute if they are moving slowly (or sitting in traffic)
+            timeInterval: 60000, 
+            
+            // 🚀 THE ULTIMATE BATTERY SAVERS (Batched Updates)
+            // Let the OS collect points in the background hardware, but only wake up 
+            // the React Native app every 2 minutes or 200 meters to process them.
+            deferredUpdatesInterval: 120000, 
+            deferredUpdatesDistance: 200, 
+            
+            // 🚀 iOS specific battery saver: stops pinging if the phone sits on a desk
+            pausesUpdatesAutomatically: true, 
+            
             showsBackgroundLocationIndicator: true,
             foregroundService: {
               notificationTitle: "Shift Active",
-              notificationBody: "Field Commander is securely tracking your route.",
+              notificationBody: "Tracking route (Battery Optimized)",
               notificationColor: "#16A34A",
             },
           });

@@ -1,4 +1,8 @@
+// Frontend/index.ts
+
 import { registerRootComponent } from 'expo';
+
+import './src/core/locationTracker';
 
 import App from './App';
 
