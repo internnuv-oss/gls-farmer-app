@@ -16,16 +16,26 @@ export const ActiveShiftWidget = () => {
   const { t } = useTranslation();
   const { isActive, startTime, startShift, endShift, activitiesLogged, shiftHistory, transitMode } = useShiftStore();
   const loginTimestamp = useAuthStore((s) => s.loginTimestamp);
-  
+
   const [showInModal, setShowInModal] = useState(false);
   const [showOutModal, setShowOutModal] = useState(false);
 
-  // 🚀 REQ 2: Strict single punch verification criteria evaluation
+  // One shift per day: true only when a COMPLETED shift exists for today
   const hasPunchedToday = shiftHistory.some(shift => {
     const shiftDate = new Date(shift.date).toDateString();
     const today = new Date().toDateString();
-    return shiftDate === today;
+    const hasCompletedShift = (shift as any).status === 'COMPLETED' ||
+      shift.events.some(e => e.type === 'punch-out');
+    return shiftDate === today && hasCompletedShift;
   });
+
+  const handleShiftCompletedPress = () => {
+    useAlertStore.getState().showAlert(
+      t("Shift Already Completed"),
+      t("You have already completed your shift for today. You can punch in again after 12:00 AM midnight."),
+      [{ text: t("OK") }]
+    );
+  };
 
   useEffect(() => {
     // 🚀 THE FIX: Compare the stamp to ensure it opens ONCE per distinct login
@@ -39,13 +49,13 @@ export const ActiveShiftWidget = () => {
     // 🚀 THE WALL: Block if 0 activities AND they were travelling
     if (activitiesLogged === 0 && transitMode !== 'No Travelling') {
       useAlertStore.getState().showAlert(
-        t("Cannot Punch Out"), 
+        t("Cannot Punch Out"),
         t("You must log at least one activity (e.g. add a farmer) before closing your shift."),
         [{ text: t("OK") }]
       );
       return;
     }
-    
+
     // If they have > 0 activities OR they selected 'No Travelling', let them open the modal!
     setShowOutModal(true);
   };
@@ -84,72 +94,76 @@ export const ActiveShiftWidget = () => {
               <Text style={{ fontSize: 11, color: '#4D7C0F', fontWeight: '800', marginLeft: 3 }}>{t("ON DUTY")}</Text>
             </View>
             <Text style={{ fontSize: 11, color: '#4D7C0F', fontWeight: '700', marginTop: 1 }} numberOfLines={1}>
-              {t("From")} {new Date(startTime || Date.now()).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+              {t("From")} {new Date(startTime || Date.now()).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
             </Text>
           </View>
-          
+
           <Pressable onPress={initiatePunchOut} style={{ backgroundColor: '#EF4444', paddingVertical: 6, paddingHorizontal: 10, borderRadius: radius.sm, flexShrink: 0 }}>
             <Text style={{ color: 'white', fontSize: 11, fontWeight: '800' }}>{t("Punch Out")}</Text>
           </Pressable>
         </View>
       ) : (
-        // 🚀 REQ 2: Change button appearance if shift already completed today
+        // One shift per day: show tappable badge that explains the restriction
         hasPunchedToday ? (
-          <View style={{ backgroundColor: '#F1F5F9', paddingVertical: 8, paddingHorizontal: 12, borderRadius: radius.md, borderWidth: 1, borderColor: colors.border }}>
-             <Text style={{ color: colors.textMuted, fontSize: 12, fontWeight: '800' }}>{t("SHIFT COMPLETED")}</Text>
-          </View>
+          <Pressable
+            onPress={handleShiftCompletedPress}
+            style={{ backgroundColor: '#F1F5F9', paddingVertical: 8, paddingHorizontal: 12, borderRadius: radius.md, borderWidth: 1, borderColor: colors.border, flexDirection: 'row', alignItems: 'center', gap: 4 }}
+          >
+            <MaterialIcons name="lock-clock" size={14} color={colors.textMuted} />
+            <Text style={{ color: colors.textMuted, fontSize: 12, fontWeight: '800' }}>{t("SHIFT COMPLETED")}</Text>
+          </Pressable>
         ) : (
-          <Pressable 
-          onPress={() => setShowInModal(true)} 
-          style={{ backgroundColor: colors.primary, paddingVertical: 8, paddingHorizontal: 12, borderRadius: radius.md, flexDirection: 'row', alignItems: 'center', gap: 4, ...shadows.soft, flexShrink: 0 }}
-        >
-          {/* 4. Apply the animation here */}
-          <Animated.View style={{ transform: [{ translateY: bounceAnim }] }}>
-            <MaterialIcons name="touch-app" size={16} color="white" />
-          </Animated.View>
-          <Text style={{ color: 'white', fontSize: 12, fontWeight: '800', textTransform: 'uppercase' }}>{t("Punch In")}</Text>
-        </Pressable>
+          <Pressable
+            onPress={() => setShowInModal(true)}
+            style={{ backgroundColor: colors.primary, paddingVertical: 8, paddingHorizontal: 12, borderRadius: radius.md, flexDirection: 'row', alignItems: 'center', gap: 4, ...shadows.soft, flexShrink: 0 }}
+          >
+            {/* 4. Apply the animation here */}
+            <Animated.View style={{ transform: [{ translateY: bounceAnim }] }}>
+              <MaterialIcons name="touch-app" size={16} color="white" />
+            </Animated.View>
+            <Text style={{ color: 'white', fontSize: 12, fontWeight: '800', textTransform: 'uppercase' }}>{t("Punch In")}</Text>
+          </Pressable>
         )
       )}
 
-      <PunchInModal 
-        visible={showInModal} 
-        onClose={() => setShowInModal(false)} 
-        onConfirm={async (isPers: boolean, km: string, mode: string, odoImg?: string, metadata?: any) => { 
+      <PunchInModal
+        visible={showInModal}
+        onClose={() => setShowInModal(false)}
+        onConfirm={async (isPers: boolean, km: string, mode: string, odoImg?: string, metadata?: any) => {
           const odoUrl = odoImg ? await uploadFileToCloudinary(odoImg, 'image') : null;
           await startShift(
-            isPers, km, mode, 
-            metadata?.vehicleType || null, 
-            metadata?.actualTime || Date.now(),     
-            metadata?.editedTime || null,           
+            isPers, km, mode,
+            metadata?.vehicleType || null,
+            metadata?.actualTime || Date.now(),
+            metadata?.editedTime || null,
             metadata?.location || null,
             odoUrl // Pass the Cloudinary URL
-          ); 
-          setShowInModal(false); 
-        }} 
+          );
+          setShowInModal(false);
+        }}
       />
 
-      <PunchOutModal 
-        visible={showOutModal} 
-        onClose={() => setShowOutModal(false)} 
-        onConfirm={async (endKm: string, odoImg?: string, metadata?: any) => { 
+      <PunchOutModal
+        visible={showOutModal}
+        onClose={() => setShowOutModal(false)}
+        onConfirm={async (endKm: string, odoImg?: string, metadata?: any) => {
           const odoUrl = odoImg ? await uploadFileToCloudinary(odoImg, 'image') : null;
           await endShift(
-            endKm, 
-            metadata?.actualTime || Date.now(), 
-            metadata?.editedTime || null,       
+            endKm,
+            metadata?.actualTime || Date.now(),
+            metadata?.editedTime || null,
             metadata?.location || null,
             odoUrl,
             metadata?.comment // 🚀 Pass the comment payload up to the store
-          ); 
-          setShowOutModal(false); 
-          
+          );
+          setShowOutModal(false);
+
           useAlertStore.getState().showAlert(
-            t("Shift Ended"), 
+            t("Shift Ended"),
             t("Your daily attendance and journey parameters have been compiled successfully."),
             [{ text: t("OK") }]
           );
-        }} 
+        }}
       />
     </View>
   );

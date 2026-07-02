@@ -20,11 +20,11 @@ import { FeedbackScreenTemplate } from '../design-system/templates';
 import { supabase } from '../core/supabase';
 import { AlertModal } from '../design-system/components/AlertModal';
 import { useAlertStore } from '../store/alertStore';
+import { useShiftStore } from '../store/shiftStore';
 import { FarmerOnboardingScreen } from '../modules/onboarding/farmer/screens/FarmerOnboardingScreen';
 import { DistributorOnboardingScreen } from '../modules/onboarding/distributor/screens/DistributorOnboardingScreen';
 import { FPOOnboardingScreen } from '../modules/onboarding/fpo/screens/FPOOnboardingScreen';
 import { ReportsHubScreen } from '../modules/reports/screens/ReportsHubScreen';
-import { AttendanceReportScreen } from '../modules/reports/screens/AttendanceReportScreen';
 import { ExpenseReportScreen } from '../modules/reports/screens/ExpenseReportScreen';
 import { AddExpenseScreen } from '../modules/reports/screens/AddExpenseScreen';
 import { TravelReportScreen } from '../modules/reports/screens/TravelReportScreen';
@@ -34,10 +34,10 @@ const Stack = createNativeStackNavigator();
 const DashboardStack = createNativeStackNavigator();
 
 const DashboardStackNavigator = () => (
-  <DashboardStack.Navigator 
-    screenOptions={{ 
+  <DashboardStack.Navigator
+    screenOptions={{
       headerShown: false,
-      animation: 'slide_from_bottom' 
+      animation: 'slide_from_bottom'
     }}
   >
     <DashboardStack.Screen name="DashboardMain" component={DashboardScreen} />
@@ -55,16 +55,16 @@ const MainTabs = () => (
       tabBarLabelStyle: { fontWeight: '700', fontSize: 12, marginBottom: 4 }
     }}
   >
-    <Tab.Screen 
-      name="Dashboard" 
-      component={DashboardStackNavigator} 
-      options={{ tabBarIcon: ({color}) => <MaterialIcons name="dashboard" size={24} color={color} /> }} 
+    <Tab.Screen
+      name="Dashboard"
+      component={DashboardStackNavigator}
+      options={{ tabBarIcon: ({ color }) => <MaterialIcons name="dashboard" size={24} color={color} /> }}
     />
-    <Tab.Screen name="My Reports" component={ReportsHubScreen} options={{ tabBarIcon: ({color}) => <MaterialIcons name="assessment" size={24} color={color} /> }} />
-    <Tab.Screen 
-      name="Profile" 
-      component={ProfileScreen} 
-      options={{ tabBarIcon: ({color}) => <MaterialIcons name="person" size={24} color={color} /> }} 
+    <Tab.Screen name="My Reports" component={ReportsHubScreen} options={{ tabBarIcon: ({ color }) => <MaterialIcons name="assessment" size={24} color={color} /> }} />
+    <Tab.Screen
+      name="Profile"
+      component={ProfileScreen}
+      options={{ tabBarIcon: ({ color }) => <MaterialIcons name="person" size={24} color={color} /> }}
     />
   </Tab.Navigator>
 );
@@ -86,24 +86,28 @@ export const AppNavigator = () => {
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       if (event === 'SIGNED_OUT' || !session) {
-        logout(); 
+        logout();
       } else if (event === 'SIGNED_IN' && session) {
         const meta = session.user.user_metadata;
         const extractedFirstName = meta.first_name || (meta.name ? meta.name.split(' ')[0] : '');
         const extractedLastName = meta.last_name || (meta.name ? meta.name.split(' ').slice(1).join(' ') : '');
 
-        useAuthStore.setState({ 
-          user: { 
-            id: session.user.id, 
+        useAuthStore.setState({
+          user: {
+            id: session.user.id,
             name: `${extractedFirstName} ${extractedLastName}`.trim(),
             firstName: extractedFirstName,
             lastName: extractedLastName,
             email: meta.real_email,
             dob: meta.dob,
             mobile: meta.mobile,
-            isProfileComplete: meta.is_profile_complete || false 
-          } 
+            isProfileComplete: meta.is_profile_complete || false
+          }
         });
+
+        // ✅ Hydrate shifts from DB right after login so the one-shift-per-day
+        // lock is always based on the server's truth, not stale local cache.
+        useShiftStore.getState().hydrateShifts();
       }
     });
 
@@ -139,7 +143,6 @@ export const AppNavigator = () => {
             <Stack.Screen name="ComingSoonScreen">
               {({ navigation }) => <ComingSoonScreen onBack={() => navigation.goBack()} />}
             </Stack.Screen>
-            <Stack.Screen name="AttendanceReportScreen" component={AttendanceReportScreen} />
             <Stack.Screen name="ExpenseReportScreen" component={ExpenseReportScreen} />
             <Stack.Screen name="AddExpenseScreen" component={AddExpenseScreen} />
             <Stack.Screen name="TravelReportScreen" component={TravelReportScreen} options={{ headerShown: false }} />
@@ -159,7 +162,7 @@ export const AppNavigator = () => {
         else if (buttons?.some(b => b.style === 'destructive')) autoTone = 'warning';
 
         return (
-          <AlertModal 
+          <AlertModal
             visible={visible}
             title={title}
             message={message}

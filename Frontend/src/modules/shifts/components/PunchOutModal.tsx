@@ -2,28 +2,37 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, Modal, Pressable, TextInput, ActivityIndicator } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
-import * as ImagePicker from 'expo-image-picker'; 
+import * as ImagePicker from 'expo-image-picker';
 import { colors, radius, spacing } from '../../../design-system/tokens';
 import { Button } from '../../../design-system/components';
 import { useShiftStore } from '../../../store/shiftStore';
-import { requestCameraPermission } from '../../../core/permissions'; 
+import { requestCameraPermission } from '../../../core/permissions';
 import { useAlertStore } from '../../../store/alertStore';
 import * as Location from 'expo-location';
 import DateTimePicker from '@react-native-community/datetimepicker';
 
+// Helper to check if calendar day has changed
+const isDayChanged = (startTimeMs: number | null, currentTime: Date) => {
+  if (!startTimeMs) return false;
+  const startDate = new Date(startTimeMs);
+  return startDate.getDate() !== currentTime.getDate() ||
+    startDate.getMonth() !== currentTime.getMonth() ||
+    startDate.getFullYear() !== currentTime.getFullYear();
+};
+
 export const PunchOutModal = ({ visible, onClose, onConfirm }: any) => {
   const { t } = useTranslation();
   // 🚀 Added transitMode to store destructuring
-  const { isPersonalVehicle, startKm, activitiesLogged, transitMode } = useShiftStore(); 
+  const { isPersonalVehicle, startKm, activitiesLogged, transitMode, startTime } = useShiftStore();
   const [endKm, setEndKm] = useState('');
   const [error, setError] = useState('');
   const [isCapturing, setIsCapturing] = useState(false);
   const [pickerMode, setPickerMode] = useState<'date' | 'time'>('date');
 
-  const [customTime, setCustomTime] = useState(new Date()); 
+  const [customTime, setCustomTime] = useState(new Date());
   const [showTimePicker, setShowTimePicker] = useState(false);
   const [isTimeEdited, setIsTimeEdited] = useState(false);
-  
+
   const [comment, setComment] = useState('');
 
   const [locationStr, setLocationStr] = useState(t("Locating..."));
@@ -33,8 +42,8 @@ export const PunchOutModal = ({ visible, onClose, onConfirm }: any) => {
     if (visible) {
       setCustomTime(new Date());
       setIsTimeEdited(false);
-      setComment(''); 
-      
+      setComment('');
+
       (async () => {
         try {
           setLocationStr(t("Fetching location..."));
@@ -44,13 +53,13 @@ export const PunchOutModal = ({ visible, onClose, onConfirm }: any) => {
             return;
           }
           let location = await Location.getLastKnownPositionAsync();
-          
+
           if (!location) {
-            location = await Location.getCurrentPositionAsync({ 
+            location = await Location.getCurrentPositionAsync({
               accuracy: Location.Accuracy.Balanced,
             });
           }
-          
+
           setExactLocation({
             lat: location.coords.latitude,
             lng: location.coords.longitude
@@ -60,7 +69,7 @@ export const PunchOutModal = ({ visible, onClose, onConfirm }: any) => {
             latitude: location.coords.latitude,
             longitude: location.coords.longitude
           });
-          
+
           if (geocode.length > 0) {
             const place = geocode[0];
             const name = place.name || '';
@@ -68,7 +77,7 @@ export const PunchOutModal = ({ visible, onClose, onConfirm }: any) => {
             const district = place.subregion || place.district || '';
             const city = place.city || '';
             const state = place.region || '';
-            
+
             const detailedParts = [name, street, district, city, state].filter(p => p.trim() !== '');
             setLocationStr(detailedParts.slice(0, 4).join(', '));
           } else {
@@ -95,7 +104,7 @@ export const PunchOutModal = ({ visible, onClose, onConfirm }: any) => {
         return;
       }
     }
-    
+
     setError('');
     setIsCapturing(true);
 
@@ -110,7 +119,7 @@ export const PunchOutModal = ({ visible, onClose, onConfirm }: any) => {
         location: exactLocation,
         comment: (activitiesLogged === 0 && transitMode === 'No Travelling') ? comment.trim() : undefined
       });
-      
+
       setEndKm('');
       setOdoImage(undefined);
     } catch (e) {
@@ -131,7 +140,7 @@ export const PunchOutModal = ({ visible, onClose, onConfirm }: any) => {
       setIsLaunchingCamera(true);
 
       const result = await ImagePicker.launchCameraAsync({
-        mediaTypes: ['images'], 
+        mediaTypes: ['images'],
         quality: 0.6,
         allowsEditing: false,
       });
@@ -150,16 +159,26 @@ export const PunchOutModal = ({ visible, onClose, onConfirm }: any) => {
     <Modal visible={visible} transparent animationType="slide">
       <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'flex-end' }}>
         <View style={{ backgroundColor: colors.surface, padding: spacing.xl, borderTopLeftRadius: 24, borderTopRightRadius: 24 }}>
-          
+
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.lg }}>
             <Text style={{ fontSize: 20, fontWeight: '900', color: colors.text }}>{t("End Shift")}</Text>
-            <Pressable onPress={() => { if(!isLaunchingCamera && !isCapturing) onClose(); }}><MaterialIcons name="close" size={24} color={colors.textMuted} /></Pressable>
+            <Pressable onPress={() => { if (!isLaunchingCamera && !isCapturing) onClose(); }}><MaterialIcons name="close" size={24} color={colors.textMuted} /></Pressable>
           </View>
 
           <View style={{ marginBottom: spacing.lg }}>
             {isTimeEdited && (
               <View style={{ alignSelf: 'flex-start', backgroundColor: '#FEF3C7', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 4, marginBottom: spacing.sm }}>
                 <Text style={{ fontSize: 10, fontWeight: '900', color: '#D97706', letterSpacing: 0.5 }}>{t("EDITED TIMESTAMP")}</Text>
+              </View>
+            )}
+
+            {/* 🚀 NEW: Crossover Shift Warning Block */}
+            {isDayChanged(startTime, customTime) && (
+              <View style={{ backgroundColor: '#FEE2E2', padding: spacing.md, borderRadius: radius.md, borderWidth: 1, borderColor: '#FCA5A5', marginBottom: spacing.md, flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <MaterialIcons name="error-outline" size={20} color={colors.danger} />
+                <Text style={{ fontSize: 12, fontWeight: '700', color: colors.danger, flex: 1, lineHeight: 16 }}>
+                  {t("Attention: You are punching out on a different day from your punch-in. You must change the Date and Time to yesterday's closing parameters before submitting.")}
+                </Text>
               </View>
             )}
 
@@ -204,20 +223,20 @@ export const PunchOutModal = ({ visible, onClose, onConfirm }: any) => {
                 if (event.type === 'set' && date) {
 
                   if (pickerMode === 'date') {
-                    if (date.getFullYear() === customTime.getFullYear() && 
-                        date.getMonth() === customTime.getMonth() && 
-                        date.getDate() === customTime.getDate()) {
-                      return; 
+                    if (date.getFullYear() === customTime.getFullYear() &&
+                      date.getMonth() === customTime.getMonth() &&
+                      date.getDate() === customTime.getDate()) {
+                      return;
                     }
                   } else {
-                    if (date.getHours() === customTime.getHours() && 
-                        date.getMinutes() === customTime.getMinutes()) {
+                    if (date.getHours() === customTime.getHours() &&
+                      date.getMinutes() === customTime.getMinutes()) {
                       return;
                     }
                   }
 
                   let newDate = new Date(customTime.getTime());
-                  
+
                   if (pickerMode === 'date') {
                     newDate.setFullYear(date.getFullYear(), date.getMonth(), date.getDate());
                   } else {
@@ -226,8 +245,8 @@ export const PunchOutModal = ({ visible, onClose, onConfirm }: any) => {
 
                   if (newDate.getTime() > Date.now()) {
                     useAlertStore.getState().showAlert(
-                       t("Invalid Selection"),
-                       t("You cannot select a future date or time.")
+                      t("Invalid Selection"),
+                      t("You cannot select a future date or time.")
                     );
                     return;
                   }
@@ -244,13 +263,13 @@ export const PunchOutModal = ({ visible, onClose, onConfirm }: any) => {
               <Text style={{ fontSize: 14, fontWeight: '700', color: colors.text, marginBottom: spacing.sm }}>
                 {t("Enter Ending KM")} (Start: {startKm} km)
               </Text>
-              <TextInput 
+              <TextInput
                 value={endKm} onChangeText={(val) => { setEndKm(val); setError(''); }} keyboardType="numeric" placeholder="e.g. 14550"
                 placeholderTextColor={colors.textMuted}
                 style={{ backgroundColor: '#F8FAFC', borderWidth: 1, borderColor: error ? colors.danger : colors.border, borderRadius: radius.md, padding: spacing.md, fontSize: 18, fontWeight: '700', marginBottom: spacing.md }}
               />
               {error ? <Text style={{ color: colors.danger, fontSize: 12, marginTop: -4, marginBottom: spacing.md, fontWeight: '600' }}>{error}</Text> : null}
-              
+
               <Text style={{ fontSize: 13, fontWeight: '700', color: colors.text, marginBottom: spacing.sm }}>
                 {t("Odometer Photo (Optional)")}
               </Text>
@@ -271,8 +290,8 @@ export const PunchOutModal = ({ visible, onClose, onConfirm }: any) => {
                   <Text style={{ marginLeft: 8, color: colors.text, fontWeight: '700' }}>{t("Opening Camera...")}</Text>
                 </View>
               ) : (
-                <Pressable 
-                  onPress={handleOdometerCapture} 
+                <Pressable
+                  onPress={handleOdometerCapture}
                   style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', padding: 14, borderWidth: 1.5, borderStyle: 'dashed', borderColor: colors.border, borderRadius: radius.md, backgroundColor: '#F8FAFC' }}
                 >
                   <MaterialIcons name="photo-camera" size={22} color={colors.primary} style={{ marginRight: 6 }} />
@@ -307,12 +326,20 @@ export const PunchOutModal = ({ visible, onClose, onConfirm }: any) => {
             </View>
           )}
 
-          <Button 
-            label={locationStr.includes('Locating') || locationStr.includes('Fetching') ? t("Detecting Location...") : (isCapturing ? t("Closing Shift...") : t("Punch Out"))} 
-            variant="danger" 
-            onPress={handleConfirm} 
-            // 🚀 Blocks submission based on the updated precise criteria
-            disabled={isCapturing || isLaunchingCamera || locationStr.includes('Locating') || locationStr.includes('Fetching') || locationStr.includes('denied') || (activitiesLogged === 0 && transitMode === 'No Travelling' && comment.trim() === '')} 
+          <Button
+            label={locationStr.includes('Locating') || locationStr.includes('Fetching') ? t("Detecting Location...") : (isCapturing ? t("Closing Shift...") : t("Punch Out"))}
+            variant="danger"
+            onPress={handleConfirm}
+            // 🚀 Safety restriction locks submission if calendar day has changed
+            disabled={
+              isCapturing ||
+              isLaunchingCamera ||
+              locationStr.includes('Locating') ||
+              locationStr.includes('Fetching') ||
+              locationStr.includes('denied') ||
+              isDayChanged(startTime, customTime) || // Blocks punch out completely
+              (activitiesLogged === 0 && transitMode === 'No Travelling' && comment.trim() === '')
+            }
           />
         </View>
       </View>

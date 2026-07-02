@@ -16,7 +16,7 @@ export default function App() {
         <AutoLogoutProvider>
           <AppNavigator />
         </AutoLogoutProvider>
-        
+
       </SafeAreaProvider>
     </GestureHandlerRootView>
   );

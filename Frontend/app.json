@@ -15,7 +15,10 @@
     "ios": {
       "supportsTablet": true,
       "infoPlist": {
-        "UIBackgroundModes": ["location", "fetch"],
+        "UIBackgroundModes": [
+          "location",
+          "fetch"
+        ],
         "NSLocationAlwaysAndWhenInUseUsageDescription": "Field Commander needs your location to track your route during your active shift.",
         "NSLocationAlwaysUsageDescription": "Field Commander needs your location to track your route during your active shift."
       }

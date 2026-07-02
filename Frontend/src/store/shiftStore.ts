@@ -8,11 +8,11 @@ import { SHIFT_LOCATION_TASK, calculateDistance } from '../core/locationUtils';
 
 export interface TimelineEvent {
   id: string;
-  time: number; 
-  actualTime?: number; 
-  editedTime?: number | null; 
-  location?: { lat: number, lng: number } | null; 
-  vehicleType?: 'two-wheeler' | 'four-wheeler' | null; 
+  time: number;
+  actualTime?: number;
+  editedTime?: number | null;
+  location?: { lat: number, lng: number } | null;
+  vehicleType?: 'two-wheeler' | 'four-wheeler' | null;
   type: 'punch-in' | 'punch-out' | 'activity' | 'expense';
   title: string;
   description?: string;
@@ -33,11 +33,11 @@ interface ShiftState {
   startKm: string;
   transitMode: string;
   activitiesLogged: number;
-  shiftHistory: PastShift[]; 
+  shiftHistory: PastShift[];
   routePath: any[];
   pendingPoints: any[]; // 🚀 NEW: Queue for un-uploaded GPS points
   totalDistance: number;
-  
+
   hydrateShifts: () => Promise<void>;
   startShift: (isPersonal: boolean, km: string, transit: string, vehicleType: 'two-wheeler' | 'four-wheeler' | null, actualTime: number, editedTime: number | null, location: any, odoImageUrl: string | null) => Promise<void>;
   endShift: (endKm: string, actualTime: number, editedTime: number | null, location: any, odoImageUrl: string | null, comment?: string) => Promise<void>;
@@ -75,7 +75,7 @@ export const useShiftStore = create<ShiftState>()(
         try {
           // Clone to prevent race conditions during upload
           const pointsToUpload = [...pendingPoints];
-          
+
           const payload = pointsToUpload.map(p => ({
             shift_id: activeShiftId,
             lat: p.lat,
@@ -136,13 +136,19 @@ export const useShiftStore = create<ShiftState>()(
         }
 
         const activeShift = shiftsData.find(s => s.status === 'ACTIVE');
-        
+
         const formattedHistory = shiftsData.map(s => ({
           ...s,
           id: s.id,
           date: s.date,
           events: s.events || [],
-          routePath: locsByShift[s.id] || []
+          // ✅ Preserve all fields needed by TravelReportScreen and shift-lock logic
+          status: s.status,
+          start_km: s.start_km,
+          end_km: s.end_km,
+          total_distance: s.total_distance || 0,
+          activities_logged: s.activities_logged || 0,
+          route_path: s.route_path || [],
         }));
 
         set({
@@ -162,7 +168,7 @@ export const useShiftStore = create<ShiftState>()(
         // 🚀 Restore Auto-Sync Timer if active
         if (syncInterval) clearInterval(syncInterval);
         if (activeShift) {
-          syncInterval = setInterval(() => get().syncPendingRoutePoints(), 60000); 
+          syncInterval = setInterval(() => get().syncPendingRoutePoints(), 60000);
         }
       },
 
@@ -173,11 +179,11 @@ export const useShiftStore = create<ShiftState>()(
         const timeToUse = editedTime || actualTime || Date.now();
         const dateStr = new Date(timeToUse).toISOString().split('T')[0];
 
-        const inEvent: TimelineEvent = { 
-          id: Date.now().toString(), 
+        const inEvent: TimelineEvent = {
+          id: Date.now().toString(),
           time: timeToUse, actualTime, editedTime, location, vehicleType,
-          type: 'punch-in', title: 'Punched In', 
-          description: isPersonal ? `Personal Vehicle • Start KM: ${km}` : `Transit: ${transit}` 
+          type: 'punch-in', title: 'Punched In',
+          description: isPersonal ? `Personal Vehicle • Start KM: ${km}` : `Transit: ${transit}`
         };
 
         const initialPoint = location ? { lat: location.lat, lng: location.lng, timestamp: timeToUse, speed: 0, heading: 0, accuracy: 5 } : null;
@@ -195,17 +201,17 @@ export const useShiftStore = create<ShiftState>()(
         if (error) throw error;
 
         if (initialPoint) {
-            await supabase.from('shift_locations').insert({
-               shift_id: data.id, ...initialPoint
-            });
+          await supabase.from('shift_locations').insert({
+            shift_id: data.id, ...initialPoint
+          });
         }
 
         const hasStarted = await Location.hasStartedLocationUpdatesAsync(SHIFT_LOCATION_TASK);
         if (!hasStarted) {
           await Location.startLocationUpdatesAsync(SHIFT_LOCATION_TASK, {
             accuracy: Location.Accuracy.Balanced,
-            distanceInterval: 50, 
-            deferredUpdatesInterval: 60000, 
+            distanceInterval: 50,
+            deferredUpdatesInterval: 60000,
             showsBackgroundLocationIndicator: true,
             foregroundService: {
               notificationTitle: "Shift Active",
@@ -220,11 +226,11 @@ export const useShiftStore = create<ShiftState>()(
         if (todayIndex >= 0) newHistory[todayIndex].events.push(inEvent);
         else newHistory.push({ id: data.id, date: dateStr, events: [inEvent] });
 
-        set({ 
-          activeShiftId: data.id, isActive: true, startTime: timeToUse, 
-          isPersonalVehicle: isPersonal, startKm: km, transitMode: transit, 
+        set({
+          activeShiftId: data.id, isActive: true, startTime: timeToUse,
+          isPersonalVehicle: isPersonal, startKm: km, transitMode: transit,
           activitiesLogged: 0, shiftHistory: newHistory,
-          routePath: initialPoint ? [initialPoint] : [], pendingPoints: [], totalDistance: 0 
+          routePath: initialPoint ? [initialPoint] : [], pendingPoints: [], totalDistance: 0
         });
 
         // 🚀 Start Batch Processing Interval
@@ -240,20 +246,20 @@ export const useShiftStore = create<ShiftState>()(
         if (hasStarted) await Location.stopLocationUpdatesAsync(SHIFT_LOCATION_TASK);
 
         const timeToUse = editedTime || actualTime || Date.now();
-        
+
         let descriptionStr = `End KM: ${endKm || 'N/A'}`;
         if (comment) {
           descriptionStr = endKm ? `End KM: ${endKm} • Note: ${comment}` : `Note: ${comment}`;
         }
 
-        const outEvent: TimelineEvent = { 
+        const outEvent: TimelineEvent = {
           id: Date.now().toString(), time: timeToUse, actualTime, editedTime, location,
-          type: 'punch-out', title: 'Punched Out', description: descriptionStr 
+          type: 'punch-out', title: 'Punched Out', description: descriptionStr
         };
 
         // Guarantee final point maps
         if (location) {
-          set((state) => ({ 
+          set((state) => ({
             pendingPoints: [...state.pendingPoints, { lat: location.lat, lng: location.lng, timestamp: timeToUse }],
             routePath: [...state.routePath, { lat: location.lat, lng: location.lng, timestamp: timeToUse }]
           }));
@@ -273,13 +279,13 @@ export const useShiftStore = create<ShiftState>()(
           const endVal = parseFloat(endKm);
           if (!isNaN(startVal) && !isNaN(endVal)) {
             const manualDistance = Math.max(0, endVal - startVal);
-            if (manualDistance < 50) {
+            if (manualDistance < 45) {
               allowanceStatus = 'Approved';
             }
           }
         } else if (!get().isPersonalVehicle) {
           // If no personal vehicle was used, TA/DA is effectively 0, so auto-approve
-          allowanceStatus = 'Approved'; 
+          allowanceStatus = 'Approved';
         }
 
         const payload = {
@@ -298,7 +304,16 @@ export const useShiftStore = create<ShiftState>()(
 
         const newHistory = [...shiftHistory];
         const shiftIndex = newHistory.findIndex(h => h.id === activeShiftId);
-        if (shiftIndex >= 0) newHistory[shiftIndex].events = updatedEvents;
+        if (shiftIndex >= 0) {
+          newHistory[shiftIndex] = {
+            ...newHistory[shiftIndex],
+            events: updatedEvents,
+            end_km: endKm,
+            total_distance: parseFloat(totalDistance.toFixed(2)),
+            activities_logged: activitiesLogged,
+            route_path: get().routePath,
+          } as any;
+        }
 
         set({ activeShiftId: null, isActive: false, startTime: null, shiftHistory: newHistory, routePath: [], pendingPoints: [], totalDistance: 0 });
       },
@@ -311,7 +326,7 @@ export const useShiftStore = create<ShiftState>()(
 
         const currentShiftRecord = shiftHistory.find(h => h.id === activeShiftId);
         if (!currentShiftRecord) return;
-        
+
         const updatedEvents = [...currentShiftRecord.events, event];
 
         await supabase.from('shifts').update({ events: updatedEvents, updated_at: new Date().toISOString() }).eq('id', activeShiftId);
@@ -319,7 +334,7 @@ export const useShiftStore = create<ShiftState>()(
         const newHistory = [...shiftHistory];
         const shiftIndex = newHistory.findIndex(h => h.id === activeShiftId);
         if (shiftIndex >= 0) newHistory[shiftIndex].events = updatedEvents;
-        
+
         set({ shiftHistory: newHistory });
       },
 
@@ -367,11 +382,24 @@ export const useShiftStore = create<ShiftState>()(
         const updatedPending = [...pendingPoints, ...validPoints];
         const updatedDistance = totalDistance + addedDistance;
 
-        set({ 
-          routePath: updatedPath, 
-          pendingPoints: updatedPending, 
-          totalDistance: updatedDistance 
-        });
+        set({ routePath: updatedPath, totalDistance: updatedDistance });
+
+        // 🚀 2. ATTEMPT CLOUD SYNC (Self-healing approach)
+        try {
+          const { error } = await supabase.from('shifts')
+            .update({
+              route_path: updatedPath,
+              total_distance: parseFloat(updatedDistance.toFixed(2))
+            })
+            .eq('id', activeShiftId);
+
+          if (error) throw error;
+        } catch (error) {
+          // If network is off, it simply fails silently.
+          // Because the local 'updatedPath' array is still growing, the missing points
+          // will automatically hitch a ride on the next successful upload when internet returns!
+          console.log("Offline: Route points safely buffered to local storage.");
+        }
       }
     }),
     { name: 'shift-storage-v5', storage: createJSONStorage(() => AsyncStorage) }
