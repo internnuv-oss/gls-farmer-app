@@ -7,6 +7,7 @@ import { MaterialIcons } from '@expo/vector-icons';
 import { Input, SelectField } from '../../../../../design-system/components';
 import { colors, radius, spacing, shadows } from '../../../../../design-system/tokens';
 import { useTranslation } from 'react-i18next';
+import { supabase } from '../../../../../core/supabase';
 
 // Hardcoded state list so we always have the top-level dropdown available
 export const INDIAN_STATES = [
@@ -53,16 +54,15 @@ export const Step1PersonalDetails = ({ control, errors, t, watch, setValue, uplo
     const fetchStateData = async () => {
       setLoadingLoc(true);
       try {
-        const res = await fetch(`https://raw.githubusercontent.com/internnuv-oss/indian-cities-and-villages/master/By%20States/${encodeURIComponent(selectedState)}.json`);
-        if (!res.ok) throw new Error("State file not found.");
+        // 🚀 Fetch directly from Supabase RPC
+        const { data, error } = await supabase.rpc('get_gujarat_location_tree');
+        if (error || !data) throw new Error("Location data not found.");
         
-        const data = await res.json();
         setStateData(data);
       } catch (e) {
-        console.log("GitHub fetch failed, using fallback for: ", selectedState);
+        console.log("Supabase fetch failed: ", e);
         setStateData(null);
-        if (selectedState === 'Gujarat') setDistrictsList(GUJARAT_DISTRICTS);
-        else setDistrictsList([]);
+        setDistrictsList([]);
       } finally { 
         setLoadingLoc(false); 
       }

@@ -7,6 +7,7 @@ import { MaterialIcons } from '@expo/vector-icons';
 import { Input, RadioGroup, TagsInput, SelectField } from '../../../../../design-system/components';
 import { spacing, colors, radius, shadows } from '../../../../../design-system/tokens';
 import { FPOOnboardingValues } from '../../schema';
+import { supabase } from '../../../../../core/supabase';
 
 interface Props { form: UseFormReturn<FPOOnboardingValues>; t: any; }
 
@@ -25,16 +26,22 @@ export const Step3Business = ({ form, t }: Props) => {
 
   useEffect(() => {
     if (!selectedState) return;
+    
     const fetchStateData = async () => {
       setLoadingLoc(true);
       try {
-        const res = await fetch(`https://raw.githubusercontent.com/internnuv-oss/indian-cities-and-villages/master/By%20States/${encodeURIComponent(selectedState)}.json`);
-        if (!res.ok) throw new Error("State file not found.");
-        setStateData(await res.json());
+        // 🚀 Fetch directly from Supabase RPC
+        const { data, error } = await supabase.rpc('get_gujarat_location_tree');
+        if (error || !data) throw new Error("Location data not found.");
+        
+        setStateData(data);
       } catch (e) {
         setStateData(null);
-      } finally { setLoadingLoc(false); }
+      } finally { 
+        setLoadingLoc(false); 
+      }
     };
+    
     fetchStateData();
   }, [selectedState]);
 

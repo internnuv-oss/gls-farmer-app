@@ -6,6 +6,7 @@ import { Input, RadioGroup, SelectField, TextArea, YearPickerField, UploadTile }
 import { colors, radius, spacing } from '../../../../../design-system/tokens';
 import { DealerOnboardingValues } from '../../schema';
 import { useTranslation } from 'react-i18next';
+import { supabase } from '../../../../../core/supabase';
 
 export const INDIAN_STATES = [
   "Andaman and Nicobar Islands", "Andhra Pradesh", "Arunachal Pradesh", "Assam", "Bihar", 
@@ -31,18 +32,25 @@ const AdditionalShopLocation = ({ form, index }: { form: UseFormReturn<DealerOnb
   const [villages, setVillages] = useState<string[]>([]);
   const [loadingLoc, setLoadingLoc] = useState(false);
 
-  useEffect(() => {
+  React.useEffect(() => {
     if (!selectedState) { setStateData(null); setCities([]); return; }
+    
     const fetchStateData = async () => {
       setLoadingLoc(true);
       try {
-        const res = await fetch(`https://raw.githubusercontent.com/internnuv-oss/indian-cities-and-villages/master/By%20States/${encodeURIComponent(selectedState)}.json`);
-        if (!res.ok) throw new Error("State file not found.");
-        setStateData(await res.json());
+        // 🚀 Fetch directly from Supabase RPC
+        const { data, error } = await supabase.rpc('get_gujarat_location_tree');
+        if (error || !data) throw new Error("Location data not found.");
+        
+        setStateData(data);
       } catch (e) {
-        setCities([]); setStateData(null);
-      } finally { setLoadingLoc(false); }
+        setCities([]); 
+        setStateData(null);
+      } finally { 
+        setLoadingLoc(false); 
+      }
     };
+    
     fetchStateData();
   }, [selectedState]);
 

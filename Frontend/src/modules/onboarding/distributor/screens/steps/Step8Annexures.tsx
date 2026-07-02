@@ -6,6 +6,7 @@ import { Input, TextArea, CheckboxItem, TagsInput, AudioRecorder, UploadTile, Se
 import { colors, radius, spacing, shadows } from '../../../../../design-system/tokens';
 import { DistributorOnboardingValues } from '../../schema';
 import { INDIAN_STATES } from './Step1BasicInfo';
+import { supabase } from '../../../../../core/supabase';
 
 const WEST_INDIA_CROPS = ["Cotton", "Groundnut", "Sugarcane", "Wheat", "Bajra", "Jowar", "Maize", "Castor", "Mustard", "Soybean", "Tur", "Chana", "Onion", "Potato", "Tomato", "Chilli"].sort();
 const DEMO_CHEMICALS = ["Urea", "DAP", "MOP", "SSP", "Complex Fertilizers", "Herbicides", "Insecticides", "Fungicides"];
@@ -26,17 +27,31 @@ const TerritoryInputRow = ({ form, index, onRemove, t }: any) => {
   const [loadingLoc, setLoadingLoc] = useState(false);
 
   useEffect(() => {
-    if (!selectedState) { setStateData(null); setDistrictsList([]); return; }
+    if (!selectedState) { 
+      setStateData(null);
+      setDistrictsList([]); 
+      setTalukasList([]);
+      setVillagesList([]);
+      return; 
+    }
+    
     const fetchStateData = async () => {
       setLoadingLoc(true);
       try {
-        const res = await fetch(`https://raw.githubusercontent.com/internnuv-oss/indian-cities-and-villages/master/By%20States/${encodeURIComponent(selectedState)}.json`);
-        if (!res.ok) throw new Error("State file not found.");
-        setStateData(await res.json());
+        // 🚀 Fetch directly from Supabase RPC
+        const { data, error } = await supabase.rpc('get_gujarat_location_tree');
+        if (error || !data) throw new Error("Location data not found.");
+        
+        setStateData(data);
       } catch (e) {
-        setDistrictsList([]); setStateData(null);
-      } finally { setLoadingLoc(false); }
+        console.log("Supabase fetch failed: ", e);
+        setStateData(null);
+        setDistrictsList([]);
+      } finally { 
+        setLoadingLoc(false); 
+      }
     };
+
     fetchStateData();
   }, [selectedState]);
 

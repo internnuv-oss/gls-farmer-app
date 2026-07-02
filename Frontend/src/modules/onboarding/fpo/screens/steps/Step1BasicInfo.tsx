@@ -7,6 +7,7 @@ import { MaterialIcons } from '@expo/vector-icons';
 import { Input, SelectField, TextArea, YearPickerField } from '../../../../../design-system/components';
 import { colors, radius, spacing } from '../../../../../design-system/tokens';
 import { FPOOnboardingValues } from '../../schema';
+import { supabase } from '../../../../../core/supabase';
 
 export const INDIAN_STATES = [
   "Andaman and Nicobar Islands", "Andhra Pradesh", "Arunachal Pradesh", "Assam", "Bihar", 
@@ -38,17 +39,30 @@ export const Step1BasicInfo = ({ form, t, isEditing, isLocked }: Props) => {
   const [loadingLoc, setLoadingLoc] = useState(false);
 
   useEffect(() => {
-    if (!selectedState) { setStateData(null); setDistrictsList([]); return; }
+    if (!selectedState) { 
+      setStateData(null);
+      setDistrictsList([]); 
+      setTalukasList([]);
+      return; 
+    }
+    
     const fetchStateData = async () => {
       setLoadingLoc(true);
       try {
-        const res = await fetch(`https://raw.githubusercontent.com/internnuv-oss/indian-cities-and-villages/master/By%20States/${encodeURIComponent(selectedState)}.json`);
-        if (!res.ok) throw new Error("State file not found.");
-        setStateData(await res.json());
+        // 🚀 Fetch directly from Supabase RPC
+        const { data, error } = await supabase.rpc('get_gujarat_location_tree');
+        if (error || !data) throw new Error("Location data not found.");
+        
+        setStateData(data);
       } catch (e) {
-        setDistrictsList([]); setStateData(null);
-      } finally { setLoadingLoc(false); }
+        console.log("Supabase fetch failed: ", e);
+        setStateData(null);
+        setDistrictsList([]);
+      } finally { 
+        setLoadingLoc(false); 
+      }
     };
+
     fetchStateData();
   }, [selectedState]);
 
