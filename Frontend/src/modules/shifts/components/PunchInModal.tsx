@@ -5,10 +5,13 @@ import { useTranslation } from 'react-i18next';
 import * as Location from 'expo-location';
 import * as ImagePicker from 'expo-image-picker'; // 🚀 Import ImagePicker for real camera launch
 import { colors, radius, spacing } from '../../../design-system/tokens';
+import { SelectField } from '../../../design-system/components';
 import { Button } from '../../../design-system/components';
 import { requestCameraPermission } from '../../../core/permissions'; // 🚀 Use global permission system
 import { useAlertStore } from '../../../store/alertStore'; // 🚀 Use global alert system
 import DateTimePicker from '@react-native-community/datetimepicker';
+import { supabase } from '../../../core/supabase';
+import { useAuthStore } from '../../../store/authStore';
 
 export const PunchInModal = ({ visible, onClose, onConfirm }: any) => {
   const { t } = useTranslation();
@@ -28,6 +31,29 @@ export const PunchInModal = ({ visible, onClose, onConfirm }: any) => {
   const [startKm, setStartKm] = useState('');
   const [transitMode, setTransitMode] = useState('');
   const [isCapturing, setIsCapturing] = useState(false);
+
+  const [routes, setRoutes] = useState<any[]>([]);
+  const [selectedRouteId, setSelectedRouteId] = useState<string | null>(null);
+
+  // 🚀 Fetch Assigned Routes on Mount
+  useEffect(() => {
+    const fetchRoutes = async () => {
+      const userId = useAuthStore.getState().user?.id;
+      if (!userId) return;
+      
+      const { data, error } = await supabase
+        .from('routes')
+        .select('*')
+        .eq('se_id', userId); // Assuming routes are assigned via se_id
+
+      if (data && !error) setRoutes(data);
+    };
+    fetchRoutes();
+  }, []);
+
+  const formatRouteLabel = (route: any) => {
+    return route.name;
+  };
 
   // Odometer Camera states
   const [odoImage, setOdoImage] = useState<string | undefined>(undefined);
@@ -188,7 +214,8 @@ export const PunchInModal = ({ visible, onClose, onConfirm }: any) => {
         vehicleType: isPersonal ? vehicleType : null,
         actualTime,
         editedTime,
-        location: exactLocation
+        location: exactLocation,
+        routeId: selectedRouteId === 'others' ? null : selectedRouteId
       });
       onClose();
     } catch (e) {
@@ -334,6 +361,33 @@ export const PunchInModal = ({ visible, onClose, onConfirm }: any) => {
           {/* STEP 2: TRANSIT LOGISTICS FORM */}
           {step === 2 && (
             <View>
+              {/* 🚀 ROUTE SELECTION (Mandatory) */}
+              <View style={{ marginBottom: spacing.md }}>
+                <SelectField
+                  label="Select Route *" 
+                  options={[
+                    ...routes.map((route) => formatRouteLabel(route)),
+                    "Others"
+                  ]}
+                  value={
+                    selectedRouteId === 'others'
+                      ? "Others"
+                      : selectedRouteId 
+                        ? formatRouteLabel(routes.find(r => r.id === selectedRouteId)) 
+                        : "" // Blank until they select something
+                  }
+                  onChange={(selectedLabel: string) => {
+                    if (selectedLabel === "Others") {
+                      setSelectedRouteId('others');
+                    } else {
+                      const matchedRoute = routes.find(r => formatRouteLabel(r) === selectedLabel);
+                      setSelectedRouteId(matchedRoute ? matchedRoute.id : null);
+                    }
+                  }}
+                  placeholder="Choose a route..."
+                />
+              </View>
+
               <Text style={{ fontSize: 15, fontWeight: '700', color: colors.text, marginBottom: spacing.sm }}>
                 {t("Are you traveling by personal vehicle?")}
               </Text>
@@ -418,9 +472,16 @@ export const PunchInModal = ({ visible, onClose, onConfirm }: any) => {
                 </View>
               )}
 
-              <Button 
+<Button 
                 label={isCapturing ? t("Punching in...") : t("Confirm")} 
-                disabled={isPersonal === null || (isPersonal && !startKm) || (isPersonal === false && !transitMode) || isCapturing || isLaunchingCamera}
+                disabled={
+                  !selectedRouteId || // 🚀 NEW: Route selection is now strictly mandatory
+                  isPersonal === null || 
+                  (isPersonal && !startKm) || 
+                  (isPersonal === false && !transitMode) || 
+                  isCapturing || 
+                  isLaunchingCamera
+                }
                 onPress={handleFinalConfirm} 
               />
             </View>

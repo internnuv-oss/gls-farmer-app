@@ -137,7 +137,8 @@ export const ActiveShiftWidget = () => {
             metadata?.actualTime || Date.now(),
             metadata?.editedTime || null,
             metadata?.location || null,
-            odoUrl // Pass the Cloudinary URL
+            odoUrl, // Pass the Cloudinary URL
+            metadata?.routeId || null
           );
           setShowInModal(false);
         }}

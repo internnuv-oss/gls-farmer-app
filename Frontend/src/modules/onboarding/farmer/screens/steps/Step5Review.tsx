@@ -118,9 +118,9 @@ export const Step5Review = ({ form, setStep, setJumpBackTo, dealers, t }: Props)
            {renderEditBtn(2)}
         </View>
         
-        <RenderField label={t("Total Land")} value={watch('totalLand')} suffix={` ${t(unit)}`} t={t} />
-        <RenderField label={t("Irrigated Land")} value={watch('irrigatedLand') || '0'} suffix={` ${t(unit)}`} isRequired={false} t={t} />
-        <RenderField label={t("Rain-Fed Land")} value={watch('rainFedLand') || '0'} suffix={` ${t(unit)}`} isRequired={false} t={t} />
+        <RenderField label={t("Total Land")} value={watch('totalLand')} suffix={` ${t(watch('landUnit') || 'Acres')}`} t={t} />
+        <RenderField label={t("Irrigated Land")} value={watch('irrigatedLand') || '0'} suffix={` ${t(watch('irrigatedLandUnit') || 'Acres')}`} isRequired={false} t={t} />
+        <RenderField label={t("Rain-Fed Land")} value={watch('rainFedLand') || '0'} suffix={` ${t(watch('rainFedLandUnit') || 'Acres')}`} isRequired={false} t={t} />
         
         <View style={{ marginTop: 8 }}>
           <RenderField label={t("Major Crops")} value={watch('majorCrops')} t={t} />

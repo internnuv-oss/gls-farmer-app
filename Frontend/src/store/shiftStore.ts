@@ -1,3 +1,5 @@
+// Frontend/src/store/shiftStore.ts
+
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -39,7 +41,7 @@ interface ShiftState {
   totalDistance: number;
 
   hydrateShifts: () => Promise<void>;
-  startShift: (isPersonal: boolean, km: string, transit: string, vehicleType: 'two-wheeler' | 'four-wheeler' | null, actualTime: number, editedTime: number | null, location: any, odoImageUrl: string | null) => Promise<void>;
+  startShift: (isPersonal: boolean, km: string, transit: string, vehicleType: 'two-wheeler' | 'four-wheeler' | null, actualTime: number, editedTime: number | null, location: any, odoImageUrl: string | null, routeId: string | null) => Promise<void>;
   endShift: (endKm: string, actualTime: number, editedTime: number | null, location: any, odoImageUrl: string | null, comment?: string) => Promise<void>;
   incrementActivity: () => Promise<void>;
   logShiftEvent: (type: 'activity' | 'expense', title: string, description: string) => Promise<void>;
@@ -172,7 +174,7 @@ export const useShiftStore = create<ShiftState>()(
         }
       },
 
-      startShift: async (isPersonal, km, transit, vehicleType, actualTime, editedTime, location, odoImageUrl) => {
+      startShift: async (isPersonal, km, transit, vehicleType, actualTime, editedTime, location, odoImageUrl, routeId) => {
         const userId = useAuthStore.getState().user?.id;
         if (!userId) return;
 
@@ -194,7 +196,8 @@ export const useShiftStore = create<ShiftState>()(
           vehicle_type: vehicleType, start_km: km, transit_mode: transit,
           start_location: location, start_odo_image: odoImageUrl,
           events: [inEvent],
-          total_distance: 0 // No more route_path array here!
+          total_distance: 0, // No more route_path array here!
+          assigned_route_id: routeId || null
         };
 
         const { data, error } = await supabase.from('shifts').insert(payload).select('id').single();

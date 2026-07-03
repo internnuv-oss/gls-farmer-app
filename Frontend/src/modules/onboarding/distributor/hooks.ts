@@ -239,7 +239,20 @@ export function useDistributorOnboarding(navigation: any, route: any) {
     useAlertStore.getState().showAlert("Saving...", "Syncing draft to database...");
     await saveDraftToDB(true);
     await useShiftStore.getState().incrementActivity(); // 🚀 NEW: Log valid activity!
-    await useShiftStore.getState().logShiftEvent('activity', 'Saved Distributor Draft', form.getValues().firmName || 'Unknown Distributor');
+    // 🚀 FORMAT TIMELINE DESCRIPTION (Route & Taluka)
+    let routeName = "";
+    const shiftId = useShiftStore.getState().activeShiftId;
+    if (shiftId) {
+      const { data: sData } = await supabase.from('shifts').select('assigned_route_id').eq('id', shiftId).single();
+      if (sData?.assigned_route_id) {
+        const { data: rData } = await supabase.from('routes').select('name').eq('id', sData.assigned_route_id).single();
+        if (rData?.name) routeName = rData.name;
+      }
+    }
+    const locName = form.getValues().taluka || form.getValues().city || "Unknown Location";
+    const eventDesc = routeName ? `${routeName} (${locName})` : locName;
+
+    await useShiftStore.getState().logShiftEvent('activity', 'Saved Distributor Draft', eventDesc);
     useAlertStore.getState().hideAlert();
     navigation.navigate("MainTabs");
   };
@@ -660,7 +673,20 @@ export function useDistributorOnboarding(navigation: any, route: any) {
         const result = await saveDistributorOnboarding(data, 'SUBMITTED', scoreData.raw, scoreData.band, user.id, editData?.id || fetchedRecordId, check.dirtyKeys, pdfUrl);
         
         await useShiftStore.getState().incrementActivity(); // 🚀 NEW: Log valid activity!
-        await useShiftStore.getState().logShiftEvent('activity', (editData || fetchedRecordId) ? 'Updated Distributor' : 'Onboarded Distributor', data.firmName || 'Unknown Distributor');
+        // 🚀 FORMAT TIMELINE DESCRIPTION (Route & Taluka)
+        let routeName = "";
+        const shiftId = useShiftStore.getState().activeShiftId;
+        if (shiftId) {
+          const { data: sData } = await supabase.from('shifts').select('assigned_route_id').eq('id', shiftId).single();
+          if (sData?.assigned_route_id) {
+            const { data: rData } = await supabase.from('routes').select('name').eq('id', sData.assigned_route_id).single();
+            if (rData?.name) routeName = rData.name;
+          }
+        }
+        const locName = data.taluka || data.city || "Unknown Location";
+        const eventDesc = routeName ? `${routeName} (${locName})` : locName;
+
+        await useShiftStore.getState().logShiftEvent('activity', (editData || fetchedRecordId) ? 'Updated Distributor' : 'Onboarded Distributor', eventDesc);
         
         // 🚀 3. DELETE DRAFT
         if (draftIdRef.current) {

@@ -43,7 +43,7 @@ export function useFarmerOnboarding(navigation: any, route: any) {
     pincode: "",
     majorCrops: [], soilType: [], waterSource: [], sideTrees: [], cattles: [], irrigationType: [], farmEquipments: [], 
     pastCrops: [{ cropName: '', area: '', areaUnit: 'Acres', inputUsed: [], otherInputUsed: '', yield: '', yieldUnit: 'Kg', problemsFaced: '' }],
-    landUnit: 'Acres', agreementAccepted: false
+    landUnit: 'Acres', irrigatedLandUnit: 'Acres', rainFedLandUnit: 'Acres', agreementAccepted: false
   });
 
   const form = useForm<FarmerOnboardingValues>({
@@ -180,7 +180,8 @@ export function useFarmerOnboarding(navigation: any, route: any) {
         'mobile', 'alternateMobile', 'totalLand', 'irrigatedLand', 'rainFedLand', 
         'majorCrops', 'soilType', 'otherSoilType', 'waterSource', 'otherWaterSource', 
         'irrigationType', 'farmEquipments', 'otherFarmEquipment', 'biofertilizer', 
-        'isIntercropping', 'sideTrees', 'cattles', 'dealerId', 'documents', 'farmerSignature', 'seSignature'
+        'isIntercropping', 'sideTrees', 'cattles', 'dealerId', 'documents', 'farmerSignature', 'seSignature',
+        'landUnit', 'irrigatedLandUnit', 'rainFedLandUnit', 'pastCrops', 'profilePhoto'
       ];
       
       const illegalEdits = dirtyKeys.filter(k => !allowedEdits.includes(k.split('.')[0]));
@@ -208,7 +209,20 @@ export function useFarmerOnboarding(navigation: any, route: any) {
     useAlertStore.getState().showAlert("Saving...", "Syncing draft to database...");
     await saveDraftToDB(true);
     await useShiftStore.getState().incrementActivity(); // 🚀 NEW: Log valid activity!
-    await useShiftStore.getState().logShiftEvent('activity', 'Saved Farmer Draft', form.getValues().fullName || 'Unknown Farmer');
+    // 🚀 FORMAT TIMELINE DESCRIPTION (Route & Village)
+    let routeName = "";
+    const shiftId = useShiftStore.getState().activeShiftId;
+    if (shiftId) {
+      const { data: sData } = await supabase.from('shifts').select('assigned_route_id').eq('id', shiftId).single();
+      if (sData?.assigned_route_id) {
+        const { data: rData } = await supabase.from('routes').select('name').eq('id', sData.assigned_route_id).single();
+        if (rData?.name) routeName = rData.name;
+      }
+    }
+    const locName = form.getValues().village || "Unknown Village";
+    const eventDesc = routeName ? `${routeName} (${locName})` : locName;
+    
+    await useShiftStore.getState().logShiftEvent('activity', 'Saved Farmer Draft', eventDesc);
     useAlertStore.getState().hideAlert();
     navigation.navigate("MainTabs");
   };
@@ -283,7 +297,10 @@ export function useFarmerOnboarding(navigation: any, route: any) {
       if (!sigData) return '<span style="color:red">No Signature</span>';
       try {
         const strokes = JSON.parse(sigData);
-        const toPath = (points: any[]) => `M ${points[0].x} ${points[0].y} ` + points.slice(1).map((p: any) => `L ${p.x} ${p.y}`).join(' ');
+        const toPath = (points: any[]) => {
+          if (!points || points.length === 0) return '';
+          return `M ${points[0].x} ${points[0].y} ` + points.slice(1).map((p: any) => `L ${p.x} ${p.y}`).join(' ');
+        };
         const paths = strokes.map((pts: any[]) => `<path d="${toPath(pts)}" stroke="#16A34A" stroke-width="4" fill="none" stroke-linecap="round" stroke-linejoin="round" />`).join('');
         return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 250" style="width: 100%; max-width: 250px; height: 80px;">${paths}</svg>`;
       } catch (e) {
@@ -356,9 +373,9 @@ export function useFarmerOnboarding(navigation: any, route: any) {
             <div class="section-title">2. Farm Details</div>
             <div class="table-wrapper">
               <table>
-                <tr><th>Total Land</th><td>${data.totalLand || '0'} ${unit}</td></tr>
-                <tr><th>Irrigated Land</th><td>${data.irrigatedLand || '0'} ${unit}</td></tr>
-                <tr><th>Rain-Fed Land</th><td>${data.rainFedLand || '0'} ${unit}</td></tr>
+                <tr><th>Total Land</th><td>${data.totalLand || '0'} ${data.landUnit || 'Acres'}</td></tr>
+                <tr><th>Irrigated Land</th><td>${data.irrigatedLand || '0'} ${data.irrigatedLandUnit || 'Acres'}</td></tr>
+                <tr><th>Rain-Fed Land</th><td>${data.rainFedLand || '0'} ${data.rainFedLandUnit || 'Acres'}</td></tr>
                 <tr><th>Major Crops</th><td>${data.majorCrops?.join(', ') || '-'}</td></tr>
                 <tr><th>Soil Type</th><td>${data.soilType?.map(s => s === 'Others' ? data.otherSoilType : s).join(', ') || '-'}</td></tr>
                 <tr><th>Water Source</th><td>${data.waterSource?.map(w => w === 'Others' ? data.otherWaterSource : w).join(', ') || '-'}</td></tr>
@@ -460,7 +477,20 @@ export function useFarmerOnboarding(navigation: any, route: any) {
         const result = await saveFarmerOnboarding(data, user.id, editData?.id || fetchedRecordId, check.dirtyKeys, pdfUrl);
         
         await useShiftStore.getState().incrementActivity(); // 🚀 NEW: Log valid activity!
-        await useShiftStore.getState().logShiftEvent('activity', (editData || fetchedRecordId) ? 'Updated Farmer' : 'Enrolled Farmer', data.fullName || 'Unknown Farmer');
+        // 🚀 FORMAT TIMELINE DESCRIPTION (Route & Village)
+        let routeName = "";
+        const shiftId = useShiftStore.getState().activeShiftId;
+        if (shiftId) {
+          const { data: sData } = await supabase.from('shifts').select('assigned_route_id').eq('id', shiftId).single();
+          if (sData?.assigned_route_id) {
+            const { data: rData } = await supabase.from('routes').select('name').eq('id', sData.assigned_route_id).single();
+            if (rData?.name) routeName = rData.name;
+          }
+        }
+        const locName = data.village || "Unknown Village";
+        const eventDesc = routeName ? `${routeName} (${locName})` : locName;
+
+        await useShiftStore.getState().logShiftEvent('activity', (editData || fetchedRecordId) ? 'Updated Farmer' : 'Enrolled Farmer', eventDesc);
         
         // 🚀 3. DELETE DRAFT IF EXISTS
         if (draftIdRef.current) {

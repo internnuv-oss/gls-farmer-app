@@ -22,7 +22,6 @@ export const Step2FarmDetails = ({ control, errors, t, watch }: any) => {
   const selectedSoilType = watch('soilType') || [];
   const selectedWaterSource = watch('waterSource') || [];
   const selectedEquipments = watch('farmEquipments') || [];
-  const landUnit = watch('landUnit') || 'Acres';
 
   return (
     <View>
@@ -48,20 +47,20 @@ export const Step2FarmDetails = ({ control, errors, t, watch }: any) => {
           )} />
         </View>
         <View style={{ flex: 1 }}>
-          <Controller control={control} name="landUnit" render={({field}) => (
+          <Controller control={control} name="irrigatedLandUnit" render={({field}) => (
             <SelectField label={t("Unit")} options={LAND_UNITS} value={field.value || 'Acres'} onChange={field.onChange} />
           )} />
         </View>
       </View>
 
       <View style={{ flexDirection: 'row', gap: spacing.sm, alignItems: 'flex-start' }}>
-      <View style={{ flex: 2 }}>
+        <View style={{ flex: 2 }}>
           <Controller control={control} name="rainFedLand" render={({field}) => (
             <Input label={t("Rain-fed Land ")} placeholder="e.g., 5" value={field.value} onChangeText={field.onChange} keyboardType="numeric" />
           )} />
         </View>
         <View style={{ flex: 1 }}>
-          <Controller control={control} name="landUnit" render={({field}) => (
+          <Controller control={control} name="rainFedLandUnit" render={({field}) => (
             <SelectField label={t("Unit")} options={LAND_UNITS} value={field.value || 'Acres'} onChange={field.onChange} />
           )} />
         </View>

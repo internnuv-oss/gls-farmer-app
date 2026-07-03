@@ -561,6 +561,7 @@ export const DashboardScreen = ({ navigation, route }: any) => {
     } else if (isFarmer) {
       const phone = item.raw.mobile || item.raw.contactMobile;
       const land = item.raw.farm_details?.totalLand || item.raw.totalLand;
+      const landUnit = item.raw.farm_details?.landUnit || item.raw.landUnit || 'Acres'; // Safely extract the unit
       const rawCrops = item.raw.farm_details?.majorCrops || item.raw.majorCrops;
       const crops = Array.isArray(rawCrops) ? rawCrops.join(', ') : rawCrops;
       const rawWater = item.raw.farm_details?.waterSource || item.raw.waterSource;
@@ -568,7 +569,7 @@ export const DashboardScreen = ({ navigation, route }: any) => {
 
       infoBlocks = [
         { icon: 'phone', value: phone, isPhone: true },
-        { icon: 'landscape', value: land ? `${land} Acres` : null, isPhone: false },
+        { icon: 'landscape', value: land ? `${land} ${t(landUnit)}` : null, isPhone: false }, // Dynamically render and translate the unit
         { icon: 'grass', value: crops, isPhone: false, translate: true },
         { icon: 'water-drop', value: water, isPhone: false, translate: true },
       ];

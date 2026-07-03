@@ -16,6 +16,8 @@ export const farmerOnboardingSchema = z.object({
 
   // 2. Farm Details
   landUnit: z.string().optional(),
+  irrigatedLandUnit: z.string().optional(),
+  rainFedLandUnit: z.string().optional(),
   totalLand: z.string().min(1, "Total land is required"),
   irrigatedLand: z.string().optional(),
   rainFedLand: z.string().optional(),

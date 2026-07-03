@@ -57,7 +57,13 @@ export const TravelReportScreen = ({ navigation }: any) => {
         const TA = manualDistance * 4;
         const DA = manualDistance > 60 ? TA + 150 : TA;
 
-        const dailyExpenses = expenses.filter(e => isSameDay(new Date(e.date), selectedDate));
+        // 🚀 FIX: Filter out the database auto-generated TA/DA expense
+        const dailyExpenses = expenses.filter(e => 
+            isSameDay(new Date(e.date), selectedDate) && 
+            e.category !== 'TA/DA' && 
+            e.receipt_url !== 'SYSTEM_GENERATED'
+        );
+        
         const totalExpenses = dailyExpenses.reduce((sum, item) => sum + Number(item.amount), 0);
         const grandTotal = DA + totalExpenses;
 
