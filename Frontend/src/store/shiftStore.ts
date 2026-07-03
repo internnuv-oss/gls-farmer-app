@@ -150,7 +150,7 @@ export const useShiftStore = create<ShiftState>()(
           end_km: s.end_km,
           total_distance: s.total_distance || 0,
           activities_logged: s.activities_logged || 0,
-          route_path: s.route_path || [],
+          route_path: locsByShift[s.id] || [],
         }));
 
         set({
@@ -180,6 +180,12 @@ export const useShiftStore = create<ShiftState>()(
 
         const timeToUse = editedTime || actualTime || Date.now();
         const dateStr = new Date(timeToUse).toISOString().split('T')[0];
+
+        // 🚀 FIX: Prevent multiple shifts on the same day from the frontend
+        const existingShift = get().shiftHistory.find(s => s.date === dateStr);
+        if (existingShift) {
+          throw new Error("A shift has already been completed for today. You cannot punch in twice.");
+        }
 
         const inEvent: TimelineEvent = {
           id: Date.now().toString(),
@@ -373,7 +379,7 @@ export const useShiftStore = create<ShiftState>()(
         let lastPoint = routePath.length > 0 ? routePath[routePath.length - 1] : null;
         const validPoints = [];
 
-        // 🚀 Advanced GPS Filtering Engine (runs entirely locally)
+        // 🚀 1. Advanced GPS Filtering Engine (keeps bad coordinates out)
         for (const point of newPoints) {
           if (!point.timestamp || point.timestamp > Date.now() + 60000) continue;
           if (point.accuracy && point.accuracy > 30) continue;
@@ -395,28 +401,27 @@ export const useShiftStore = create<ShiftState>()(
 
         if (validPoints.length === 0) return;
 
-        // 🚀 Append to local structures only
+        // 🚀 2. Build updated data sets
         const updatedPath = [...routePath, ...validPoints];
         const updatedPending = [...pendingPoints, ...validPoints];
         const updatedDistance = totalDistance + addedDistance;
 
-        set({ routePath: updatedPath, totalDistance: updatedDistance });
+        // 🚀 FIX 1: Explicitly include 'pendingPoints' in the state. 
+        // Without this, your upload queue was resetting to empty on every single loop!
+        set({ 
+          routePath: updatedPath, 
+          totalDistance: updatedDistance,
+          pendingPoints: updatedPending 
+        });
 
-        // 🚀 2. ATTEMPT CLOUD SYNC (Self-healing approach)
+        // 🚀 FIX 2: Manually trigger the batch uploader immediately right here.
+        // Standard JS intervals freeze when the phone screen turns off, but this background 
+        // execution thread stays awake for a few seconds—giving us the perfect window to upload live!
         try {
-          const { error } = await supabase.from('shifts')
-            .update({
-              route_path: updatedPath,
-              total_distance: parseFloat(updatedDistance.toFixed(2))
-            })
-            .eq('id', activeShiftId);
-
-          if (error) throw error;
+          await get().syncPendingRoutePoints();
         } catch (error) {
-          // If network is off, it simply fails silently.
-          // Because the local 'updatedPath' array is still growing, the missing points
-          // will automatically hitch a ride on the next successful upload when internet returns!
-          console.log("Offline: Route points safely buffered to local storage.");
+          // If they lose network in a dead-zone, points stay securely buffered in 'pendingPoints'
+          console.log("Background cloud sync failed, points safely buffered locally.");
         }
       }
     }),

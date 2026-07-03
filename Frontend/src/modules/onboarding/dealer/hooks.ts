@@ -464,7 +464,7 @@ export function useDealerOnboarding(navigation: any, route: any) {
                       <th>GPS Coordinates</th>
                       <td>
                         ${data.shopLocations?.['shop_exterior'] 
-                           ? `<a href="https://maps.google.com/?q=$${data.shopLocations['shop_exterior'].lat},${data.shopLocations['shop_exterior'].lng}" class="action-link">📍 View on Map</a><br><span style="font-size: 11px; color: #64748B;">${data.shopLocations['shop_exterior'].lat.toFixed(5)}, ${data.shopLocations['shop_exterior'].lng.toFixed(5)}</span>` 
+                           ? `<a href="https://www.google.com/maps?q=${data.shopLocations['shop_exterior'].lat},${data.shopLocations['shop_exterior'].lng}" target="_blank" class="action-link">📍 View on Map</a><br><span style="font-size: 11px; color: #64748B;">${data.shopLocations['shop_exterior'].lat.toFixed(5)}, ${data.shopLocations['shop_exterior'].lng.toFixed(5)}</span>` 
                            : '<span class="empty-text">Missing</span>'}
                       </td>
                     </tr>

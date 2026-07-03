@@ -218,8 +218,12 @@ export const PunchInModal = ({ visible, onClose, onConfirm }: any) => {
         routeId: selectedRouteId === 'others' ? null : selectedRouteId
       });
       onClose();
-    } catch (e) {
-      useAlertStore.getState().showAlert(t("Error"), t("Failed to punch in. Please try again."));
+    } catch (e: any) {
+      // 🚀 FIX: Display the exact error message thrown by the store or Supabase
+      useAlertStore.getState().showAlert(
+        t("Cannot Punch In"), 
+        e.message || t("Failed to punch in. Please try again.")
+      );
     } finally {
       setIsCapturing(false);
     }

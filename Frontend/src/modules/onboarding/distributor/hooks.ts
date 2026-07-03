@@ -498,7 +498,7 @@ export function useDistributorOnboarding(navigation: any, route: any) {
                   <th>Facility GPS Coordinates</th>
                   <td>
                     ${(data as any).storageLocations?.['storage_exterior'] 
-                      ? `<a href="http://maps.google.com/?q=${(data as any).storageLocations['storage_exterior'].lat},${(data as any).storageLocations['storage_exterior'].lng}" class="action-link">📍 View on Map</a><br><span style="font-size: 11px; color: #64748B;">Lat: ${(data as any).storageLocations['storage_exterior'].lat.toFixed(5)}, Lng: ${(data as any).storageLocations['storage_exterior'].lng.toFixed(5)}</span>`
+                      ? `<a href="https://www.google.com/maps?q=${(data as any).storageLocations['storage_exterior'].lat},${(data as any).storageLocations['storage_exterior'].lng}" target="_blank" class="action-link">📍 View on Map</a><br><span style="font-size: 11px; color: #64748B;">Lat: ${(data as any).storageLocations['storage_exterior'].lat.toFixed(5)}, Lng: ${(data as any).storageLocations['storage_exterior'].lng.toFixed(5)}</span>`
                       : '<span class="empty-text">Not Captured</span>'}
                   </td>
                 </tr>
