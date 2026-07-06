@@ -11,7 +11,7 @@ import { Step3Mindset } from './steps/Step3Mindset';
 
 export const FSPPEnrollmentScreen = ({ navigation, route }: any) => {
   const { t } = useTranslation();
-  const { form, step, setStep, isNextEnabled, isSubmitEnabled, isSubmitting, submit, showSuccess, setShowSuccess, calculateScore, totalLand } = useFSPPEnrollment(navigation, route);
+  const { form, step, setStep, isNextEnabled, isSubmitEnabled, isSubmitting, submit, showSuccess, setShowSuccess, calculateScore, totalLand, isCompleted } = useFSPPEnrollment(navigation, route);
 
   if (showSuccess) {
     const result = calculateScore();
@@ -82,17 +82,21 @@ export const FSPPEnrollmentScreen = ({ navigation, route }: any) => {
       footer={
         <View>
           {step < 4 ? (
-            <Button label="Next" onPress={() => setStep(step + 1)} disabled={!isNextEnabled} />
+            <Button label="Next" onPress={() => setStep(step + 1)} disabled={!isNextEnabled && !isCompleted} />
+          ) : isCompleted ? (
+            <Button label="Close" onPress={() => navigation.goBack()} />
           ) : (
             <Button label="Submit Assessment" onPress={submit} loading={isSubmitting} disabled={!isSubmitEnabled} />
           )}
         </View>
       }
     >
-      {step === 1 && <Step1Land form={form} totalLand={totalLand} />}
-      {step === 2 && <Step2Awareness form={form} />}
-      {step === 3 && <Step3Mindset form={form} />}
-      {step === 4 && renderReview()}
+      <View style={{ flex: 1 }} pointerEvents={isCompleted ? 'none' : 'auto'}>
+        {step === 1 && <Step1Land form={form} totalLand={totalLand} />}
+        {step === 2 && <Step2Awareness form={form} />}
+        {step === 3 && <Step3Mindset form={form} />}
+        {step === 4 && renderReview()}
+      </View>
     </WizardFlowTemplate>
   );
 };

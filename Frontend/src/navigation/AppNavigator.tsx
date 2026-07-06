@@ -14,6 +14,7 @@ import { SEOnboardingScreen } from '../modules/onboarding/se/screens/SEOnboardin
 import { LoginScreen } from '../modules/auth/screens/LoginScreen';
 import { RegisterScreen } from '../modules/auth/screens/RegisterScreen';
 import { EntityProfileScreen } from '../modules/dashboard/screens/EntityProfileScreen';
+import { GeneralVisitScreen } from '../modules/dashboard/screens/GeneralVisitScreen';
 import { FarmerHubScreen } from '../modules/dashboard/screens/FarmerHubScreen';
 import { ComingSoonScreen } from '../modules/core/screens/ComingSoonScreen';
 import { useAuthStore } from '../store/authStore';
@@ -46,6 +47,7 @@ const DashboardStackNavigator = () => (
     <DashboardStack.Screen name="DashboardMain" component={DashboardScreen} />
     <DashboardStack.Screen name="EntityProfile" component={EntityProfileScreen} />
     <DashboardStack.Screen name="FarmerHub" component={FarmerHubScreen} />
+    <DashboardStack.Screen name="GeneralVisit" component={GeneralVisitScreen} />
   </DashboardStack.Navigator>
 );
 

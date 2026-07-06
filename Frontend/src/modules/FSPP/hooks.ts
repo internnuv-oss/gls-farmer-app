@@ -148,6 +148,7 @@ export const useFSPPEnrollment = (navigation: any, route: any) => {
     showSuccess,
     setShowSuccess,
     calculateScore,
-    totalLand
+    totalLand,
+    isCompleted
   };
 };

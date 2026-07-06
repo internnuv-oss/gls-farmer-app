@@ -83,6 +83,75 @@ export const FarmerHubScreen = ({ route, navigation }: any) => {
               </View>
             </Pressable>
 
+            {/* General Visit Card */}
+            <Pressable
+              onPress={() => {
+                navigation.navigate("GeneralVisit", { entity: entity });
+              }}
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                backgroundColor: colors.surface,
+                padding: spacing.xl,
+                borderRadius: radius.lg,
+                borderWidth: 1,
+                borderColor: colors.border,
+                marginBottom: spacing.lg,
+                ...shadows.soft,
+              }}
+            >
+              <View style={{ width: 48, height: 48, borderRadius: 12, backgroundColor: '#FEF2F2', alignItems: 'center', justifyContent: 'center', marginRight: spacing.lg }}>
+                <MaterialIcons name="event" size={28} color="#DC2626" />
+              </View>
+              
+              <View style={{ flex: 1 }}>
+                <Text style={{ fontSize: 18, fontWeight: '800', color: colors.text }}>
+                  {t("General Visit")}
+                </Text>
+              </View>
+
+              <View style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: '#F1F5F9', alignItems: 'center', justifyContent: 'center' }}>
+                <MaterialIcons name="chevron-right" size={20} color={colors.textMuted} />
+              </View>
+            </Pressable>
+
+            {/* FSPP Enrollment Card */}
+            {!isDraft && (
+              <Pressable
+                onPress={() => {
+                  navigation.navigate("FSPPEnrollment", { entity: { ...entity, raw: entity.raw } });
+                }}
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  backgroundColor: colors.surface,
+                  padding: spacing.xl,
+                  borderRadius: radius.lg,
+                  borderWidth: 1,
+                  borderColor: colors.border,
+                  marginBottom: spacing.lg,
+                  ...shadows.soft,
+                }}
+              >
+                <View style={{ width: 48, height: 48, borderRadius: 12, backgroundColor: '#EFF6FF', alignItems: 'center', justifyContent: 'center', marginRight: spacing.lg }}>
+                  <MaterialIcons name="assignment" size={28} color={entity.raw?.fspp_details?.statusLabel ? "#166534" : "#2563EB"} />
+                </View>
+                
+                <View style={{ flex: 1 }}>
+                  <Text style={{ fontSize: 18, fontWeight: '800', color: colors.text }}>
+                    {entity.raw?.fspp_details?.statusLabel ? t("View FSPP Assessment") : t("FSPP Enrollment")}
+                  </Text>
+                  <Text style={{ fontSize: 12, color: colors.textMuted, fontWeight: '700', marginTop: 4 }}>
+                    {entity.raw?.fspp_details?.statusLabel ? t("Completed") : t("Not yet enrolled")}
+                  </Text>
+                </View>
+
+                <View style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: '#F1F5F9', alignItems: 'center', justifyContent: 'center' }}>
+                  <MaterialIcons name="chevron-right" size={20} color={colors.textMuted} />
+                </View>
+              </Pressable>
+            )}
+
           </View>
 
       </ScrollView>

@@ -876,13 +876,6 @@ export const EntityProfileScreen = ({ navigation, route }: any) => {
           </View>
         </SectionCard>
 
-        {/* --- FSPP ACTIONS --- */}
-        {isFarmer && !fspp?.statusLabel && (
-          <View style={{ marginBottom: spacing.lg }}>
-            <Button label="Enroll into FSPP" onPress={() => navigation.navigate('FSPPEnrollment', { entity: { ...entity, raw } })} />
-          </View>
-        )}
-
         {/* --- PDF ACTIONS --- */}
         <View style={{ marginTop: spacing.lg }}>
           {raw.pdf_url ? (
