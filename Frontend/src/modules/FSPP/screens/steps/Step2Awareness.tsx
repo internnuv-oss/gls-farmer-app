@@ -26,7 +26,7 @@ export const Step2Awareness = ({ form }: { form: UseFormReturn<FSPPFormData> }) 
 
   return (
     <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 40 }}>
-      <Text style={{ fontSize: 16, fontWeight: '800', color: colors.text, marginBottom: spacing.md }}>3. Prior Awareness of Biological Agricultural Inputs</Text>
+      <Text style={{ fontSize: 16, fontWeight: '800', color: colors.text, marginBottom: spacing.md }}>{t("3. Prior Awareness of Biological Agricultural Inputs")}</Text>
       <View style={{ gap: spacing.md, marginBottom: spacing.xl }}>
         {BIO_OPTIONS.map((opt, i) => (
           <Pressable key={i} onPress={() => setValue('bioAwareness', opt.value, { shouldValidate: true })} style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: bio === opt.value ? colors.primarySoft : colors.surface, padding: spacing.md, borderRadius: radius.md, borderWidth: 1, borderColor: bio === opt.value ? colors.primary : colors.border }}>
@@ -38,7 +38,7 @@ export const Step2Awareness = ({ form }: { form: UseFormReturn<FSPPFormData> }) 
         ))}
       </View>
 
-      <Text style={{ fontSize: 16, fontWeight: '800', color: colors.text, marginBottom: spacing.md }}>4. Prior Knowledge of GLS Organization</Text>
+      <Text style={{ fontSize: 16, fontWeight: '800', color: colors.text, marginBottom: spacing.md }}>{t("4. Prior Knowledge of GLS Organization")}</Text>
       <View style={{ gap: spacing.md }}>
         {GLS_OPTIONS.map((opt, i) => (
           <Pressable key={i} onPress={() => setValue('glsKnowledge', opt.value, { shouldValidate: true })} style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: gls === opt.value ? colors.primarySoft : colors.surface, padding: spacing.md, borderRadius: radius.md, borderWidth: 1, borderColor: gls === opt.value ? colors.primary : colors.border }}>

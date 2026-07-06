@@ -32,18 +32,18 @@ export const Step1Land = ({ form, totalLand }: { form: UseFormReturn<FSPPFormDat
     <View style={{ flex: 1 }}>
       <View style={{ backgroundColor: '#F8FAFC', padding: spacing.md, borderRadius: radius.md, marginBottom: spacing.xl, borderWidth: 1, borderColor: '#E2E8F0' }}>
         <Text style={{ fontSize: 13, color: colors.textMuted, fontWeight: '700' }}>{t('BASELINE DEMOGRAPHICS')}</Text>
-        <Text style={{ fontSize: 16, color: colors.text, fontWeight: '800', marginTop: 4 }}>Total Land Holding: {totalLand} Acres</Text>
+        <Text style={{ fontSize: 16, color: colors.text, fontWeight: '800', marginTop: 4 }}>{t("Total Land Holding :")}  {totalLand} {t("Acres")}</Text>
       </View>
 
-      <Text style={{ fontSize: 16, fontWeight: '800', color: colors.text, marginBottom: spacing.sm }}>1. Committed Land for Hybrid Farming</Text>
-      <Text style={{ fontSize: 13, color: colors.textMuted, marginBottom: spacing.md }}>Specific portion of land dedicated 100% to GLS hybrid/biological schedule</Text>
+      <Text style={{ fontSize: 16, fontWeight: '800', color: colors.text, marginBottom: spacing.sm }}>{t("1. Committed Land for Hybrid Farming")}</Text>
+      <Text style={{ fontSize: 13, color: colors.textMuted, marginBottom: spacing.md }}>{t("Specific portion of land dedicated 100% to GLS hybrid/biological schedule")}</Text>
       
       <View style={{ marginBottom: spacing.xl, zIndex: 10 }}>
         <View style={{ flexDirection: 'row', gap: spacing.sm, alignItems: 'flex-start' }}>
           <View style={{ flex: 2 }}>
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.xs }}>
-              <Text style={{ fontSize: 12, color: colors.textMuted, fontWeight: '600' }}>Area</Text>
-              <Text style={{ fontSize: 11, color: colors.primary, fontWeight: '700' }}>Max: {committedUnit === 'Bigha' ? totalLand * 2.5 : totalLand} {committedUnit}</Text>
+              <Text style={{ fontSize: 12, color: colors.textMuted, fontWeight: '600' }}>{t("Area")}</Text>
+              <Text style={{ fontSize: 11, color: colors.primary, fontWeight: '700' }}>{t("Max:")} {committedUnit === 'Bigha' ? totalLand * 2.5 : totalLand} {committedUnit}</Text>
             </View>
             <TextInput
               style={{ backgroundColor: colors.surface, paddingHorizontal: spacing.lg, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.border, fontSize: 16, color: colors.text, fontWeight: '600', height: 56 }}
@@ -67,7 +67,7 @@ export const Step1Land = ({ form, totalLand }: { form: UseFormReturn<FSPPFormDat
             />
           </View>
           <View style={{ flex: 1, position: 'relative', zIndex: 20 }}>
-            <Text style={{ fontSize: 12, color: colors.textMuted, marginBottom: spacing.xs, fontWeight: '600' }}>Unit</Text>
+            <Text style={{ fontSize: 12, color: colors.textMuted, marginBottom: spacing.xs, fontWeight: '600' }}>{t("Unit")}</Text>
             <Pressable 
               onPress={() => setIsUnitDropdownOpen(!isUnitDropdownOpen)}
               style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: colors.surface, paddingHorizontal: spacing.md, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.border, height: 56 }}
@@ -102,8 +102,10 @@ export const Step1Land = ({ form, totalLand }: { form: UseFormReturn<FSPPFormDat
         )}
       </View>
 
-      <Text style={{ fontSize: 16, fontWeight: '800', color: colors.text, marginBottom: spacing.sm }}>2. Current Average Seasonal Expenditure per {isBigha ? 'Bigha' : 'Acre'}</Text>
-      <View style={{ gap: spacing.md }}>
+      <Text style={{ fontSize: 16, fontWeight: '800', color: colors.text, marginBottom: spacing.sm }}>
+  {t("2. Current Average Seasonal Expenditure per {{unit}}", { unit: isBigha ? 'Bigha' : 'Acre' })}
+</Text>  
+    <View style={{ gap: spacing.md }}>
         {EXPENSE_OPTIONS.map((opt, i) => (
           <Pressable key={i} onPress={() => setValue('seasonalExpense', opt.value, { shouldValidate: true })} style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: expense === opt.value ? colors.primarySoft : colors.surface, padding: spacing.md, borderRadius: radius.md, borderWidth: 1, borderColor: expense === opt.value ? colors.primary : colors.border }}>
             <View style={{ width: 24, height: 24, borderRadius: 12, borderWidth: 2, borderColor: expense === opt.value ? colors.primary : colors.border, justifyContent: 'center', alignItems: 'center', marginRight: spacing.md }}>

@@ -48,22 +48,22 @@ export const FSPPEnrollmentScreen = ({ navigation, route }: any) => {
 
     return (
       <View style={{ flex: 1, justifyContent: 'center' }}>
-        <Text style={{ fontSize: 20, fontWeight: '900', color: colors.text, textAlign: 'center', marginBottom: spacing.md }}>Review Evaluation</Text>
+        <Text style={{ fontSize: 20, fontWeight: '900', color: colors.text, textAlign: 'center', marginBottom: spacing.md }}>{t("Review Evaluation")}</Text>
         {isKO && (
           <View style={{ backgroundColor: '#FEF2F2', padding: spacing.md, borderRadius: radius.md, borderWidth: 1, borderColor: '#FECACA', marginBottom: spacing.md }}>
-            <Text style={{ color: '#991B1B', fontWeight: '800', textAlign: 'center' }}>KNOCK-OUT CRITERIA FAILED</Text>
-            <Text style={{ color: '#991B1B', textAlign: 'center', marginTop: 4 }}>Land holding or committed land is less than 1 acre. Farmer is automatically disqualified.</Text>
+            <Text style={{ color: '#991B1B', fontWeight: '800', textAlign: 'center' }}>{t("KNOCK-OUT CRITERIA FAILED")}</Text>
+            <Text style={{ color: '#991B1B', textAlign: 'center', marginTop: 4 }}>{t("Land holding or committed land is less than 1 acre. Farmer is automatically disqualified.")}</Text>
           </View>
         )}
         <View style={{ backgroundColor: colors.surface, padding: spacing.lg, borderRadius: radius.md, borderWidth: 1, borderColor: colors.border, alignItems: 'center' }}>
-          <Text style={{ fontSize: 14, color: colors.textMuted, fontWeight: '700' }}>COMPUTED SCORE</Text>
+          <Text style={{ fontSize: 14, color: colors.textMuted, fontWeight: '700' }}>{t("COMPUTED SCORE")}</Text>
           <Text style={{ fontSize: 48, fontWeight: '900', color: isKO ? colors.danger : colors.primary }}>{result.score}</Text>
           <Text style={{ fontSize: 16, fontWeight: '800', color: colors.text, marginTop: spacing.sm, textAlign: 'center' }}>{result.status}</Text>
         </View>
 
         {missing.length > 0 && (
           <View style={{ backgroundColor: '#FFFBEB', padding: spacing.md, borderRadius: radius.md, borderWidth: 1, borderColor: '#FEF3C7', marginTop: spacing.lg }}>
-            <Text style={{ color: '#B45309', fontWeight: '800', marginBottom: spacing.sm, fontSize: 14 }}>Incomplete Fields (Required before Submit):</Text>
+            <Text style={{ color: '#B45309', fontWeight: '800', marginBottom: spacing.sm, fontSize: 14 }}>{t("Incomplete Fields (Required before Submit):")}</Text>
             {missing.map((m, i) => (
               <Text key={i} style={{ color: '#D97706', fontSize: 13, marginBottom: 2, fontWeight: '500' }}>• {m}</Text>
             ))}
