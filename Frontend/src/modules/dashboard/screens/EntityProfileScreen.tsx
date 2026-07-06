@@ -304,6 +304,7 @@ export const EntityProfileScreen = ({ navigation, route }: any) => {
   const scoring = raw.scoring || {};
   const businessScope = raw.business_scope || {}; // 🚀 ADD THIS LINE
   const documents = raw.documents || {};
+  const fspp = raw.fspp_details || {};
 
   return (
     <SimpleScreenTemplate 
@@ -359,15 +360,26 @@ export const EntityProfileScreen = ({ navigation, route }: any) => {
           </View>
         </View>
 
+        {/* --- FSPP BANNER --- */}
+        {isFarmer && fspp?.statusLabel && (
+          <View style={{ backgroundColor: fspp.category === 'Category A' ? '#DCFCE7' : fspp.category === 'Category B' ? '#FEF3C7' : '#FEE2E2', padding: spacing.md, borderRadius: radius.md, marginBottom: spacing.lg, borderWidth: 1, borderColor: fspp.category === 'Category A' ? '#22C55E' : fspp.category === 'Category B' ? '#F59E0B' : '#EF4444', alignItems: 'center' }}>
+            <Text style={{ fontSize: 13, fontWeight: '800', color: fspp.category === 'Category A' ? '#166534' : fspp.category === 'Category B' ? '#B45309' : '#991B1B', textTransform: 'uppercase' }}>FSPP Qualification</Text>
+            <Text style={{ fontSize: 16, fontWeight: '900', color: fspp.category === 'Category A' ? '#166534' : fspp.category === 'Category B' ? '#B45309' : '#991B1B', marginTop: 4, textAlign: 'center' }}>{fspp.statusLabel}</Text>
+            {fspp.score !== undefined && (
+              <Text style={{ fontSize: 13, fontWeight: '700', color: fspp.category === 'Category A' ? '#166534' : fspp.category === 'Category B' ? '#B45309' : '#991B1B', marginTop: 4 }}>Score: {fspp.score} / 100</Text>
+            )}
+          </View>
+        )}
+
         {/* --- SCORE & LOCATION WIDGETS --- */}
         <View style={{ flexDirection: 'row', gap: spacing.md, marginBottom: spacing.lg }}>
-          {(isDealer || isDistributor) && (
+          {(isDealer || isDistributor || (isFarmer && fspp?.score !== undefined)) && (
             <View style={{ flex: 1, backgroundColor: colors.surface, padding: spacing.lg, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.border, ...shadows.soft, alignItems: 'center', justifyContent: 'space-between' }}>
-              <MaterialIcons name="speed" size={28} color={getScoreColor(entity.score)} style={{ marginBottom: 8 }} />
+              <MaterialIcons name="speed" size={28} color={getScoreColor(isFarmer ? fspp.score : entity.score)} style={{ marginBottom: 8 }} />
               <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-                <Text style={{ fontSize: 26, fontWeight: '900', color: getScoreColor(entity.score) }}>{entity.score}</Text>
+                <Text style={{ fontSize: 26, fontWeight: '900', color: getScoreColor(isFarmer ? fspp.score : entity.score) }}>{isFarmer ? fspp.score : entity.score}</Text>
               </View>
-              <Text style={{ fontSize: 11, fontWeight: '800', color: colors.textMuted, marginTop: 8 }}>{t('PROFILE SCORE')}</Text>
+              <Text style={{ fontSize: 11, fontWeight: '800', color: colors.textMuted, marginTop: 8 }}>{isFarmer ? t('FSPP SCORE') : t('PROFILE SCORE')}</Text>
             </View>
           )}
 
@@ -863,6 +875,13 @@ export const EntityProfileScreen = ({ navigation, route }: any) => {
             
           </View>
         </SectionCard>
+
+        {/* --- FSPP ACTIONS --- */}
+        {isFarmer && !fspp?.statusLabel && (
+          <View style={{ marginBottom: spacing.lg }}>
+            <Button label="Enroll into FSPP" onPress={() => navigation.navigate('FSPPEnrollment', { entity: { ...entity, raw } })} />
+          </View>
+        )}
 
         {/* --- PDF ACTIONS --- */}
         <View style={{ marginTop: spacing.lg }}>

@@ -19,3 +19,4 @@ export * from "./MultiSelectField";
 export * from "./DatePickerField";
 export * from "./AlertModal";
 export * from "./FilterModal";
+export * from "./EntityCard";

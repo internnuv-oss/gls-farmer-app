@@ -14,6 +14,7 @@ import { SEOnboardingScreen } from '../modules/onboarding/se/screens/SEOnboardin
 import { LoginScreen } from '../modules/auth/screens/LoginScreen';
 import { RegisterScreen } from '../modules/auth/screens/RegisterScreen';
 import { EntityProfileScreen } from '../modules/dashboard/screens/EntityProfileScreen';
+import { FarmerHubScreen } from '../modules/dashboard/screens/FarmerHubScreen';
 import { ComingSoonScreen } from '../modules/core/screens/ComingSoonScreen';
 import { useAuthStore } from '../store/authStore';
 import { colors } from '../design-system/tokens';
@@ -25,6 +26,7 @@ import { useShiftStore } from '../store/shiftStore';
 import { FarmerOnboardingScreen } from '../modules/onboarding/farmer/screens/FarmerOnboardingScreen';
 import { DistributorOnboardingScreen } from '../modules/onboarding/distributor/screens/DistributorOnboardingScreen';
 import { FPOOnboardingScreen } from '../modules/onboarding/fpo/screens/FPOOnboardingScreen';
+import { FSPPEnrollmentScreen } from '../modules/FSPP/screens/FSPPEnrollmentScreen';
 import { ReportsHubScreen } from '../modules/reports/screens/ReportsHubScreen';
 import { ExpenseReportScreen } from '../modules/reports/screens/ExpenseReportScreen';
 import { AddExpenseScreen } from '../modules/reports/screens/AddExpenseScreen';
@@ -43,6 +45,7 @@ const DashboardStackNavigator = () => (
   >
     <DashboardStack.Screen name="DashboardMain" component={DashboardScreen} />
     <DashboardStack.Screen name="EntityProfile" component={EntityProfileScreen} />
+    <DashboardStack.Screen name="FarmerHub" component={FarmerHubScreen} />
   </DashboardStack.Navigator>
 );
 
@@ -141,6 +144,7 @@ export const AppNavigator = () => {
             <Stack.Screen name="FarmerOnboarding" component={FarmerOnboardingScreen} />
             <Stack.Screen name="DistributorOnboarding" component={DistributorOnboardingScreen} />
             <Stack.Screen name="FPOOnboarding" component={FPOOnboardingScreen} />
+            <Stack.Screen name="FSPPEnrollment" component={FSPPEnrollmentScreen} />
             <Stack.Screen name="ComingSoonScreen">
               {({ navigation }) => <ComingSoonScreen onBack={() => navigation.goBack()} />}
             </Stack.Screen>
