@@ -1,4 +1,4 @@
-import React, { useState, useRef, useMemo } from 'react';
+import React, { useState, useRef, useMemo, useEffect } from 'react';
 import { View, Text, ScrollView, Pressable, StyleSheet } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
@@ -6,6 +6,8 @@ import MapView, { Polyline, Marker, PROVIDER_GOOGLE } from 'react-native-maps';
 import ViewShot, { captureRef } from 'react-native-view-shot';
 import * as Sharing from 'expo-sharing';
 import * as FileSystem from 'expo-file-system/legacy';
+import { supabase } from '../../../core/supabase';
+import { calculateDistance } from '../../../core/locationUtils';
 
 import { colors, radius, spacing, shadows } from '../../../design-system/tokens';
 import { Button } from '../../../design-system/components';
@@ -27,7 +29,6 @@ export const TravelReportScreen = ({ navigation }: any) => {
     const viewShotRef = useRef<ViewShot>(null);
     const mapRef = useRef<MapView>(null);
 
-    // --- REPORT DATA ---
     const isSameDay = (d1: Date, d2: Date) =>
         d1.getDate() === d2.getDate() &&
         d1.getMonth() === d2.getMonth() &&
@@ -36,6 +37,70 @@ export const TravelReportScreen = ({ navigation }: any) => {
     const dailyShift = useMemo(() => {
         return shiftHistory.find((s) => isSameDay(new Date(s.date), selectedDate));
     }, [selectedDate, shiftHistory]);
+
+    const [dynamicRoute, setDynamicRoute] = useState<any[]>([]);
+    const [isLoadingRoute, setIsLoadingRoute] = useState(false);
+
+    useEffect(() => {
+        const fetchRouteForShift = async () => {
+            if (!dailyShift?.id) {
+                setDynamicRoute([]);
+                return;
+            }
+    
+            setIsLoadingRoute(true);
+            try {
+                let allPoints: any[] = [];
+                let lastTimestamp = 0;
+                let hasMore = true;
+    
+                // Paginate through Supabase to bypass the 1,000 row limit
+                while (hasMore) {
+                    const { data } = await supabase
+                        .from('shift_locations')
+                        .select('lat, lng, timestamp')
+                        .eq('shift_id', dailyShift.id)
+                        .gt('timestamp', lastTimestamp)
+                        .order('timestamp', { ascending: true })
+                        .limit(1000);
+    
+                    if (data && data.length > 0) {
+                        allPoints = [...allPoints, ...data];
+                        lastTimestamp = data[data.length - 1].timestamp;
+                        if (data.length < 1000) hasMore = false;
+                    } else {
+                        hasMore = false;
+                    }
+                }
+    
+                // 🚀 MAP OPTIMIZATION: Simple Decimation
+                // Only keep points that are at least ~50 meters apart visually to prevent UI freezing
+                const simplifiedPoints = [];
+                let lastAdded = null;
+    
+                for (const point of allPoints) {
+                    if (!lastAdded) {
+                        simplifiedPoints.push({ lat: point.lat, lng: point.lng });
+                        lastAdded = point;
+                    } else {
+                        const dist = calculateDistance(lastAdded.lat, lastAdded.lng, point.lat, point.lng);
+                        if (dist > 0.05) { // 0.05 km = 50 meters
+                            simplifiedPoints.push({ lat: point.lat, lng: point.lng });
+                            lastAdded = point;
+                        }
+                    }
+                }
+    
+                setDynamicRoute(simplifiedPoints);
+            } catch (error) {
+                console.error("Failed to fetch route:", error);
+            } finally {
+                setIsLoadingRoute(false);
+            }
+        };
+    
+        fetchRouteForShift();
+    }, [dailyShift?.id]);
 
     const reportData = useMemo(() => {
         if (!dailyShift) return null;
@@ -57,7 +122,6 @@ export const TravelReportScreen = ({ navigation }: any) => {
         const TA = manualDistance * 4;
         const DA = manualDistance > 60 ? TA + 150 : TA;
 
-        // 🚀 FIX: Filter out the database auto-generated TA/DA expense
         const dailyExpenses = expenses.filter(e => 
             isSameDay(new Date(e.date), selectedDate) && 
             e.category !== 'TA/DA' && 
@@ -68,7 +132,7 @@ export const TravelReportScreen = ({ navigation }: any) => {
         const grandTotal = DA + totalExpenses;
 
         const rawRoute = shiftData.routePath || shiftData.route_path || [];
-        const routeCoordinates = rawRoute
+        const routeCoordinates = dynamicRoute
             .filter((p: any) => p && p.lat && p.lng)
             .map((point: any) => ({ latitude: point.lat, longitude: point.lng }));
 
@@ -78,7 +142,7 @@ export const TravelReportScreen = ({ navigation }: any) => {
             startKm,
             endKm,
             manualDistance,
-            gpsDistance,
+            gpsDistance: parseFloat(gpsDistance).toFixed(2), // 🚀 Format to 2 decimal places
             TA,
             DA,
             activities,
@@ -88,6 +152,19 @@ export const TravelReportScreen = ({ navigation }: any) => {
             grandTotal,
         };
     }, [dailyShift, expenses, selectedDate]);
+
+    // 🚀 FIX: Prevent map flashing world coordinates. Seed the region natively.
+    const mapInitialRegion = useMemo(() => {
+        if (reportData?.routeCoordinates && reportData.routeCoordinates.length > 0) {
+            return {
+                latitude: reportData.routeCoordinates[0].latitude,
+                longitude: reportData.routeCoordinates[0].longitude,
+                latitudeDelta: 0.05,
+                longitudeDelta: 0.05,
+            };
+        }
+        return undefined;
+    }, [reportData]);
 
     const getIconForType = (type: string) => {
         switch(type) {
@@ -132,7 +209,6 @@ export const TravelReportScreen = ({ navigation }: any) => {
         setIsCapturing(true);
         
         try {
-            // 1. Capture the screenshot to a temporary cache URI
             const uri = await captureRef(viewShotRef, {
                 format: 'png',
                 quality: 1.0,
@@ -141,24 +217,17 @@ export const TravelReportScreen = ({ navigation }: any) => {
             const isAvailable = await Sharing.isAvailableAsync();
             
             if (isAvailable) {
-                // 2. Format the Name (remove spaces/special characters for safety)
                 const rawName = user?.name || user?.firstName || 'Executive';
                 const safeName = rawName.replace(/[^a-zA-Z0-9]/g, '_');
-                
-                // 3. Format the Date (DD_MM_YYYY)
                 const dateStr = selectedDate.toLocaleDateString('en-GB').replace(/\//g, '_');
-                
-                // 4. Construct the Final File Name
                 const finalFileName = `${safeName}_${dateStr}_Report.png`;
                 const renamedUri = `${FileSystem.documentDirectory}${finalFileName}`;
                 
-                // 5. Copy the temporary image to the new named path
                 await FileSystem.copyAsync({
                     from: uri,
                     to: renamedUri
                 });
 
-                // 6. Share the properly named file
                 await Sharing.shareAsync(renamedUri, { 
                     mimeType: 'image/png',
                     dialogTitle: 'Share Travel Report' 
@@ -171,16 +240,19 @@ export const TravelReportScreen = ({ navigation }: any) => {
         }
     };
 
-    const handleMapLayout = () => {
-        if (mapRef.current && reportData?.routeCoordinates && reportData.routeCoordinates.length > 0) {
-            mapRef.current.fitToCoordinates(reportData.routeCoordinates, {
-                edgePadding: { top: 50, right: 50, bottom: 50, left: 50 },
-                animated: true,
-            });
+    // 🚀 FIX: Reliable callback attached to the Map's native ready state
+    const fitMapToRoute = () => {
+        if (mapRef.current && reportData?.routeCoordinates && reportData.routeCoordinates.length > 1) {
+            // Slight delay ensures the layout sizing resolves perfectly before animating zoom
+            setTimeout(() => {
+                mapRef.current?.fitToCoordinates(reportData.routeCoordinates, {
+                    edgePadding: { top: 50, right: 50, bottom: 50, left: 50 },
+                    animated: true,
+                });
+            }, 300);
         }
     };
 
-    // --- CALENDAR LOGIC ---
     const year = currentMonth.getFullYear();
     const month = currentMonth.getMonth();
     const daysInMonth = new Date(year, month + 1, 0).getDate();
@@ -197,7 +269,6 @@ export const TravelReportScreen = ({ navigation }: any) => {
 
     return (
         <View style={{ flex: 1, backgroundColor: colors.screen }}>
-            {/* Header */}
             <View style={{ paddingTop: 50, paddingHorizontal: spacing.lg, paddingBottom: spacing.md, borderBottomWidth: 1, borderBottomColor: colors.border, flexDirection: "row", alignItems: "center", justifyContent: "space-between", backgroundColor: colors.surface }}>
                 <View style={{ flexDirection: "row", alignItems: "center" }}>
                     <Pressable
@@ -216,7 +287,7 @@ export const TravelReportScreen = ({ navigation }: any) => {
             </View>
 
             <ScrollView contentContainerStyle={{ paddingBottom: 100 }}>
-                <ViewShot ref={viewShotRef} options={{ format: "jpg", quality: 0.9 }} style={{ flex: 1, backgroundColor: colors.screen }}>
+            <ViewShot ref={viewShotRef} options={{ format: "png", quality: 1.0 }} style={{ flex: 1, backgroundColor: colors.screen }}>
                     {user && (
                         <View style={{ padding: spacing.lg, backgroundColor: colors.primarySoft, borderBottomWidth: 1, borderBottomColor: colors.border }}>
                             <Text style={{ fontSize: 20, fontWeight: "900", color: colors.primary }}>{user.name}</Text>
@@ -291,18 +362,19 @@ export const TravelReportScreen = ({ navigation }: any) => {
                                     {reportData.routeCoordinates.length > 0 ? (
                                         <MapView
                                             ref={mapRef}
-                                            provider={PROVIDER_GOOGLE} // 🚀 FORCE GOOGLE MAPS ENGINE
+                                            provider={PROVIDER_GOOGLE}
                                             style={{ flex: 1 }}
-                                            onLayout={handleMapLayout}
+                                            initialRegion={mapInitialRegion} // 🚀 FIXED: No more world map flashes
+                                            onMapReady={fitMapToRoute}       // 🚀 FIXED: Triggers exactly when engine mounts
                                             scrollEnabled={false}
                                             zoomEnabled={false}
                                         >
                                             <Polyline 
                                                 coordinates={reportData.routeCoordinates} 
                                                 strokeColor={colors.primary} 
-                                                strokeWidth={5} // 🚀 Make it slightly thicker like Strava
-                                                lineCap="round" // 🚀 Smooth out the ends of the line
-                                                lineJoin="round" // 🚀 Smooth out sharp 90-degree turns
+                                                strokeWidth={5} 
+                                                lineCap="round" 
+                                                lineJoin="round" 
                                             />
                                             <Marker coordinate={reportData.routeCoordinates[0]} pinColor="green" title="Start" />
                                             <Marker coordinate={reportData.routeCoordinates[reportData.routeCoordinates.length - 1]} pinColor="red" title="End" />
@@ -364,13 +436,11 @@ export const TravelReportScreen = ({ navigation }: any) => {
                                         <Text style={styles.rowValue}>₹{reportData.TA || 0}</Text>
                                     </View>
 
-                                    {/* NEW: Daily Allowance (DA) - ₹150 if distance > 60km, else ₹0 */}
                                     <View style={styles.row}>
                                         <Text style={styles.rowLabel}>Daily Allowance (DA):</Text>
                                         <Text style={styles.rowValue}>₹{reportData.manualDistance > 60 ? 150 : 0}</Text>
                                     </View>
 
-                                    {/* Other Expenses */}
                                     {reportData.dailyExpenses && reportData.dailyExpenses.length > 0 && (
                                         <View style={styles.row}>
                                             <Text style={styles.rowLabel}>{t("Other Expenses")}:</Text>
@@ -378,7 +448,6 @@ export const TravelReportScreen = ({ navigation }: any) => {
                                         </View>
                                     )}
 
-                                    {/* Grand Total: TA + DA + Other Expenses */}
                                     <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginTop: spacing.lg, paddingTop: spacing.md, borderTopWidth: 1.5, borderTopColor: colors.primarySoft }}>
                                         <Text style={{ fontSize: 18, fontWeight: "900", color: colors.primary }}>{t("Grand Total")}:</Text>
                                         <Text style={{ fontSize: 24, fontWeight: "900", color: colors.primary }}>

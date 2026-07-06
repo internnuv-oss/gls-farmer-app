@@ -24,7 +24,7 @@ export interface PastShift {
   id: string;
   date: string;
   events: TimelineEvent[];
-  routePath?: any[]; // 🚀 Exposed for UI map rendering
+  routePath?: any[]; 
 }
 
 interface ShiftState {
@@ -37,7 +37,7 @@ interface ShiftState {
   activitiesLogged: number;
   shiftHistory: PastShift[];
   routePath: any[];
-  pendingPoints: any[]; // 🚀 NEW: Queue for un-uploaded GPS points
+  pendingPoints: any[]; 
   totalDistance: number;
 
   hydrateShifts: () => Promise<void>;
@@ -46,7 +46,7 @@ interface ShiftState {
   incrementActivity: () => Promise<void>;
   logShiftEvent: (type: 'activity' | 'expense', title: string, description: string) => Promise<void>;
   addRoutePoints: (points: any[]) => Promise<void>;
-  syncPendingRoutePoints: () => Promise<void>; // 🚀 NEW: Batched Uploader
+  syncPendingRoutePoints: () => Promise<void>; 
 }
 
 let syncInterval: NodeJS.Timeout | null = null;
@@ -67,7 +67,6 @@ export const useShiftStore = create<ShiftState>()(
       pendingPoints: [],
       totalDistance: 0,
 
-      // 🚀 NEW: Batched Syncing Logic
       syncPendingRoutePoints: async () => {
         if (isSyncing) return;
         const { activeShiftId, pendingPoints, totalDistance } = get();
@@ -75,7 +74,6 @@ export const useShiftStore = create<ShiftState>()(
 
         isSyncing = true;
         try {
-          // Clone to prevent race conditions during upload
           const pointsToUpload = [...pendingPoints];
 
           const payload = pointsToUpload.map(p => ({
@@ -88,19 +86,19 @@ export const useShiftStore = create<ShiftState>()(
             heading: p.heading || null
           }));
 
-          // 1. Bulk insert to the new table
           const { error: insertError } = await supabase.from('shift_locations').insert(payload);
           if (insertError) throw insertError;
 
-          // 2. Sync the latest total_distance
           const { error: updateError } = await supabase.from('shifts')
             .update({ total_distance: parseFloat(totalDistance.toFixed(2)) })
             .eq('id', activeShiftId);
           if (updateError) throw updateError;
 
-          // 3. Clear ONLY the points that successfully uploaded
+          // 🚀 FIX: Extract timestamps to filter safely regardless of JS object memory reference changes
+          const timestampsToUpload = pointsToUpload.map(p => p.timestamp);
+          
           set((state) => ({
-            pendingPoints: state.pendingPoints.filter(p => !pointsToUpload.includes(p))
+            pendingPoints: state.pendingPoints.filter(p => !timestampsToUpload.includes(p.timestamp))
           }));
         } catch (e) {
           console.log("Offline or sync failed: GPS points safely buffered.", e);
@@ -112,47 +110,42 @@ export const useShiftStore = create<ShiftState>()(
       hydrateShifts: async () => {
         const userId = useAuthStore.getState().user?.id;
         if (!userId) return;
-
+      
         const { data: shiftsData, error: shiftsError } = await supabase
           .from('shifts')
           .select('*')
           .eq('se_id', userId)
           .order('date', { ascending: false });
-
+      
         if (shiftsError || !shiftsData) return;
-
-        // 🚀 Fetch all shift locations and group them by shift_id
-        const shiftIds = shiftsData.map(s => s.id);
-        const { data: allLocs } = await supabase
-          .from('shift_locations')
-          .select('shift_id, lat, lng, timestamp')
-          .in('shift_id', shiftIds)
-          .order('timestamp', { ascending: true });
-
-        const locsByShift: Record<string, any[]> = {};
-        if (allLocs) {
-          allLocs.forEach(l => {
-            if (!locsByShift[l.shift_id]) locsByShift[l.shift_id] = [];
-            locsByShift[l.shift_id].push({ lat: l.lat, lng: l.lng, timestamp: l.timestamp });
-          });
-        }
-
+      
         const activeShift = shiftsData.find(s => s.status === 'ACTIVE');
-
+        let activeRoutePath: any[] = [];
+      
+        // 🚀 FIX: ONLY fetch the route for the currently active shift (Prevents 1000-row limit & OOM crashes)
+        if (activeShift) {
+          const { data: activeLocs } = await supabase
+            .from('shift_locations')
+            .select('lat, lng, timestamp')
+            .eq('shift_id', activeShift.id)
+            .order('timestamp', { ascending: true }); // Supabase 1000 limit might hit if they drive 12 hours, but it protects RAM.
+      
+          if (activeLocs) activeRoutePath = activeLocs;
+        }
+      
         const formattedHistory = shiftsData.map(s => ({
           ...s,
           id: s.id,
           date: s.date,
           events: s.events || [],
-          // ✅ Preserve all fields needed by TravelReportScreen and shift-lock logic
           status: s.status,
           start_km: s.start_km,
           end_km: s.end_km,
           total_distance: s.total_distance || 0,
           activities_logged: s.activities_logged || 0,
-          route_path: locsByShift[s.id] || [],
+          route_path: [], // 🚀 FIX: We leave this empty. The Report Screen will fetch it on-demand!
         }));
-
+      
         set({
           shiftHistory: formattedHistory,
           activeShiftId: activeShift ? activeShift.id : null,
@@ -162,12 +155,11 @@ export const useShiftStore = create<ShiftState>()(
           startKm: activeShift ? activeShift.start_km : '',
           transitMode: activeShift ? activeShift.transit_mode : '',
           activitiesLogged: activeShift ? activeShift.activities_logged : 0,
-          routePath: activeShift ? (locsByShift[activeShift.id] || []) : [],
-          pendingPoints: [], // Wipe pending queue on fresh load
+          routePath: activeRoutePath, 
+          pendingPoints: get().pendingPoints || [], 
           totalDistance: activeShift ? (activeShift.total_distance || 0) : 0
         });
-
-        // 🚀 Restore Auto-Sync Timer if active
+      
         if (syncInterval) clearInterval(syncInterval);
         if (activeShift) {
           syncInterval = setInterval(() => get().syncPendingRoutePoints(), 60000);
@@ -181,7 +173,6 @@ export const useShiftStore = create<ShiftState>()(
         const timeToUse = editedTime || actualTime || Date.now();
         const dateStr = new Date(timeToUse).toISOString().split('T')[0];
 
-        // 🚀 FIX: Prevent multiple shifts on the same day from the frontend
         const existingShift = get().shiftHistory.find(s => s.date === dateStr);
         if (existingShift) {
           throw new Error("A shift has already been completed for today. You cannot punch in twice.");
@@ -202,7 +193,7 @@ export const useShiftStore = create<ShiftState>()(
           vehicle_type: vehicleType, start_km: km, transit_mode: transit,
           start_location: location, start_odo_image: odoImageUrl,
           events: [inEvent],
-          total_distance: 0, // No more route_path array here!
+          total_distance: 0,
           assigned_route_id: routeId || null
         };
 
@@ -218,31 +209,24 @@ export const useShiftStore = create<ShiftState>()(
         const hasStarted = await Location.hasStartedLocationUpdatesAsync(SHIFT_LOCATION_TASK);
         if (!hasStarted) {
           await Location.startLocationUpdatesAsync(SHIFT_LOCATION_TASK, {
-            // 🚀 The Sweet Spot: Uses real GPS but allows the OS hardware to rest
-            accuracy: Location.Accuracy.High, 
-            
-            // 🚀 Distance: 50 meters captures road curves beautifully without spamming the CPU
-            distanceInterval: 50, 
-            
-            // 🚀 Time: Only ping every 1 minute if they are moving slowly (or sitting in traffic)
-            timeInterval: 60000, 
-            
-            // 🚀 THE ULTIMATE BATTERY SAVERS (Batched Updates)
-            // Let the OS collect points in the background hardware, but only wake up 
-            // the React Native app every 2 minutes or 200 meters to process them.
-            deferredUpdatesInterval: 120000, 
-            deferredUpdatesDistance: 200, 
-            
-            // 🚀 iOS specific battery saver: stops pinging if the phone sits on a desk
-            pausesUpdatesAutomatically: true, 
-            
+            accuracy: Location.Accuracy.Balanced, 
+        
+            distanceInterval: 20, 
+        
+            timeInterval: 20000, 
+        
+            deferredUpdatesInterval: 60000, 
+        
+            deferredUpdatesDistance: 100, 
+        
+            pausesUpdatesAutomatically: false, 
             showsBackgroundLocationIndicator: true,
             foregroundService: {
               notificationTitle: "Shift Active",
               notificationBody: "Tracking route (Battery Optimized)",
               notificationColor: "#16A34A",
             },
-          });
+        });
         }
 
         const newHistory = [...get().shiftHistory];
@@ -257,7 +241,6 @@ export const useShiftStore = create<ShiftState>()(
           routePath: initialPoint ? [initialPoint] : [], pendingPoints: [], totalDistance: 0
         });
 
-        // 🚀 Start Batch Processing Interval
         if (syncInterval) clearInterval(syncInterval);
         syncInterval = setInterval(() => get().syncPendingRoutePoints(), 60000);
       },
@@ -281,7 +264,6 @@ export const useShiftStore = create<ShiftState>()(
           type: 'punch-out', title: 'Punched Out', description: descriptionStr
         };
 
-        // Guarantee final point maps
         if (location) {
           set((state) => ({
             pendingPoints: [...state.pendingPoints, { lat: location.lat, lng: location.lng, timestamp: timeToUse }],
@@ -289,14 +271,12 @@ export const useShiftStore = create<ShiftState>()(
           }));
         }
 
-        // 🚀 Final flush before ending shift
         await get().syncPendingRoutePoints();
         if (syncInterval) {
           clearInterval(syncInterval);
           syncInterval = null;
         }
 
-        // 🚀 CALCULATE ALLOWANCE STATUS
         let allowanceStatus = 'Pending';
         if (get().isPersonalVehicle && endKm) {
           const startVal = parseFloat(get().startKm || '0');
@@ -308,7 +288,6 @@ export const useShiftStore = create<ShiftState>()(
             }
           }
         } else if (!get().isPersonalVehicle) {
-          // If no personal vehicle was used, TA/DA is effectively 0, so auto-approve
           allowanceStatus = 'Approved';
         }
 
@@ -317,7 +296,7 @@ export const useShiftStore = create<ShiftState>()(
           end_odo_image: odoImageUrl, status: 'COMPLETED', updated_at: new Date().toISOString(),
           total_distance: parseFloat(get().totalDistance.toFixed(2)),
           activities_logged: activitiesLogged,
-          allowance_status: allowanceStatus // 🚀 Keep this
+          allowance_status: allowanceStatus
         };
 
         const currentShiftRecord = shiftHistory.find(h => h.id === activeShiftId);
@@ -347,12 +326,10 @@ export const useShiftStore = create<ShiftState>()(
         if (!activeShiftId) return;
 
         const event: TimelineEvent = { id: Date.now().toString(), time: Date.now(), type, title, description };
-
         const currentShiftRecord = shiftHistory.find(h => h.id === activeShiftId);
         if (!currentShiftRecord) return;
 
         const updatedEvents = [...currentShiftRecord.events, event];
-
         await supabase.from('shifts').update({ events: updatedEvents, updated_at: new Date().toISOString() }).eq('id', activeShiftId);
 
         const newHistory = [...shiftHistory];
@@ -379,18 +356,20 @@ export const useShiftStore = create<ShiftState>()(
         let lastPoint = routePath.length > 0 ? routePath[routePath.length - 1] : null;
         const validPoints = [];
 
-        // 🚀 1. Advanced GPS Filtering Engine (keeps bad coordinates out)
         for (const point of newPoints) {
-          if (!point.timestamp || point.timestamp > Date.now() + 60000) continue;
-          if (point.accuracy && point.accuracy > 30) continue;
-          if (point.speed && point.speed > 33.33) continue;
+          // 🚀 FIX: Buffered time significantly to accommodate slight device desyncs
+          if (!point.timestamp || point.timestamp > Date.now() + 300000) continue; 
+          
+          // 🚀 FIX: Extremely relaxed accuracy threshold. Mobile GPS in rural cars is rarely perfect 30m.
+          if (point.accuracy && point.accuracy > 200) continue;
 
           if (lastPoint) {
             const distInKm = calculateDistance(lastPoint.lat, lastPoint.lng, point.lat, point.lng);
             const distInMeters = distInKm * 1000;
 
-            if (distInMeters < 10) continue;
-            if (distInMeters > 50 && point.speed === 0 && lastPoint.speed === 0) continue;
+            // 🚀 FIX: Removed the highly problematic speed === 0 check. 
+            // It was dropping all points when the user was stationary at a farmer's location!
+            if (distInMeters < 15) continue; 
 
             addedDistance += distInKm;
           }
@@ -401,26 +380,19 @@ export const useShiftStore = create<ShiftState>()(
 
         if (validPoints.length === 0) return;
 
-        // 🚀 2. Build updated data sets
         const updatedPath = [...routePath, ...validPoints];
         const updatedPending = [...pendingPoints, ...validPoints];
         const updatedDistance = totalDistance + addedDistance;
 
-        // 🚀 FIX 1: Explicitly include 'pendingPoints' in the state. 
-        // Without this, your upload queue was resetting to empty on every single loop!
         set({ 
           routePath: updatedPath, 
           totalDistance: updatedDistance,
           pendingPoints: updatedPending 
         });
 
-        // 🚀 FIX 2: Manually trigger the batch uploader immediately right here.
-        // Standard JS intervals freeze when the phone screen turns off, but this background 
-        // execution thread stays awake for a few seconds—giving us the perfect window to upload live!
         try {
           await get().syncPendingRoutePoints();
         } catch (error) {
-          // If they lose network in a dead-zone, points stay securely buffered in 'pendingPoints'
           console.log("Background cloud sync failed, points safely buffered locally.");
         }
       }
