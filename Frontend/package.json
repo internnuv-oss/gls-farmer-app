@@ -7,7 +7,8 @@
     "android": "expo start --android",
     "ios": "expo start --ios",
     "web": "expo start --web",
-    "translate": "node scripts/auto-translate.mjs"
+    "extract-en": "node scripts/extract-en.mjs",
+    "translate-all": "node scripts/auto-translate.mjs"
   },
   "dependencies": {
     "@expo/vector-icons": "^15.1.1",
