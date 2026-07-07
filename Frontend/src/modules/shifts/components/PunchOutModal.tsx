@@ -22,7 +22,6 @@ const isDayChanged = (startTimeMs: number | null, currentTime: Date) => {
 
 export const PunchOutModal = ({ visible, onClose, onConfirm }: any) => {
   const { t } = useTranslation();
-  // 🚀 Added transitMode to store destructuring
   const { isPersonalVehicle, startKm, activitiesLogged, transitMode, startTime } = useShiftStore();
   const [endKm, setEndKm] = useState('');
   const [error, setError] = useState('');
@@ -105,14 +104,23 @@ export const PunchOutModal = ({ visible, onClose, onConfirm }: any) => {
       }
     }
 
+    const actualTime = Date.now();
+    const editedTime = isTimeEdited ? customTime.getTime() : null;
+    const timeToUse = editedTime || actualTime;
+
+    // 🚀 CRITICAL FIX: Final check to prevent submission of illegal backdated times
+    if (startTime && timeToUse < startTime) {
+      useAlertStore.getState().showAlert(
+        t("Invalid Time"), 
+        t("Your Punch Out time cannot be earlier than your Punch In time.")
+      );
+      return;
+    }
+
     setError('');
     setIsCapturing(true);
 
     try {
-      const actualTime = Date.now();
-      const editedTime = isTimeEdited ? customTime.getTime() : null;
-
-      // 🚀 Pass the comment payload up ONLY if both conditions are met
       await onConfirm(endKm, odoImage, {
         actualTime,
         editedTime,
@@ -172,7 +180,6 @@ export const PunchOutModal = ({ visible, onClose, onConfirm }: any) => {
               </View>
             )}
 
-            {/* 🚀 NEW: Crossover Shift Warning Block */}
             {isDayChanged(startTime, customTime) && (
               <View style={{ backgroundColor: '#FEE2E2', padding: spacing.md, borderRadius: radius.md, borderWidth: 1, borderColor: '#FCA5A5', marginBottom: spacing.md, flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                 <MaterialIcons name="error-outline" size={20} color={colors.danger} />
@@ -251,6 +258,15 @@ export const PunchOutModal = ({ visible, onClose, onConfirm }: any) => {
                     return;
                   }
 
+                  // 🚀 CRITICAL FIX: UI level block preventing backdating before punch-in
+                  if (startTime && newDate.getTime() < startTime) {
+                    useAlertStore.getState().showAlert(
+                      t("Invalid Selection"),
+                      t("You cannot select a Punch Out time that is earlier than your Punch In time.")
+                    );
+                    return;
+                  }
+
                   setCustomTime(newDate);
                   setIsTimeEdited(true);
                 }
@@ -305,7 +321,6 @@ export const PunchOutModal = ({ visible, onClose, onConfirm }: any) => {
             </Text>
           )}
 
-          {/* 🚀 ONLY SHOW IF NO ACTIVITIES LOGGED AND TRANSIT IS 'NO TRAVELLING' */}
           {activitiesLogged === 0 && transitMode === 'No Travelling' && (
             <View style={{ marginBottom: spacing.lg }}>
               <Text style={{ fontSize: 14, fontWeight: '800', color: colors.text, marginBottom: spacing.sm }}>
@@ -330,14 +345,13 @@ export const PunchOutModal = ({ visible, onClose, onConfirm }: any) => {
             label={locationStr.includes('Locating') || locationStr.includes('Fetching') ? t("Detecting Location...") : (isCapturing ? t("Closing Shift...") : t("Punch Out"))}
             variant="danger"
             onPress={handleConfirm}
-            // 🚀 Safety restriction locks submission if calendar day has changed
             disabled={
               isCapturing ||
               isLaunchingCamera ||
               locationStr.includes('Locating') ||
               locationStr.includes('Fetching') ||
               locationStr.includes('denied') ||
-              isDayChanged(startTime, customTime) || // Blocks punch out completely
+              isDayChanged(startTime, customTime) || 
               (activitiesLogged === 0 && transitMode === 'No Travelling' && comment.trim() === '')
             }
           />
