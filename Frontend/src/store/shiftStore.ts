@@ -44,6 +44,7 @@ interface ShiftState {
   startShift: (isPersonal: boolean, km: string, transit: string, vehicleType: 'two-wheeler' | 'four-wheeler' | null, actualTime: number, editedTime: number | null, location: any, odoImageUrl: string | null, routeId: string | null) => Promise<void>;
   endShift: (endKm: string, actualTime: number, editedTime: number | null, location: any, odoImageUrl: string | null, comment?: string) => Promise<void>;
   incrementActivity: () => Promise<void>;
+  logActivityForDate: (dateStr: string, title: string, description: string) => Promise<void>;
   logShiftEvent: (type: 'activity' | 'expense', title: string, description: string) => Promise<void>;
   addRoutePoints: (points: any[]) => Promise<void>;
   syncPendingRoutePoints: () => Promise<void>; 
@@ -346,6 +347,60 @@ export const useShiftStore = create<ShiftState>()(
           await supabase.from('shifts').update({ activities_logged: newCount }).eq('id', activeShiftId);
         }
         set({ activitiesLogged: newCount });
+      },
+
+      logActivityForDate: async (dateStr: string, title: string, description: string) => {
+        // Parse DD-MM-YYYY to YYYY-MM-DD
+        const parts = dateStr.split('-');
+        if (parts.length !== 3) return;
+        const targetDate = `${parts[2]}-${parts[1]}-${parts[0]}`;
+        
+        const userId = useAuthStore.getState().user?.id;
+        if (!userId) return;
+
+        // Fetch shift for that specific date
+        const { data: shiftData, error: shiftError } = await supabase
+          .from('shifts')
+          .select('id, events, activities_logged')
+          .eq('se_id', userId)
+          .eq('date', targetDate)
+          .single();
+
+        if (shiftError || !shiftData) {
+          // If no shift exists for that date, we silently ignore as there's no travel report to attach to
+          return; 
+        }
+
+        const newEvent: TimelineEvent = {
+          id: Date.now().toString(),
+          time: Date.now(),
+          type: 'activity',
+          title,
+          description
+        };
+
+        const updatedEvents = [...(shiftData.events || []), newEvent];
+        const newCount = (shiftData.activities_logged || 0) + 1;
+
+        // Update Supabase
+        await supabase.from('shifts').update({ 
+          events: updatedEvents, 
+          activities_logged: newCount 
+        }).eq('id', shiftData.id);
+
+        // Update local state if the currently active shift is the one being updated
+        if (shiftData.id === get().activeShiftId) {
+          set({ activitiesLogged: newCount });
+        }
+
+        // Update shiftHistory locally to reflect immediately on Travel Report
+        const newHistory = [...get().shiftHistory];
+        const shiftIndex = newHistory.findIndex(h => h.id === shiftData.id);
+        if (shiftIndex >= 0) {
+          newHistory[shiftIndex].events = updatedEvents;
+          (newHistory[shiftIndex] as any).activities_logged = newCount;
+          set({ shiftHistory: newHistory });
+        }
       },
 
       addRoutePoints: async (newPoints: any[]) => {

@@ -11,7 +11,7 @@ import * as Crypto from 'expo-crypto'; // 🚀 IMPORT CRYPTO FOR UUIDs
 
 import { requestCameraPermission } from "../../../core/permissions";
 import { useAuthStore } from "../../../store/authStore";
-import { supabase } from "../../../core/supabase"; 
+import { supabase } from "../../../core/supabase";
 import { uploadFileToCloudinary } from "../services/cloudinaryService";
 import { farmerOnboardingSchema, FarmerOnboardingValues } from "./schema";
 import { useAlertStore } from "../../../store/alertStore";
@@ -21,7 +21,7 @@ import { useDraftStore } from "../../../store/draftStore";
 
 export function useFarmerOnboarding(navigation: any, route: any) {
   const user = useAuthStore((s) => s.user);
-  
+
   const editData = route?.params?.editData;
   const draftData = route?.params?.draftData;
   const draftId = route?.params?.draftId;
@@ -30,18 +30,18 @@ export function useFarmerOnboarding(navigation: any, route: any) {
   const [jumpBackTo, setJumpBackTo] = useState<number | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
-  const [dealers, setDealers] = useState<{label: string, value: string}[]>([]);
-  const [uploading, setUploading] = useState<Record<string, boolean>>({}); 
-  
+  const [dealers, setDealers] = useState<{ label: string, value: string }[]>([]);
+  const [uploading, setUploading] = useState<Record<string, boolean>>({});
+
   const draftIdRef = useRef<string | undefined>(draftId);
   const showSuccessRef = useRef(showSuccess);
 
   useEffect(() => { showSuccessRef.current = showSuccess; }, [showSuccess]);
 
   const defaultValues = editData ? mapFarmerDbToForm(editData) : (draftData || {
-    profilePhoto: "",state: "Gujarat", // 🚀 DEFAULT TO GUJARAT
+    profilePhoto: "", state: "Gujarat", // 🚀 DEFAULT TO GUJARAT
     pincode: "",
-    majorCrops: [], soilType: [], waterSource: [], sideTrees: [], cattles: [], irrigationType: [], farmEquipments: [], 
+    majorCrops: [], soilType: [], waterSource: [], sideTrees: [], cattles: [], irrigationType: [], farmEquipments: [],
     pastCrops: [{ cropName: '', area: '', areaUnit: 'Acres', inputUsed: [], otherInputUsed: '', yield: '', yieldUnit: 'Kg', problemsFaced: '' }],
     landUnit: 'Acres', irrigatedLandUnit: 'Acres', rainFedLandUnit: 'Acres', agreementAccepted: false
   });
@@ -68,11 +68,11 @@ export function useFarmerOnboarding(navigation: any, route: any) {
 
       setIsFetchingProfile(true);
       try {
-        const existingProfile = await fetchProfileByMobile('farmer', mobileNumber); 
-        
+        const existingProfile = await fetchProfileByMobile('farmer', mobileNumber);
+
         if (existingProfile) {
           useAlertStore.getState().showAlert("Profile Found", "An existing profile was found and has been loaded.");
-          
+
           if (existingProfile.source === 'draft') {
             reset(existingProfile.data.draft_data);
             draftIdRef.current = existingProfile.data.entity_id;
@@ -109,10 +109,10 @@ export function useFarmerOnboarding(navigation: any, route: any) {
 
   // 🚀 DB CRUD: Direct Save Function (With Draft Auditing & Anti-Duplication)
   const saveDraftToDB = async (isManualSave = false) => {
-    if (editData || showSuccessRef.current) return; 
-    
+    if (editData || showSuccessRef.current) return;
+
     const dirtyKeys = Object.keys(form.formState.dirtyFields);
-    
+
     // 🚀 FIX 1: Absolutely abort if nothing was changed (prevents unmount duplicates)
     if (dirtyKeys.length === 0) return;
 
@@ -125,19 +125,19 @@ export function useFarmerOnboarding(navigation: any, route: any) {
     }
 
     const currentValues = form.getValues();
-    if (!currentValues || !currentValues.fullName || !currentValues.mobile || !user?.id) return; 
+    if (!currentValues || !currentValues.fullName || !currentValues.mobile || !user?.id) return;
 
     if (!draftIdRef.current) {
-      draftIdRef.current = Crypto.randomUUID(); 
+      draftIdRef.current = Crypto.randomUUID();
     }
 
     try {
       const { data: existingDraft } = await supabase.from('drafts').select('update_history').eq('entity_id', draftIdRef.current).maybeSingle();
       const history = existingDraft?.update_history || [];
-      
+
       if (isManualSave && dirtyKeys.length > 0) {
         history.push({ updated_by: user.id, updated_at: new Date().toISOString(), modified_fields: dirtyKeys });
-        form.reset(currentValues, { keepValues: true }); 
+        form.reset(currentValues, { keepValues: true });
       }
 
       const { error } = await supabase.from('drafts').upsert({
@@ -160,7 +160,7 @@ export function useFarmerOnboarding(navigation: any, route: any) {
       // 🚀 OFFLINE / CRASH FALLBACK: Save locally with the current step
       const fallbackData = { ...currentValues, _step: step };
       const localDrafts = useDraftStore.getState().drafts;
-      
+
       if (localDrafts.some(d => d.id === draftIdRef.current!)) {
         useDraftStore.getState().updateDraft(draftIdRef.current!, fallbackData);
       } else {
@@ -175,17 +175,17 @@ export function useFarmerOnboarding(navigation: any, route: any) {
     // 🚀 FIX: Prevent blocking users if they hit submit without modifying anything
     if (dirtyKeys.length === 0) return { pass: true, error: "", dirtyKeys: [] };
 
-    if ((editData || fetchedRecordId) && isLocked) { 
+    if ((editData || fetchedRecordId) && isLocked) {
       const allowedEdits = [
-        'mobile', 'alternateMobile', 'totalLand', 'irrigatedLand', 'rainFedLand', 
-        'majorCrops', 'soilType', 'otherSoilType', 'waterSource', 'otherWaterSource', 
-        'irrigationType', 'farmEquipments', 'otherFarmEquipment', 'biofertilizer', 
+        'mobile', 'alternateMobile', 'totalLand', 'irrigatedLand', 'rainFedLand',
+        'majorCrops', 'soilType', 'otherSoilType', 'waterSource', 'otherWaterSource',
+        'irrigationType', 'farmEquipments', 'otherFarmEquipment', 'biofertilizer',
         'isIntercropping', 'sideTrees', 'cattles', 'dealerId', 'documents', 'farmerSignature', 'seSignature',
         'landUnit', 'irrigatedLandUnit', 'rainFedLandUnit', 'pastCrops', 'profilePhoto'
       ];
-      
+
       const illegalEdits = dirtyKeys.filter(k => !allowedEdits.includes(k.split('.')[0]));
-      
+
       if (illegalEdits.length > 0) {
         return { pass: false, error: "You are only authorized to edit Mobile, Farm Details, Livestock, and Dealer Linkage for completed profiles.", dirtyKeys: [] };
       }
@@ -221,12 +221,12 @@ export function useFarmerOnboarding(navigation: any, route: any) {
     }
     const locName = form.getValues().village || "Unknown Village";
     const eventDesc = routeName ? `${routeName} (${locName})` : locName;
-    
+
     await useShiftStore.getState().logShiftEvent('activity', 'Saved Farmer Draft', eventDesc);
     useAlertStore.getState().hideAlert();
     navigation.navigate("MainTabs");
   };
-  
+
   // 🚀 DB CRUD: Background Auto-Save
   useEffect(() => {
     const sub = AppState.addEventListener("change", async (nextAppState) => {
@@ -236,7 +236,7 @@ export function useFarmerOnboarding(navigation: any, route: any) {
     });
     return () => {
       sub.remove();
-      if (!showSuccessRef.current) saveDraftToDB(false); 
+      if (!showSuccessRef.current) saveDraftToDB(false);
     };
   }, [step]);
 
@@ -245,7 +245,7 @@ export function useFarmerOnboarding(navigation: any, route: any) {
   const handleUpload = async (key: string) => {
     const perm = await requestCameraPermission();
     if (!perm.granted) return useAlertStore.getState().showAlert("Permission Denied", perm.fallbackMessage);
-    
+
     const result = await ImagePicker.launchCameraAsync({ quality: 0.7, allowsEditing: true, aspect: [1, 1] });
     if (result.canceled) return;
 
@@ -263,20 +263,20 @@ export function useFarmerOnboarding(navigation: any, route: any) {
 
   const validationStatus = useMemo(() => {
     const isStep1Valid = !!(values.fullName && values.fatherName && values.mobile?.length === 10 && values.state && values.city && values.taluka && values.village);
-    
+
     const isStep2Valid = !!(values.totalLand && Array.isArray(values.majorCrops) && values.majorCrops.length > 0 && Array.isArray(values.soilType) && values.soilType.length > 0 && Array.isArray(values.waterSource) && values.waterSource.length > 0) &&
-                         !(Array.isArray(values.soilType) && values.soilType.includes('Others') && !values.otherSoilType) &&
-                         !(Array.isArray(values.waterSource) && values.waterSource.includes('Others') && !values.otherWaterSource) &&
-                         !(Array.isArray(values.farmEquipments) && values.farmEquipments.includes('Others') && !values.otherFarmEquipment);
-                         
+      !(Array.isArray(values.soilType) && values.soilType.includes('Others') && !values.otherSoilType) &&
+      !(Array.isArray(values.waterSource) && values.waterSource.includes('Others') && !values.otherWaterSource) &&
+      !(Array.isArray(values.farmEquipments) && values.farmEquipments.includes('Others') && !values.otherFarmEquipment);
+
     // 🚀 CRITICAL FIX: Prepend Array.isArray checks
     const isStep3Valid = Array.isArray(values.pastCrops) && values.pastCrops.every(crop => {
-       if (Array.isArray(crop.inputUsed) && crop.inputUsed.includes('Others') && !crop.otherInputUsed) return false;
-       return true;
+      if (Array.isArray(crop.inputUsed) && crop.inputUsed.includes('Others') && !crop.otherInputUsed) return false;
+      return true;
     });
-    
+
     const isStep4Valid = !!(values.agreementAccepted && values.farmerSignature && values.seSignature);
-  
+
     return [
       { isValid: isStep1Valid, name: "Step 1: Personal Details (Check Mobile/Location)" },
       { isValid: isStep2Valid, name: "Step 2: Farm Details (Check 'Others' text)" },
@@ -291,7 +291,7 @@ export function useFarmerOnboarding(navigation: any, route: any) {
   const generateHTML = () => {
     const data = form.getValues();
     const dateStr = new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' });
-    const unit = data.landUnit || 'Acres'; 
+    const unit = data.landUnit || 'Acres';
 
     const renderSignature = (sigData?: string) => {
       if (!sigData) return '<span style="color:red">No Signature</span>';
@@ -448,16 +448,16 @@ export function useFarmerOnboarding(navigation: any, route: any) {
 
   const submit = async () => {
     if (submitLockedRef.current) return; // Prevent double trigger
-    
+
     const missingSteps = validationStatus.filter(v => !v.isValid).map(v => v.name);
     if (missingSteps.length > 0) {
       useAlertStore.getState().showAlert("Missing Information", "Please complete the following sections before submitting:\n\n• " + missingSteps.join("\n• "));
-      return; 
+      return;
     }
 
     await form.handleSubmit(async (data) => {
       if (!user?.id) return useAlertStore.getState().showAlert("Error", "User session not found.");
-      
+
       const check = checkRestrictions();
       if (!check.pass) return useAlertStore.getState().showAlert("Restricted Action", check.error);
 
@@ -475,7 +475,7 @@ export function useFarmerOnboarding(navigation: any, route: any) {
         // 🚀 2. SAVE TO DATABASE ATOMICALLY (Passing PDF URL)
         useAlertStore.getState().showAlert("Saving", "Uploading complete profile to database...");
         const result = await saveFarmerOnboarding(data, user.id, editData?.id || fetchedRecordId, check.dirtyKeys, pdfUrl);
-        
+
         await useShiftStore.getState().incrementActivity(); // 🚀 NEW: Log valid activity!
         // 🚀 FORMAT TIMELINE DESCRIPTION (Route & Village)
         let routeName = "";
@@ -491,13 +491,13 @@ export function useFarmerOnboarding(navigation: any, route: any) {
         const eventDesc = routeName ? `${routeName} (${locName})` : locName;
 
         await useShiftStore.getState().logShiftEvent('activity', (editData || fetchedRecordId) ? 'Updated Farmer' : 'Enrolled Farmer', eventDesc);
-        
+
         // 🚀 3. DELETE DRAFT IF EXISTS
         if (draftIdRef.current) {
-           await supabase.from('drafts').delete().eq('entity_id', draftIdRef.current);
-           draftIdRef.current = undefined; 
+          await supabase.from('drafts').delete().eq('entity_id', draftIdRef.current);
+          draftIdRef.current = undefined;
         }
-        
+
         showSuccessRef.current = true;
         useAlertStore.getState().hideAlert();
         setShowSuccess(true);
@@ -512,5 +512,5 @@ export function useFarmerOnboarding(navigation: any, route: any) {
     })();
   };
 
-  return { form, step, setStep, jumpBackTo, setJumpBackTo,saveAndExit, saveDraft, submit, isSubmitting, isNextEnabled, showSuccess, setShowSuccess, dealers, generatePDF, uploading, handleUpload, isEditing: !!editData, isLocked };
+  return { form, step, setStep, jumpBackTo, setJumpBackTo, saveAndExit, saveDraft, submit, isSubmitting, isNextEnabled, showSuccess, setShowSuccess, dealers, generatePDF, uploading, handleUpload, isEditing: !!editData, isLocked };
 }

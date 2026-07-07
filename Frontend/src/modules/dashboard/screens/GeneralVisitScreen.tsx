@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { View, Text, Pressable, ScrollView, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
@@ -9,11 +9,13 @@ import { TextArea } from '../../../design-system/components/TextArea';
 import { Button } from '../../../design-system/components/Button';
 import { supabase } from '../../../core/supabase';
 import { useAlertStore } from '../../../store/alertStore';
+import { useShiftStore } from '../../../store/shiftStore';
 
 export const GeneralVisitScreen = ({ route, navigation }: any) => {
   const { t } = useTranslation();
   const { entity } = route.params;
   const { showAlert } = useAlertStore();
+  const isActive = useShiftStore((s) => s.isActive);
 
   const getTodayString = () => {
     const d = new Date();
@@ -26,13 +28,36 @@ export const GeneralVisitScreen = ({ route, navigation }: any) => {
   const [date, setDate] = useState<string>(getTodayString());
   const [comment, setComment] = useState('');
   const [loading, setLoading] = useState(false);
+  const submittingRef = useRef(false); // prevents race-condition double submissions
+
+  // Normalize to always be DD-MM-YYYY with zero-padded parts
+  const normalizeDateStr = (d: string): string => {
+    if (!d) return '';
+    const parts = d.split('-');
+    if (parts.length !== 3) return d;
+    const day   = parts[0].padStart(2, '0');
+    const month = parts[1].padStart(2, '0');
+    const year  = parts[2];
+    return `${day}-${month}-${year}`;
+  };
 
   const handleSubmit = async () => {
+    // Block if a submission is already in-flight (race condition guard)
+    if (submittingRef.current) return;
+    submittingRef.current = true;
+
+    if (!isActive) {
+      submittingRef.current = false;
+      showAlert(t("Not Allowed"), t("You can only log a General Visit while you are punched in."));
+      return;
+    }
     if (!comment.trim()) {
+      submittingRef.current = false;
       showAlert(t("Error"), t("Comment is compulsory for a General Visit."));
       return;
     }
     if (!date) {
+      submittingRef.current = false;
       showAlert(t("Error"), t("Please select a date."));
       return;
     }
@@ -41,12 +66,13 @@ export const GeneralVisitScreen = ({ route, navigation }: any) => {
     try {
       const tableName = entity.isDraft ? 'drafts' : 'farmers';
       const entityId = entity.entityId || entity.id;
+      const idColumn = entity.isDraft ? 'entity_id' : 'id';
 
       // 1. Fetch current comments
       const { data: currentData, error: fetchError } = await supabase
         .from(tableName)
         .select('comments')
-        .eq('id', entityId)
+        .eq(idColumn, entityId)
         .single();
 
       if (fetchError && fetchError.code !== 'PGRST116') {
@@ -54,16 +80,20 @@ export const GeneralVisitScreen = ({ route, navigation }: any) => {
       }
 
       const currentComments = currentData?.comments || [];
+      const normalizedDate = normalizeDateStr(date);
       
-      const isDuplicateDate = currentComments.some((c: any) => c.date === date);
+      const isDuplicateDate = currentComments.some(
+        (c: any) => normalizeDateStr(c.date) === normalizedDate
+      );
       if (isDuplicateDate) {
         setLoading(false);
-        showAlert(t("Error"), t("A visit log already exists for this date. Only one comment per date is allowed."));
+        submittingRef.current = false;
+        showAlert(t("Visit Already Exists for this Date"), t("A visit log already exists for this date. Only one comment per date is allowed."));
         return;
       }
 
       const newCommentObj = {
-        date: date,
+        date: normalizedDate,
         comment: comment.trim(),
         created_at: new Date().toISOString()
       };
@@ -74,9 +104,13 @@ export const GeneralVisitScreen = ({ route, navigation }: any) => {
       const { error: updateError } = await supabase
         .from(tableName)
         .update({ comments: newComments })
-        .eq('id', entityId);
+        .eq(idColumn, entityId);
 
       if (updateError) throw updateError;
+
+      // Use logActivityForDate — works whether shift is active OR already punched out
+      // logShiftEvent silently does nothing when activeShiftId is null (after punch-out)
+      await useShiftStore.getState().logActivityForDate(date, 'General Visit', `${entity.name} • ${date}`);
 
       showAlert(
         t("Success"),
@@ -93,6 +127,7 @@ export const GeneralVisitScreen = ({ route, navigation }: any) => {
       showAlert(t("Error"), t("Failed to log visit: ") + e.message);
     } finally {
       setLoading(false);
+      submittingRef.current = false;
     }
   };
 
