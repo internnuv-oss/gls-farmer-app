@@ -1,5 +1,5 @@
 import React, { useState, useRef, useMemo, useEffect } from 'react';
-import { View, Text, ScrollView, Pressable, StyleSheet } from 'react-native';
+import { View, Text, ScrollView, Pressable, StyleSheet, RefreshControl } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
 import MapView, { Polyline, Marker, PROVIDER_GOOGLE } from 'react-native-maps';
@@ -40,6 +40,96 @@ export const TravelReportScreen = ({ navigation }: any) => {
 
     const [dynamicRoute, setDynamicRoute] = useState<any[]>([]);
     const [isLoadingRoute, setIsLoadingRoute] = useState(false);
+
+    // 🚀 NEW: State to hold the fetched route details
+    const [assignedRoute, setAssignedRoute] = useState<{name: string, locations: string[]} | null>(null);
+
+    // 🚀 NEW: State and Handler for Pull-to-Refresh functionality
+    const [refreshing, setRefreshing] = useState(false);
+
+    const onRefresh = async () => {
+        if (!dailyShift?.id) return;
+        setRefreshing(true);
+        setIsLoadingRoute(true);
+        try {
+            let allPoints: any[] = [];
+            let lastTimestamp = 0;
+            let hasMore = true;
+
+            while (hasMore) {
+                const { data } = await supabase
+                    .from('shift_locations')
+                    .select('lat, lng, timestamp')
+                    .eq('shift_id', dailyShift.id)
+                    .gt('timestamp', lastTimestamp)
+                    .order('timestamp', { ascending: true })
+                    .limit(1000);
+
+                if (data && data.length > 0) {
+                    allPoints = [...allPoints, ...data];
+                    lastTimestamp = data[data.length - 1].timestamp;
+                    if (data.length < 1000) hasMore = false;
+                } else {
+                    hasMore = false;
+                }
+            }
+
+            const simplifiedPoints = [];
+            let lastAdded = null;
+
+            for (const point of allPoints) {
+                if (!lastAdded) {
+                    simplifiedPoints.push({ lat: point.lat, lng: point.lng });
+                    lastAdded = point;
+                } else {
+                    const dist = calculateDistance(lastAdded.lat, lastAdded.lng, point.lat, point.lng);
+                    if (dist > 0.05) {
+                        simplifiedPoints.push({ lat: point.lat, lng: point.lng });
+                        lastAdded = point;
+                    }
+                }
+            }
+
+            setDynamicRoute(simplifiedPoints);
+            
+            // Re-trigger the map camera framing to re-align the newly refreshed polyline bounds
+            fitMapToRoute();
+        } catch (error) {
+            console.error("Refresh failed:", error);
+        } finally {
+            setIsLoadingRoute(false);
+            setRefreshing(false);
+        }
+    };
+
+    useEffect(() => {
+        const fetchRouteDetails = async () => {
+            if (!dailyShift) {
+                setAssignedRoute(null);
+                return;
+            }
+            // If they selected "Others" during punch-in, assigned_route_id is null
+            if (!dailyShift.assigned_route_id) {
+                setAssignedRoute({ name: 'Others', locations: [] });
+                return;
+            }
+            
+            try {
+                const { data, error } = await supabase
+                    .from('routes')
+                    .select('name, locations')
+                    .eq('id', dailyShift.assigned_route_id)
+                    .single();
+                    
+                if (data && !error) {
+                    setAssignedRoute({ name: data.name, locations: data.locations || [] });
+                }
+            } catch (e) {
+                console.error("Failed to fetch route details", e);
+            }
+        };
+        fetchRouteDetails();
+    }, [dailyShift?.assigned_route_id, dailyShift]);
 
     useEffect(() => {
         const fetchRouteForShift = async () => {
@@ -179,6 +269,29 @@ export const TravelReportScreen = ({ navigation }: any) => {
         const styling = getIconForType(item.type);
         const isLast = index === dataLength - 1;
 
+        // 🚀 NEW: Dynamic Activity Description based on Route mapping
+        let displayDescription = item.description;
+        if (item.type === 'activity' && assignedRoute && displayDescription) {
+            const isInRoute = (assignedRoute.locations || []).some((loc: any) => {
+                // Safely extract the string whether it's an array of strings or objects like {name: 'Village'}
+                const locName = typeof loc === 'string' ? loc : (loc?.name || loc?.village || '');
+                if (!locName || typeof locName !== 'string') return false;
+                
+                return displayDescription.toLowerCase().includes(locName.toLowerCase());
+            });
+            
+            // Prevent double-wrapping if the string somehow already contains the prefix
+            if (!displayDescription.startsWith(`${assignedRoute.name} (`) && !displayDescription.startsWith('Others (')) {
+                if (isInRoute && assignedRoute.name !== 'Others') {
+                    // Display: "RouteName (VillageName)"
+                    displayDescription = `${assignedRoute.name} (${displayDescription})`;
+                } else {
+                    // Display: "Others (VillageName)"
+                    displayDescription = `Others (${displayDescription})`;
+                }
+            }
+        }
+
         return (
             <View key={index} style={{ flexDirection: 'row', marginBottom: spacing.lg }}>
                 <View style={{ width: 75, alignItems: 'flex-end', paddingRight: spacing.md }}>
@@ -196,8 +309,8 @@ export const TravelReportScreen = ({ navigation }: any) => {
 
                 <View style={{ flex: 1, paddingLeft: spacing.md, paddingBottom: isLast ? 0 : spacing.lg }}>
                     <Text style={{ fontSize: 16, fontWeight: '800', color: colors.text }}>{t(item.title)}</Text>
-                    {item.description ? (
-                        <Text style={{ fontSize: 14, color: colors.textMuted, fontWeight: '600', marginTop: 4 }}>{t(item.description)}</Text>
+                    {displayDescription ? (
+                        <Text style={{ fontSize: 14, color: colors.textMuted, fontWeight: '600', marginTop: 4 }}>{t(displayDescription)}</Text>
                     ) : null}
                 </View>
             </View>
@@ -286,7 +399,18 @@ export const TravelReportScreen = ({ navigation }: any) => {
                 )}
             </View>
 
-            <ScrollView contentContainerStyle={{ paddingBottom: 100 }}>
+            {/* 🚀 Injected RefreshControl configuration */}
+            <ScrollView 
+                contentContainerStyle={{ paddingBottom: 100 }}
+                refreshControl={
+                    <RefreshControl 
+                        refreshing={refreshing} 
+                        onRefresh={onRefresh} 
+                        colors={[colors.primary]} // Android color indicator theme tint
+                        tintColor={colors.primary} // iOS color indicator spinner tint
+                    />
+                }
+            >
             <ViewShot ref={viewShotRef} options={{ format: "png", quality: 1.0 }} style={{ flex: 1, backgroundColor: colors.screen }}>
                     {user && (
                         <View style={{ padding: spacing.lg, backgroundColor: colors.primarySoft, borderBottomWidth: 1, borderBottomColor: colors.border }}>
@@ -425,6 +549,14 @@ export const TravelReportScreen = ({ navigation }: any) => {
                                     <Text style={{ fontSize: 16, fontWeight: "800", color: colors.text, marginTop: 24, marginBottom: 12, borderBottomWidth: 1, borderBottomColor: colors.border, paddingBottom: 8 }}>
                                         {t("Summary")}
                                     </Text>
+                                    
+                                    {/* 🚀 NEW: Assigned Route Display */}
+                                    <View style={styles.row}>
+                                        <Text style={styles.rowLabel}>{t("Assigned Route")}:</Text>
+                                        <Text style={[styles.rowValue, { color: colors.primary }]}>
+                                            {assignedRoute ? assignedRoute.name : t("Loading...")}
+                                        </Text>
+                                    </View>
 
                                     <View style={styles.row}>
                                         <Text style={styles.rowLabel}>Profiles / Activities Logged:</Text>

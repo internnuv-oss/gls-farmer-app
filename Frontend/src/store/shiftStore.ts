@@ -24,7 +24,8 @@ export interface PastShift {
   id: string;
   date: string;
   events: TimelineEvent[];
-  routePath?: any[]; 
+  routePath?: any[];
+  assigned_route_id?: string | null;
 }
 
 interface ShiftState {
@@ -132,6 +133,7 @@ export const useShiftStore = create<ShiftState>()(
           end_km: s.end_km,
           total_distance: s.total_distance || 0,
           activities_logged: s.activities_logged || 0,
+          assigned_route_id: s.assigned_route_id || null,
         }));
       
         set({
