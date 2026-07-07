@@ -131,10 +131,10 @@ export const TravelReportScreen = ({ navigation }: any) => {
         const totalExpenses = dailyExpenses.reduce((sum, item) => sum + Number(item.amount), 0);
         const grandTotal = DA + totalExpenses;
 
-        const rawRoute = shiftData.routePath || shiftData.route_path || [];
-        const routeCoordinates = dynamicRoute
-            .filter((p: any) => p && p.lat && p.lng)
-            .map((point: any) => ({ latitude: point.lat, longitude: point.lng }));
+        const routeCoordinates = dynamicRoute.map((point: any) => ({ 
+            latitude: point.lat, 
+            longitude: point.lng 
+        }));
 
         return {
             punchInTime: punchInEvent ? new Date(punchInEvent.time) : null,

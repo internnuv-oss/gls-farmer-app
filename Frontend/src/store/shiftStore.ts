@@ -36,7 +36,7 @@ interface ShiftState {
   transitMode: string;
   activitiesLogged: number;
   shiftHistory: PastShift[];
-  routePath: any[];
+  lastLocation: { lat: number, lng: number } | null;
   pendingPoints: any[]; 
   totalDistance: number;
 
@@ -64,7 +64,7 @@ export const useShiftStore = create<ShiftState>()(
       transitMode: '',
       activitiesLogged: 0,
       shiftHistory: [],
-      routePath: [],
+      lastLocation: null,
       pendingPoints: [],
       totalDistance: 0,
 
@@ -121,18 +121,6 @@ export const useShiftStore = create<ShiftState>()(
         if (shiftsError || !shiftsData) return;
       
         const activeShift = shiftsData.find(s => s.status === 'ACTIVE');
-        let activeRoutePath: any[] = [];
-      
-        // 🚀 FIX: ONLY fetch the route for the currently active shift (Prevents 1000-row limit & OOM crashes)
-        if (activeShift) {
-          const { data: activeLocs } = await supabase
-            .from('shift_locations')
-            .select('lat, lng, timestamp')
-            .eq('shift_id', activeShift.id)
-            .order('timestamp', { ascending: true }); // Supabase 1000 limit might hit if they drive 12 hours, but it protects RAM.
-      
-          if (activeLocs) activeRoutePath = activeLocs;
-        }
       
         const formattedHistory = shiftsData.map(s => ({
           ...s,
@@ -144,7 +132,6 @@ export const useShiftStore = create<ShiftState>()(
           end_km: s.end_km,
           total_distance: s.total_distance || 0,
           activities_logged: s.activities_logged || 0,
-          route_path: [], // 🚀 FIX: We leave this empty. The Report Screen will fetch it on-demand!
         }));
       
         set({
@@ -156,7 +143,7 @@ export const useShiftStore = create<ShiftState>()(
           startKm: activeShift ? activeShift.start_km : '',
           transitMode: activeShift ? activeShift.transit_mode : '',
           activitiesLogged: activeShift ? activeShift.activities_logged : 0,
-          routePath: activeRoutePath, 
+          lastLocation: activeShift?.start_location || null, // 🚀 Tracks distance without array
           pendingPoints: get().pendingPoints || [], 
           totalDistance: activeShift ? (activeShift.total_distance || 0) : 0
         });
@@ -239,7 +226,8 @@ export const useShiftStore = create<ShiftState>()(
           activeShiftId: data.id, isActive: true, startTime: timeToUse,
           isPersonalVehicle: isPersonal, startKm: km, transitMode: transit,
           activitiesLogged: 0, shiftHistory: newHistory,
-          routePath: initialPoint ? [initialPoint] : [], pendingPoints: [], totalDistance: 0
+          lastLocation: initialPoint ? { lat: initialPoint.lat, lng: initialPoint.lng } : null, 
+          pendingPoints: [], totalDistance: 0
         });
 
         if (syncInterval) clearInterval(syncInterval);
@@ -247,7 +235,7 @@ export const useShiftStore = create<ShiftState>()(
       },
 
       endShift: async (endKm, actualTime, editedTime, location, odoImageUrl, comment) => {
-        const { activeShiftId, shiftHistory, totalDistance, activitiesLogged, routePath } = get();
+        const { activeShiftId, shiftHistory, totalDistance, activitiesLogged } = get();
         if (!activeShiftId) return;
 
         const hasStarted = await Location.hasStartedLocationUpdatesAsync(SHIFT_LOCATION_TASK);
@@ -268,7 +256,7 @@ export const useShiftStore = create<ShiftState>()(
         if (location) {
           set((state) => ({
             pendingPoints: [...state.pendingPoints, { lat: location.lat, lng: location.lng, timestamp: timeToUse }],
-            routePath: [...state.routePath, { lat: location.lat, lng: location.lng, timestamp: timeToUse }]
+            lastLocation: { lat: location.lat, lng: location.lng }
           }));
         }
 
@@ -314,12 +302,11 @@ export const useShiftStore = create<ShiftState>()(
             events: updatedEvents,
             end_km: endKm,
             total_distance: parseFloat(totalDistance.toFixed(2)),
-            activities_logged: activitiesLogged,
-            route_path: get().routePath,
+            activities_logged: activitiesLogged
           } as any;
         }
 
-        set({ activeShiftId: null, isActive: false, startTime: null, shiftHistory: newHistory, routePath: [], pendingPoints: [], totalDistance: 0 });
+        set({ activeShiftId: null, isActive: false, startTime: null, shiftHistory: newHistory, lastLocation: null, pendingPoints: [], totalDistance: 0 });
       },
 
       logShiftEvent: async (type, title, description) => {
@@ -404,43 +391,37 @@ export const useShiftStore = create<ShiftState>()(
       },
 
       addRoutePoints: async (newPoints: any[]) => {
-        const { activeShiftId, routePath, pendingPoints, totalDistance } = get();
+        const { activeShiftId, lastLocation, pendingPoints, totalDistance } = get();
         if (!activeShiftId) return;
 
         let addedDistance = 0;
-        let lastPoint = routePath.length > 0 ? routePath[routePath.length - 1] : null;
+        let currentLastPoint = lastLocation;
         const validPoints = [];
 
         for (const point of newPoints) {
-          // 🚀 FIX: Buffered time significantly to accommodate slight device desyncs
           if (!point.timestamp || point.timestamp > Date.now() + 300000) continue; 
-          
-          // 🚀 FIX: Extremely relaxed accuracy threshold. Mobile GPS in rural cars is rarely perfect 30m.
           if (point.accuracy && point.accuracy > 200) continue;
 
-          if (lastPoint) {
-            const distInKm = calculateDistance(lastPoint.lat, lastPoint.lng, point.lat, point.lng);
+          if (currentLastPoint) {
+            const distInKm = calculateDistance(currentLastPoint.lat, currentLastPoint.lng, point.lat, point.lng);
             const distInMeters = distInKm * 1000;
 
-            // 🚀 FIX: Removed the highly problematic speed === 0 check. 
-            // It was dropping all points when the user was stationary at a farmer's location!
-            if (distInMeters < 15) continue; 
+            if (distInMeters < 15) continue; // Noise filter
 
             addedDistance += distInKm;
           }
 
           validPoints.push(point);
-          lastPoint = point;
+          currentLastPoint = { lat: point.lat, lng: point.lng };
         }
 
         if (validPoints.length === 0) return;
 
-        const updatedPath = [...routePath, ...validPoints];
         const updatedPending = [...pendingPoints, ...validPoints];
         const updatedDistance = totalDistance + addedDistance;
 
         set({ 
-          routePath: updatedPath, 
+          lastLocation: currentLastPoint, 
           totalDistance: updatedDistance,
           pendingPoints: updatedPending 
         });
