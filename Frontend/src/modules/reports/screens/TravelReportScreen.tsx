@@ -271,6 +271,13 @@ export const TravelReportScreen = ({ navigation }: any) => {
 
         // 🚀 NEW: Dynamic Activity Description based on Route mapping
         let displayDescription = item.description;
+        
+        // Append Assigned Route to the Punch-in event description
+        if (item.type === 'punch-in' && assignedRoute) {
+            const routeText = `${t('Route')}: ${assignedRoute.name}`;
+            displayDescription = displayDescription ? `${routeText}\n${displayDescription}` : routeText;
+        }
+
         if (item.type === 'activity' && assignedRoute && displayDescription) {
             const isInRoute = (assignedRoute.locations || []).some((loc: any) => {
                 // Safely extract the string whether it's an array of strings or objects like {name: 'Village'}
@@ -550,13 +557,6 @@ export const TravelReportScreen = ({ navigation }: any) => {
                                         {t("Summary")}
                                     </Text>
                                     
-                                    {/* 🚀 NEW: Assigned Route Display */}
-                                    <View style={styles.row}>
-                                        <Text style={styles.rowLabel}>{t("Assigned Route")}:</Text>
-                                        <Text style={[styles.rowValue, { color: colors.primary }]}>
-                                            {assignedRoute ? assignedRoute.name : t("Loading...")}
-                                        </Text>
-                                    </View>
 
                                     <View style={styles.row}>
                                         <Text style={styles.rowLabel}>Profiles / Activities Logged:</Text>
