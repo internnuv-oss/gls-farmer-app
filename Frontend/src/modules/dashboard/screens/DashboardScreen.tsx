@@ -27,6 +27,7 @@ import {
 import { FloatingActionMenu, EmptyState, EntityCard } from "../../../design-system/components";
 import { colors, radius, spacing, shadows } from "../../../design-system/tokens";
 import { FilterModal, FilterState, defaultFilters } from "../../../design-system/components/FilterModal";
+import { AnalyticsTable } from "../components/AnalyticsTable";
 
 const { width } = Dimensions.get("window");
 
@@ -111,6 +112,9 @@ export const DashboardScreen = ({ navigation, route }: any) => {
   const [searchQuery, setSearchQuery] = useState("");
   const [isFilterModalOpen, setIsFilterModalOpen] = useState(false);
   const [filters, setFilters] = useState<FilterState>(defaultFilters);
+
+  // Analytics Modal State
+  const [analyticsModalConfig, setAnalyticsModalConfig] = useState<{isOpen: boolean; entities: any[]; title: string}>({ isOpen: false, entities: [], title: '' });
 
   const mappedDrafts = useMemo(() => {
     return {
@@ -614,6 +618,27 @@ export const DashboardScreen = ({ navigation, route }: any) => {
                   keyExtractor={r => r.id}
                   contentContainerStyle={{ padding: spacing.lg, paddingBottom: 100 }}
                   refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[colors.primary]} tintColor={colors.primary} />}
+                  ListHeaderComponent={
+                    <View style={{ flexDirection: 'row', justifyContent: 'flex-end', marginBottom: spacing.sm }}>
+                      <Pressable 
+                        onPress={() => {
+                          const routeEntities = processedRoutes.map(r => ({
+                            name: r.name,
+                            farmers: item.data.filter((f: any) => {
+                              const fVill = (f.raw?.village || f.raw?.personal_details?.village || '').trim().toLowerCase();
+                              return r.villages.map((v: string) => v.toLowerCase()).includes(fVill);
+                            }),
+                            villageCount: r.villages.length
+                          }));
+                          setAnalyticsModalConfig({ isOpen: true, entities: routeEntities, title: t('Routes Analysis') });
+                        }}
+                        style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: colors.surface, paddingHorizontal: 12, paddingVertical: 6, borderRadius: radius.pill, borderWidth: 1, borderColor: colors.border, ...shadows.soft }}
+                      >
+                        <MaterialIcons name="analytics" size={16} color={colors.primary} />
+                        <Text style={{ marginLeft: 6, fontSize: 13, fontWeight: '700', color: colors.primary }}>{t("Analysis")}</Text>
+                      </Pressable>
+                    </View>
+                  }
                   renderItem={({ item: route }) => (
                     <Pressable
                       onPress={() => {
@@ -669,9 +694,28 @@ export const DashboardScreen = ({ navigation, route }: any) => {
                     <MaterialIcons name="arrow-back" size={20} color={colors.primary} />
                     <Text style={{ color: colors.primary, fontWeight: '800', marginLeft: 4 }}>{t("Back to Routes")}</Text>
                   </Pressable>
-                  <Text style={{ fontSize: 22, fontWeight: '900', color: colors.text, paddingHorizontal: spacing.lg, marginTop: spacing.sm, marginBottom: spacing.md }}>
-                    {processedRoutes.find(r => r.id === selectedRouteId)?.name}
-                  </Text>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: spacing.lg, marginTop: spacing.sm, marginBottom: spacing.md }}>
+                    <Text style={{ fontSize: 22, fontWeight: '900', color: colors.text, flex: 1 }}>
+                      {processedRoutes.find(r => r.id === selectedRouteId)?.name}
+                    </Text>
+                    <Pressable 
+                      onPress={() => {
+                        const villageEntities = processedVillages.map(v => ({
+                          name: v.name,
+                          farmers: item.data.filter((f: any) => {
+                            const fVill = (f.raw?.village || f.raw?.personal_details?.village || '').trim().toLowerCase();
+                            return fVill === v.name.toLowerCase();
+                          }),
+                          villageCount: 1
+                        }));
+                        setAnalyticsModalConfig({ isOpen: true, entities: villageEntities, title: t('Villages Analysis') });
+                      }}
+                      style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: colors.surface, paddingHorizontal: 12, paddingVertical: 6, borderRadius: radius.pill, borderWidth: 1, borderColor: colors.border, ...shadows.soft }}
+                    >
+                      <MaterialIcons name="analytics" size={16} color={colors.primary} />
+                      <Text style={{ marginLeft: 6, fontSize: 13, fontWeight: '700', color: colors.primary }}>{t("Analysis")}</Text>
+                    </Pressable>
+                  </View>
                   <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: spacing.lg, paddingBottom: 100 }}>
                     {processedVillages.map(v => (
                       <Pressable
@@ -735,9 +779,28 @@ export const DashboardScreen = ({ navigation, route }: any) => {
                         <MaterialIcons name="arrow-back" size={20} color={colors.primary} />
                         <Text style={{ color: colors.primary, fontWeight: '800', marginLeft: 4 }}>{t("Back to Villages")}</Text>
                       </Pressable>
-                      <Text style={{ fontSize: 20, fontWeight: '900', color: colors.text }}>
-                        {t("Farmers in")} {selectedVillageName}
-                      </Text>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                        <Text style={{ fontSize: 20, fontWeight: '900', color: colors.text, flex: 1 }}>
+                          {t("Farmers in")} {selectedVillageName}
+                        </Text>
+                        <Pressable 
+                          onPress={() => {
+                            const filteredFarmers = item.data.filter((f: any) => {
+                              const fVill = (f.raw?.village || f.raw?.personal_details?.village || '').trim().toLowerCase();
+                              return fVill === (selectedVillageName || '').trim().toLowerCase();
+                            });
+                            setAnalyticsModalConfig({ 
+                              isOpen: true, 
+                              entities: [{ name: selectedVillageName || '', farmers: filteredFarmers, villageCount: 1 }],
+                              title: `${selectedVillageName} Village Analysis`
+                            });
+                          }}
+                          style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: colors.surface, paddingHorizontal: 12, paddingVertical: 6, borderRadius: radius.pill, borderWidth: 1, borderColor: colors.border, ...shadows.soft }}
+                        >
+                          <MaterialIcons name="analytics" size={16} color={colors.primary} />
+                          <Text style={{ marginLeft: 6, fontSize: 13, fontWeight: '700', color: colors.primary }}>{t("Analysis")}</Text>
+                        </Pressable>
+                      </View>
                     </View>
                   }
                 />
@@ -818,6 +881,29 @@ export const DashboardScreen = ({ navigation, route }: any) => {
         onClose={() => setIsFilterModalOpen(false)}
         routesList={[...routes].sort((a, b) => (a.name || '').localeCompare(b.name || '')).map(r => ({ label: r.name, value: r.id }))} 
       />
+
+      {/* Analytics Modal */}
+      <Modal
+        visible={analyticsModalConfig.isOpen}
+        animationType="slide"
+        presentationStyle="pageSheet"
+        onRequestClose={() => setAnalyticsModalConfig({ isOpen: false, entities: [], title: '' })}
+      >
+        <View style={{ flex: 1, backgroundColor: colors.screen }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', padding: spacing.lg, paddingBottom: spacing.sm, backgroundColor: colors.surface }}>
+            <Pressable
+              onPress={() => setAnalyticsModalConfig({ isOpen: false, entities: [], title: '' })}
+              style={{ padding: spacing.xs, marginRight: spacing.md, backgroundColor: colors.surface, borderRadius: radius.pill }}
+            >
+              <MaterialIcons name="close" size={24} color={colors.text} />
+            </Pressable>
+            <Text style={{ fontSize: 18, fontWeight: '800', color: colors.text }}>
+              {t("Analysis")}
+            </Text>
+          </View>
+          <AnalyticsTable entities={analyticsModalConfig.entities} title={analyticsModalConfig.title} />
+        </View>
+      </Modal>
     </View>
   );
 };
