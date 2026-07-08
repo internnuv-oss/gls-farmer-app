@@ -890,7 +890,7 @@ export const DashboardScreen = ({ navigation, route }: any) => {
         onRequestClose={() => setAnalyticsModalConfig({ isOpen: false, entities: [], title: '' })}
       >
         <View style={{ flex: 1, backgroundColor: colors.screen }}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', padding: spacing.lg, paddingBottom: spacing.sm, backgroundColor: colors.surface }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', paddingTop: 52, paddingHorizontal: spacing.lg, paddingBottom: spacing.sm, backgroundColor: colors.surface }}>
             <Pressable
               onPress={() => setAnalyticsModalConfig({ isOpen: false, entities: [], title: '' })}
               style={{ padding: spacing.xs, marginRight: spacing.md, backgroundColor: colors.surface, borderRadius: radius.pill }}

@@ -1,6 +1,7 @@
 import { useState, useMemo } from 'react';
 import { useForm } from 'react-hook-form';
 import { useAlertStore } from '../../store/alertStore';
+import { useShiftStore } from '../../store/shiftStore';
 import { supabase } from '../../core/supabase';
 
 export type FSPPFormData = {
@@ -128,6 +129,18 @@ export const useFSPPEnrollment = (navigation: any, route: any) => {
         .eq('id', raw.id);
 
       if (error) throw error;
+
+      // Log as activity in Travel Report (silently ignored if SE is not punched in today)
+      const today = new Date();
+      const dd = String(today.getDate()).padStart(2, '0');
+      const mm = String(today.getMonth() + 1).padStart(2, '0');
+      const yyyy = today.getFullYear();
+      const todayStr = `${dd}-${mm}-${yyyy}`;
+      await useShiftStore.getState().logActivityForDate(
+        todayStr,
+        'FSPP Enrollment',
+        `${raw.fullName || raw.full_name || 'Farmer'} • ${todayStr}`
+      );
 
       setShowSuccess(true);
     } catch (err: any) {

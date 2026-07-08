@@ -10,6 +10,7 @@ import { Button } from '../../../design-system/components/Button';
 import { supabase } from '../../../core/supabase';
 import { useAlertStore } from '../../../store/alertStore';
 import { useShiftStore } from '../../../store/shiftStore';
+import { useAuthStore } from '../../../store/authStore';
 
 export const GeneralVisitScreen = ({ route, navigation }: any) => {
   const { t } = useTranslation();
@@ -89,6 +90,27 @@ export const GeneralVisitScreen = ({ route, navigation }: any) => {
         setLoading(false);
         submittingRef.current = false;
         showAlert(t("Visit Already Exists for this Date"), t("A visit log already exists for this date. Only one comment per date is allowed."));
+        return;
+      }
+
+      // Verify a shift exists for the selected date
+      const [selDay, selMonth, selYear] = normalizedDate.split('-');
+      const isoDate = `${selYear}-${selMonth}-${selDay}`;
+      const userId = useAuthStore.getState().user?.id;
+      const { data: shiftForDate } = await supabase
+        .from('shifts')
+        .select('id')
+        .eq('se_id', userId)
+        .eq('date', isoDate)
+        .maybeSingle();
+
+      if (!shiftForDate) {
+        setLoading(false);
+        submittingRef.current = false;
+        showAlert(
+          t("No Shift Found"),
+          t("You cannot log a General Visit for a date on which you were not punched in.")
+        );
         return;
       }
 
