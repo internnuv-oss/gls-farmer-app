@@ -112,27 +112,6 @@ export const FarmerHubScreen = ({ route, navigation }: any) => {
                 <MaterialIcons name="chevron-right" size={20} color={colors.textMuted} />
               </View>
             </Pressable>
-            
-            {/* 🚀 NEW: MASTER FARM CARD ENTRY BUTTON */}
-            {!isDraft && localEntity.raw?.fspp_details?.statusLabel && (
-              <Pressable
-                onPress={() => navigation.navigate("FarmCardsListScreen", { farmer: localEntity })}
-                style={{
-                  flexDirection: 'row', alignItems: 'center', backgroundColor: colors.surface, padding: spacing.xl,
-                  borderRadius: radius.lg, borderWidth: 1, borderColor: colors.info, marginBottom: spacing.lg, ...shadows.soft,
-                }}
-              >
-                <View style={{ width: 48, height: 48, borderRadius: 12, backgroundColor: '#DBEAFE', alignItems: 'center', justifyContent: 'center', marginRight: spacing.lg }}>
-                  <MaterialIcons name="assignment-ind" size={28} color={colors.info} />
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={{ fontSize: 18, fontWeight: '800', color: colors.text }}>{t("Farm Cards")}</Text>
-                </View>
-                <View style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: '#F1F5F9', alignItems: 'center', justifyContent: 'center' }}>
-                  <MaterialIcons name="chevron-right" size={20} color={colors.textMuted} />
-                </View>
-              </Pressable>
-            )}
 
             {/* General Visit Card */}
             <Pressable
@@ -197,6 +176,27 @@ export const FarmerHubScreen = ({ route, navigation }: any) => {
                   </Text>
                 </View>
 
+                <View style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: '#F1F5F9', alignItems: 'center', justifyContent: 'center' }}>
+                  <MaterialIcons name="chevron-right" size={20} color={colors.textMuted} />
+                </View>
+              </Pressable>
+            )}
+            
+            {/* 🚀 NEW: MASTER FARM CARD ENTRY BUTTON */}
+            {!isDraft && localEntity.raw?.fspp_details?.statusLabel && (
+              <Pressable
+                onPress={() => navigation.navigate("FarmCardsListScreen", { farmer: localEntity })}
+                style={{
+                  flexDirection: 'row', alignItems: 'center', backgroundColor: colors.surface, padding: spacing.xl,
+                  borderRadius: radius.lg, borderWidth: 1, borderColor: colors.info, marginBottom: spacing.lg, ...shadows.soft,
+                }}
+              >
+                <View style={{ width: 48, height: 48, borderRadius: 12, backgroundColor: '#DBEAFE', alignItems: 'center', justifyContent: 'center', marginRight: spacing.lg }}>
+                  <MaterialIcons name="assignment-ind" size={28} color={colors.info} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={{ fontSize: 18, fontWeight: '800', color: colors.text }}>{t("Farm Cards")}</Text>
+                </View>
                 <View style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: '#F1F5F9', alignItems: 'center', justifyContent: 'center' }}>
                   <MaterialIcons name="chevron-right" size={20} color={colors.textMuted} />
                 </View>
