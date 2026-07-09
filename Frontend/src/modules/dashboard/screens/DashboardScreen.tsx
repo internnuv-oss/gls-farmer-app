@@ -364,6 +364,15 @@ export const DashboardScreen = ({ navigation, route }: any) => {
       });
     }
 
+    // 🚀 FIXED: Farm Cards Status Filtering
+    if (filters.farmCardStatus && filters.farmCardStatus.length > 0) {
+      result = result.filter((f) => {
+        // Since we updated the Supabase query, f.raw.farm_cards is now a real array!
+        const hasCards = Array.isArray(f.raw?.farm_cards) && f.raw.farm_cards.length > 0;
+        return filters.farmCardStatus.includes(hasCards ? 'Added' : 'None');
+      });
+    }
+
     result.sort((a, b) => {
       if (filters.sortBy === "land_high") return parseFloat(b.raw?.farm_details?.totalLand || b.raw?.farmDetails?.totalLand || "0") - parseFloat(a.raw?.farm_details?.totalLand || a.raw?.farmDetails?.totalLand || "0");
       if (filters.sortBy === "land_low") return parseFloat(a.raw?.farm_details?.totalLand || a.raw?.farmDetails?.totalLand || "0") - parseFloat(b.raw?.farm_details?.totalLand || b.raw?.farmDetails?.totalLand || "0");

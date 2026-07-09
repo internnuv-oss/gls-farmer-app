@@ -287,6 +287,25 @@ export const FilterModal: React.FC<FilterModalProps> = ({ visible, entityType, c
                       options={routesList} 
                     />
                   )}
+                  {/* 🚀 NEW: Advanced Farmer Filters */}
+                  <FilterAccordionGroup 
+                    title="FSPP Assessment Status" 
+                    selectedValues={localFilters.fsppStatus} 
+                    onToggleItem={(val) => toggleFilter('fsppStatus', val)}
+                    options={[
+                      { label: "Completed", value: "Completed" },
+                      { label: "Pending", value: "Pending" }
+                    ]} 
+                  />
+                  <FilterAccordionGroup 
+                    title="Farm Cards Status" 
+                    selectedValues={localFilters.farmCardStatus} 
+                    onToggleItem={(val) => toggleFilter('farmCardStatus', val)}
+                    options={[
+                      { label: "Added", value: "Added" },
+                      { label: "None", value: "None" }
+                    ]} 
+                  />
                   <FilterAccordionGroup 
                     title="Farm Scale" 
                     selectedValues={localFilters.scale} 
@@ -333,16 +352,6 @@ export const FilterModal: React.FC<FilterModalProps> = ({ visible, entityType, c
                       { label: "Borewell", value: "Borewell" },
                       { label: "Rain", value: "Rain" },
                       { label: "Others", value: "Others" }
-                    ]} 
-                  />
-                  {/* 🚀 NEW: Advanced Farmer Filters */}
-                  <FilterAccordionGroup 
-                    title="FSPP Assessment Status" 
-                    selectedValues={localFilters.fsppStatus} 
-                    onToggleItem={(val) => toggleFilter('fsppStatus', val)}
-                    options={[
-                      { label: "Completed", value: "Completed" },
-                      { label: "Pending", value: "Pending" }
                     ]} 
                   />
                 </>

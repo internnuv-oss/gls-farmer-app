@@ -15,7 +15,8 @@ export const fetchMyFarmers = async (userId: string, page: number = 0, limit: nu
   const to = from + limit - 1;
   const { data, error } = await supabase
     .from('farmers')
-    .select('*')
+    // 🚀 FIXED: Tell Supabase to join the farm_cards table so we know if they have any!
+    .select('*, farm_cards(id)') 
     .eq('se_id', userId)
     .order('updated_at', { ascending: false })
     .range(from, to);

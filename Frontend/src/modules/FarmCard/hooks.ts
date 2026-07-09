@@ -3,7 +3,6 @@ import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as ImagePicker from "expo-image-picker";
-import * as ImageManipulator from 'expo-image-manipulator';
 import * as Location from 'expo-location'; 
 import { requestCameraPermission } from '../../core/permissions';
 import { uploadFileToCloudinary } from '../onboarding/services/cloudinaryService';
@@ -13,6 +12,7 @@ import { useAlertStore } from '../../store/alertStore';
 import { saveFarmCard } from './services/farmCardService';
 import { useShiftStore } from '../../store/shiftStore';
 import { Alert } from 'react-native';
+import { supabase } from "../../core/supabase";
 
 export function useFarmCardOnboarding(navigation: any, route: any) {
   const user = useAuthStore((s) => s.user);
@@ -263,8 +263,27 @@ export function useFarmCardOnboarding(navigation: any, route: any) {
       // 🚀 Pass the draft ID as the 4th parameter so the database Updates instead of Inserts
       await saveFarmCard(finalData, user.id, 'SUBMITTED', draftCard?.id);
       
+      // 🚀 NEW: Log Final Submission Activity for Travel Report (with Route integration)
       await useShiftStore.getState().incrementActivity();
-      await useShiftStore.getState().logShiftEvent('activity', 'Generated Farm Card', `${data.farmerName} (${data.village}, ${data.taluka})`);
+      
+      let routeName = "Others"; // Default to Others
+      const shiftId = useShiftStore.getState().activeShiftId;
+      if (shiftId) {
+        const { data: sData } = await supabase.from('shifts').select('assigned_route_id').eq('id', shiftId).single();
+        if (sData?.assigned_route_id) {
+          const { data: rData } = await supabase.from('routes').select('name').eq('id', sData.assigned_route_id).single();
+          if (rData?.name) routeName = rData.name;
+        }
+      }
+      
+      const farmerName = data.farmerName || "Unknown Farmer";
+      const villageName = data.village || "Unknown Village";
+      const plotInfo = [data.fieldNumber, data.plotNumber].filter(Boolean).join(' / ') || "Unknown Plot";
+      
+      // Format: Farmer Name (Field/Plot) \n Route (Village)
+      const eventDesc = `${farmerName} (Plot: ${plotInfo})\n${routeName} (${villageName})`;
+      
+      await useShiftStore.getState().logShiftEvent('activity', 'Farm Card Generated', eventDesc);
       
       useAlertStore.getState().showAlert("Success", "Farm Card generated and secured.");
       navigation.navigate("MainTabs");
@@ -305,6 +324,28 @@ export function useFarmCardOnboarding(navigation: any, route: any) {
 
       await saveFarmCard(draftPayload, user.id, 'DRAFT', draftCard?.id);
       
+      // 🚀 NEW: Log Draft Activity for Travel Report
+      await useShiftStore.getState().incrementActivity();
+      
+      let routeName = "Others"; // Default to Others
+      const shiftId = useShiftStore.getState().activeShiftId;
+      if (shiftId) {
+        const { data: sData } = await supabase.from('shifts').select('assigned_route_id').eq('id', shiftId).single();
+        if (sData?.assigned_route_id) {
+          const { data: rData } = await supabase.from('routes').select('name').eq('id', sData.assigned_route_id).single();
+          if (rData?.name) routeName = rData.name;
+        }
+      }
+      
+      const farmerName = draftPayload.farmerName || "Unknown Farmer";
+      const villageName = draftPayload.village || "Unknown Village";
+      const plotInfo = [draftPayload.fieldNumber, draftPayload.plotNumber].filter(Boolean).join(' / ') || "Unknown Plot";
+      
+      // Format: Farmer Name (Field/Plot) \n Route (Village)
+      const eventDesc = `${farmerName} (Plot: ${plotInfo})\n${routeName} (${villageName})`;
+      
+      await useShiftStore.getState().logShiftEvent('activity', 'Saved Farm Card Draft', eventDesc);
+
       useAlertStore.getState().showAlert("Draft Saved", "Farm Card progress has been saved.");
       navigation.goBack();
     } catch (e: any) {

@@ -59,7 +59,7 @@ export const ReportsHubScreen = ({ navigation }: any) => {
           <MaterialIcons name="map" size={28} color="#65A30D" />
         </View>
         <View style={{ flex: 1 }}>
-          <Text style={{ fontSize: 18, fontWeight: '800', color: colors.text }}>{t('Travel Report')}</Text>
+          <Text style={{ fontSize: 18, fontWeight: '800', color: colors.text }}>{t('Daily Travel Report')}</Text>
           <Text style={{ fontSize: 13, color: colors.textMuted, fontWeight: '500', marginTop: 2 }}>{t('View GPS route & calculated TA/DA')}</Text>
         </View>
         <MaterialIcons name="chevron-right" size={24} color={colors.textMuted} />

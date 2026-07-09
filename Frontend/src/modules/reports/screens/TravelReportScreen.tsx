@@ -8,6 +8,7 @@ import * as Sharing from 'expo-sharing';
 import * as FileSystem from 'expo-file-system/legacy';
 import { supabase } from '../../../core/supabase';
 import { calculateDistance } from '../../../core/locationUtils';
+import * as Print from 'expo-print';
 
 import { colors, radius, spacing, shadows } from '../../../design-system/tokens';
 import { Button } from '../../../design-system/components';
@@ -325,36 +326,211 @@ export const TravelReportScreen = ({ navigation }: any) => {
     };
 
     const handleShareReport = async () => {
-        if (!viewShotRef.current) return;
         setIsCapturing(true);
         
         try {
-            const uri = await captureRef(viewShotRef, {
-                format: 'png',
-                quality: 1.0,
-                result: 'tmpfile'
-            });
-            const isAvailable = await Sharing.isAvailableAsync();
+            // 1. 🚀 CAPTURE NATIVE MAP AS BASE64 IMAGE (OPTIMIZED FOR SPEED)
+            let mapImageHtml = '';
+            if (mapRef.current && reportData?.routeCoordinates && reportData.routeCoordinates.length > 0) {
+                try {
+                    const base64 = await mapRef.current.takeSnapshot({
+                        width: 700,  // 🚀 Optimized width for A4 PDF
+                        height: 700,
+                        format: 'jpg', // 🚀 Changed from png to jpg (Massively faster to encode)
+                        quality: 1,
+                        result: 'base64'
+                    });
+                    
+                    // 🚀 Make sure to change the MIME type to image/jpeg here!
+                    mapImageHtml = `<img src="data:image/jpeg;base64,${base64}" class="map-image" />`;
+                } catch (mapErr) {
+                    console.error("Failed to snapshot map:", mapErr);
+                    mapImageHtml = `<div class="no-map">Map capture failed</div>`;
+                }
+            } else {
+                mapImageHtml = `
+                    <div class="no-map">
+                        <i class="material-icons" style="font-size: 48px; color: #94A3B8;">map</i>
+                        <div style="margin-top: 8px;">No GPS route recorded</div>
+                    </div>`;
+            }
+
+            // 2. Map timeline events to HTML with exact styling
+            const events = [...(dailyShift?.events || [])].sort((a: any, b: any) => a.time - b.time);
             
+            const eventsHtml = events.map((item: any, index: number) => {
+                const timeStr = new Date(item.time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                const styling = getIconForType(item.type);
+                const isLast = index === events.length - 1;
+                
+                let displayDescription = item.description || "";
+                if (item.type === 'punch-in' && assignedRoute) {
+                    displayDescription = `Route: ${assignedRoute.name}${displayDescription ? `<br/>${displayDescription.replace(/\n/g, '<br/>')}` : ''}`;
+                } else if (displayDescription) {
+                    displayDescription = displayDescription.replace(/\n/g, '<br/>'); // Preserve newlines
+                }
+                
+                return `
+                    <div class="timeline-event">
+                        <div class="time">${timeStr}</div>
+                        <div class="dot-container">
+                            <div class="icon-badge" style="background-color: ${styling.bg};">
+                                <i class="material-icons" style="color: ${styling.color}; font-size: 14px;">${styling.name}</i>
+                            </div>
+                            ${!isLast ? `<div class="connector"></div>` : ''}
+                        </div>
+                        <div class="content ${isLast ? 'last-content' : ''}">
+                            <div class="title">${t(item.title)}</div>
+                            ${displayDescription ? `<div class="desc">${t(displayDescription)}</div>` : ''}
+                        </div>
+                    </div>
+                `;
+            }).join('');
+
+            // 3. Build the ultra-HD HTML Document
+            const htmlContent = `
+                <!DOCTYPE html>
+                <html>
+                <head>
+                    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no" />
+                    <!-- Import exact app fonts and Material Icons -->
+                    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@500;600;700;800;900&display=swap" rel="stylesheet">
+                    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+                    <style>
+                        /* 🚀 PROPER PAGINATION MARGINS */
+                        @page { margin: 40px 20px; }
+                        
+                        body { 
+                            font-family: 'Inter', sans-serif; 
+                            color: #0F172A; 
+                            background-color: #FFFFFF;
+                            -webkit-print-color-adjust: exact;
+                        }
+                        
+                        /* Header */
+                        .header { background-color: #EEF2FF; padding: 20px; border-radius: 12px; border-bottom: 2px solid #E2E8F0; margin-bottom: 24px; }
+                        .header h1 { margin: 0 0 4px 0; color: #16A34A; font-size: 24px; font-weight: 900; }
+                        .header p { margin: 4px 0; font-size: 14px; font-weight: 700; color: #334155; }
+                        
+                        /* Map */
+                        .map-container { width: 100%; height: 700px; border-radius: 16px; border: 1px solid #E2E8F0; overflow: hidden; margin-bottom: 24px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); }
+                        .map-image { width: 100%; height: 100%; object-fit: cover; }
+                        .no-map { width: 100%; height: 100%; background-color: #E2E8F0; display: flex; flex-direction: column; align-items: center; justify-content: center; color: #64748B; font-weight: 600; }
+                        
+                        /* Metric Cards */
+                        .grid { display: flex; gap: 16px; margin-bottom: 24px; }
+                        .card { flex: 1; border: 1px solid #E2E8F0; padding: 16px; border-radius: 12px; background: #FFFFFF; }
+                        .card-label { font-size: 11px; font-weight: 800; color: #64748B; text-transform: uppercase; margin-bottom: 8px; }
+                        .card-value { font-size: 20px; font-weight: 900; color: #0F172A; }
+                        .card-sub { font-size: 12px; font-weight: 600; color: #64748B; margin-top: 4px; }
+
+                        /* Section Blocks */
+                        .section-box { border: 1px solid #E2E8F0; border-radius: 12px; padding: 20px; margin-bottom: 24px; page-break-inside: avoid; }
+                        .section-title { font-size: 16px; font-weight: 800; border-bottom: 1px solid #E2E8F0; padding-bottom: 12px; margin-bottom: 20px; color: #0F172A; }
+                        
+                        /* Exact App Timeline Match */
+                        .timeline-event { display: flex; margin-bottom: 0; page-break-inside: avoid; }
+                        .time { width: 75px; text-align: right; padding-right: 16px; font-size: 13px; font-weight: 800; color: #0F172A; padding-top: 4px; }
+                        .dot-container { display: flex; flex-direction: column; align-items: center; width: 26px; }
+                        .icon-badge { width: 26px; height: 26px; border-radius: 13px; display: flex; align-items: center; justify-content: center; z-index: 10; }
+                        .connector { width: 2px; flex-grow: 1; background-color: #E2E8F0; margin-top: -2px; margin-bottom: -2px; }
+                        .content { flex: 1; padding-left: 16px; padding-bottom: 24px; }
+                        .last-content { padding-bottom: 0; }
+                        .title { font-size: 16px; font-weight: 800; color: #0F172A; }
+                        .desc { font-size: 14px; font-weight: 600; color: #64748B; margin-top: 4px; line-height: 1.5; }
+
+                        /* Summary Table */
+                        .summary-row { display: flex; justify-content: space-between; padding: 8px 0; font-size: 14px; }
+                        .row-label { font-weight: 700; color: #64748B; }
+                        .row-value { font-weight: 900; color: #0F172A; }
+                        .total-row { border-top: 2px solid #BBF7D0; margin-top: 16px; padding-top: 16px; font-size: 18px; color: #16A34A; display: flex; justify-content: space-between; align-items: center; }
+                        .total-val { font-size: 24px; font-weight: 900; }
+                    </style>
+                </head>
+                <body>
+                    <div class="header">
+                        <h1>${user?.name || 'Executive'}</h1>
+                        <p>Phone: ${user?.mobile || 'N/A'}</p>
+                        <p>${selectedDate.toLocaleDateString()}</p>
+                    </div>
+
+                    <div class="map-container">
+                        ${mapImageHtml}
+                    </div>
+
+                    <div class="grid">
+                        <div class="card">
+                            <div class="card-label">Manual Distance</div>
+                            <div class="card-value">${reportData?.manualDistance || 0} km</div>
+                            <div class="card-sub">${reportData?.startKm || 0} to ${reportData?.endKm || 0}</div>
+                        </div>
+                        <div class="card">
+                            <div class="card-label">GPS Tracked</div>
+                            <div class="card-value">${reportData?.gpsDistance || 0} km</div>
+                            <div class="card-sub">Background System</div>
+                        </div>
+                    </div>
+
+                    <div class="section-box">
+                        <div class="section-title">Activities</div>
+                        ${events.length > 0 ? eventsHtml : '<div style="color: #64748B; font-weight: 600; text-align: center;">No activities logged on this date.</div>'}
+                    </div>
+
+                    <div class="section-box">
+                        <div class="section-title">Summary</div>
+                        <div class="summary-row">
+                            <span class="row-label">Assigned Route:</span>
+                            <span class="row-value">${assignedRoute?.name || 'Others'}</span>
+                        </div>
+                        <div class="summary-row">
+                            <span class="row-label">Profiles / Activities Logged:</span>
+                            <span class="row-value">${reportData?.activities || 0}</span>
+                        </div>
+                        <div class="summary-row">
+                            <span class="row-label">Travel Allowance (TA @ ₹4/km):</span>
+                            <span class="row-value">₹${reportData?.TA || 0}</span>
+                        </div>
+                        <div class="summary-row">
+                            <span class="row-label">Daily Allowance (DA):</span>
+                            <span class="row-value">₹${(reportData?.manualDistance || 0) > 60 ? 150 : 0}</span>
+                        </div>
+                        ${(reportData?.totalExpenses || 0) > 0 ? `
+                        <div class="summary-row">
+                            <span class="row-label">Other Expenses:</span>
+                            <span class="row-value">₹${reportData?.totalExpenses}</span>
+                        </div>
+                        ` : ''}
+                        
+                        <div class="total-row">
+                            <span style="font-weight: 900;">Grand Total:</span>
+                            <span class="total-val">₹${(reportData?.TA || 0) + ((reportData?.manualDistance || 0) > 60 ? 150 : 0) + (reportData?.totalExpenses || 0)}</span>
+                        </div>
+                    </div>
+                </body>
+                </html>
+            `;
+
+            // 4. Generate PDF
+            const { uri } = await Print.printToFileAsync({ html: htmlContent });
+            
+            // 5. Share PDF
+            const isAvailable = await Sharing.isAvailableAsync();
             if (isAvailable) {
-                const rawName = user?.name || user?.firstName || 'Executive';
-                const safeName = rawName.replace(/[^a-zA-Z0-9]/g, '_');
+                // Rename file for cleaner sharing
+                const safeName = (user?.name || user?.firstName || 'Executive').replace(/[^a-zA-Z0-9]/g, '_');
                 const dateStr = selectedDate.toLocaleDateString('en-GB').replace(/\//g, '_');
-                const finalFileName = `${safeName}_${dateStr}_Report.png`;
+                const finalFileName = `${safeName}_${dateStr}_Report.pdf`;
                 const renamedUri = `${FileSystem.documentDirectory}${finalFileName}`;
                 
-                await FileSystem.copyAsync({
-                    from: uri,
-                    to: renamedUri
-                });
+                await FileSystem.copyAsync({ from: uri, to: renamedUri });
 
                 await Sharing.shareAsync(renamedUri, { 
-                    mimeType: 'image/png',
+                    mimeType: 'application/pdf',
                     dialogTitle: 'Share Travel Report' 
                 });
             }
         } catch (error) {
-            console.error("Error sharing report:", error);
+            console.error("Error sharing PDF report:", error);
         } finally {
             setIsCapturing(false);
         }

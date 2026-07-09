@@ -130,17 +130,27 @@ export const useFSPPEnrollment = (navigation: any, route: any) => {
 
       if (error) throw error;
 
-      // Log as activity in Travel Report (silently ignored if SE is not punched in today)
-      const today = new Date();
-      const dd = String(today.getDate()).padStart(2, '0');
-      const mm = String(today.getMonth() + 1).padStart(2, '0');
-      const yyyy = today.getFullYear();
-      const todayStr = `${dd}-${mm}-${yyyy}`;
-      await useShiftStore.getState().logActivityForDate(
-        todayStr,
-        'FSPP Enrollment',
-        `${raw.fullName || raw.full_name || 'Farmer'} • ${todayStr}`
-      );
+      // 🚀 NEW: Log FSPP Activity for Travel Report Timeline
+      await useShiftStore.getState().incrementActivity();
+      
+      let routeName = "Others";
+      const shiftId = useShiftStore.getState().activeShiftId;
+      if (shiftId) {
+        const { data: sData } = await supabase.from('shifts').select('assigned_route_id').eq('id', shiftId).single();
+        if (sData?.assigned_route_id) {
+          const { data: rData } = await supabase.from('routes').select('name').eq('id', sData.assigned_route_id).single();
+          if (rData?.name) routeName = rData.name;
+        }
+      }
+      
+      // Extract Farmer Name and Village robustly from the raw entity data
+      const farmerName = raw.fullName || raw.full_name || "Unknown Farmer";
+      const villageName = raw.personal_details?.village || raw.village || "Unknown Village";
+      
+      // Format: Farmer Name \n Score: X (Category) \n Route (Village)
+      const eventDesc = `${farmerName}\nScore: ${result.score} (${result.category})\n${routeName} (${villageName})`;
+      
+      await useShiftStore.getState().logShiftEvent('activity', 'Completed FSPP Assessment', eventDesc);
 
       setShowSuccess(true);
     } catch (err: any) {
