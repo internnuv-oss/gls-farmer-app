@@ -32,6 +32,9 @@ import { ReportsHubScreen } from '../modules/reports/screens/ReportsHubScreen';
 import { ExpenseReportScreen } from '../modules/reports/screens/ExpenseReportScreen';
 import { AddExpenseScreen } from '../modules/reports/screens/AddExpenseScreen';
 import { TravelReportScreen } from '../modules/reports/screens/TravelReportScreen';
+import { FarmCardOnboardingScreen } from '../modules/FarmCard/screens/FarmCardOnboardingScreen';
+import { FarmCardDetailsScreen } from '../modules/FarmCard/screens/FarmCardDetailsScreen';
+import { FarmCardsListScreen } from '../modules/FarmCard/screens/FarmCardsListScreen';
 
 const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
@@ -153,6 +156,9 @@ export const AppNavigator = () => {
             <Stack.Screen name="ExpenseReportScreen" component={ExpenseReportScreen} />
             <Stack.Screen name="AddExpenseScreen" component={AddExpenseScreen} />
             <Stack.Screen name="TravelReportScreen" component={TravelReportScreen} options={{ headerShown: false }} />
+            <Stack.Screen name="FarmCardOnboardingScreen" component={FarmCardOnboardingScreen} />
+            <Stack.Screen name="FarmCardsListScreen" component={FarmCardsListScreen} />
+            <Stack.Screen name="FarmCardDetailsScreen" component={FarmCardDetailsScreen} />
           </>
         ) : (
           <>

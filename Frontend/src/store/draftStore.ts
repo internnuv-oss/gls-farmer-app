@@ -8,7 +8,7 @@ import { useAuthStore } from './authStore'; // 🚀 IMPORT AUTH STORE
 export interface Draft {
   id: string;
   userId?: string; // 🚀 Link draft to a specific user
-  type: 'DEALER' | 'FARMER' | 'DISTRIBUTOR'|'FPO'; 
+  type: 'DEALER' | 'FARMER' | 'DISTRIBUTOR'|'FPO'|'FARM_CARD'; 
   data: any;
   updatedAt: number;
 }

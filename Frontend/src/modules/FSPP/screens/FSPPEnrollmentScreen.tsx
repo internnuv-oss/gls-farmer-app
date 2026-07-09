@@ -1,10 +1,12 @@
 import React from 'react';
-import { View, Text } from 'react-native';
+import { View, Text, Pressable } from 'react-native';
 import { useTranslation } from 'react-i18next';
+import i18n from '../../../core/i18n';
 import { WizardFlowTemplate, FeedbackScreenTemplate } from '../../../design-system/templates';
 import { Button } from '../../../design-system/components';
-import { colors, radius, spacing } from '../../../design-system/tokens';
+import { spacing, colors, radius } from '../../../design-system/tokens';
 import { useFSPPEnrollment } from '../hooks';
+
 import { Step1Land } from './steps/Step1Land';
 import { Step2Awareness } from './steps/Step2Awareness';
 import { Step3Mindset } from './steps/Step3Mindset';
@@ -12,6 +14,12 @@ import { Step3Mindset } from './steps/Step3Mindset';
 export const FSPPEnrollmentScreen = ({ navigation, route }: any) => {
   const { t } = useTranslation();
   const { form, step, setStep, isNextEnabled, isSubmitEnabled, isSubmitting, submit, showSuccess, setShowSuccess, calculateScore, totalLand, isCompleted } = useFSPPEnrollment(navigation, route);
+
+  // 🚀 Added Language Switcher Logic
+  const cycleLanguage = () => {
+    const next = i18n.language === 'en' ? 'hi' : i18n.language === 'hi' ? 'gu' : 'en';
+    i18n.changeLanguage(next);
+  };
 
   if (showSuccess) {
     const result = calculateScore();
@@ -78,6 +86,11 @@ export const FSPPEnrollmentScreen = ({ navigation, route }: any) => {
       headerTitle="FSPP Enrollment"
       stepLabel={`STEP ${step} OF 4`}
       progress01={step / 4}
+      headerRight={
+        <Pressable onPress={cycleLanguage} style={{ backgroundColor: colors.primarySoft, paddingHorizontal: 12, paddingVertical: 6, borderRadius: radius.pill }}>
+          <Text style={{ fontWeight: '900', color: colors.primary, fontSize: 12 }}>{i18n.language.toUpperCase()}</Text>
+        </Pressable>
+      }
       onBack={() => { step > 1 ? setStep(step - 1) : navigation.goBack(); }}
       footer={
         <View>
