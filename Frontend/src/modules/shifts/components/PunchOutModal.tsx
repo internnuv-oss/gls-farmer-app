@@ -250,21 +250,20 @@ export const PunchOutModal = ({ visible, onClose, onConfirm }: any) => {
                     newDate.setHours(date.getHours(), date.getMinutes(), 0, 0);
                   }
 
+                  // 🚀 CRITICAL FIX: Prevent the Catch-22 infinite loop. 
+                  // Instead of throwing an error and aborting, we auto-clamp the time to a valid boundary!
                   if (newDate.getTime() > Date.now()) {
+                    newDate = new Date(); // Clamp exactly to right now
                     useAlertStore.getState().showAlert(
-                      t("Invalid Selection"),
-                      t("You cannot select a future date or time.")
+                      t("Auto-Adjusted"),
+                      t("You cannot select a future date/time. Adjusted to current time.")
                     );
-                    return;
-                  }
-
-                  // 🚀 CRITICAL FIX: UI level block preventing backdating before punch-in
-                  if (startTime && newDate.getTime() < startTime) {
+                  } else if (startTime && newDate.getTime() < startTime) {
+                    newDate = new Date(startTime); // Clamp exactly to the Punch-In time
                     useAlertStore.getState().showAlert(
-                      t("Invalid Selection"),
-                      t("You cannot select a Punch Out time that is earlier than your Punch In time.")
+                      t("Auto-Adjusted"),
+                      t("Time cannot be earlier than your Punch In. Adjusted to your Punch In time.")
                     );
-                    return;
                   }
 
                   setCustomTime(newDate);

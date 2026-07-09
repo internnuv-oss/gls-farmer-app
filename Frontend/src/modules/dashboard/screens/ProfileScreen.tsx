@@ -21,7 +21,7 @@ export const ProfileScreen = () => {
   
   const [refreshing, setRefreshing] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [counts, setCounts] = useState({ dealers: 0, farmers: 0, distributors: 0 });
+  const [counts, setCounts] = useState({ dealers: 0, farmers: 0, distributors: 0, fpos: 0 });
   const [seData, setSeData] = useState<any>(null);
   
   const [viewerUrl, setViewerUrl] = useState<string | null>(null);
@@ -141,7 +141,7 @@ export const ProfileScreen = () => {
   // 🚀 CHANGED TO PRESSABLE AND ADDED onPress PROP
   const StatBox = ({ title, count, icon, color, onPress }: any) => (
     <Pressable style={styles.statBox} onPress={onPress}>
-      <MaterialIcons name={icon} size={28} color={color} style={{ marginBottom: 8 }} />
+      <MaterialIcons name={icon} size={30} color={color} style={{ marginBottom: 8 }} />
       <Text style={{ fontSize: 24, fontWeight: '900', color: colors.text }}>{count}</Text>
       <Text style={styles.statTitle}>{title}</Text>
     </Pressable>
@@ -183,20 +183,28 @@ export const ProfileScreen = () => {
         </Text>
       </View>
 
-      {/* 🚀 MOVED STATBOXES HERE - ALWAYS VISIBLE WITH NAVIGATION */}
-      <View style={{ flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.xl }}>
-        <StatBox 
-          title={t('Dealers')} count={counts.dealers} icon="storefront" color={colors.primary} 
-          onPress={() => navigation.navigate('Dashboard', { screen: 'DashboardMain', params: { activeTab: 1 } })} 
-        />
-        <StatBox 
-          title={t('Farmers')} count={counts.farmers} icon="agriculture" color={colors.success} 
-          onPress={() => navigation.navigate('Dashboard', { screen: 'DashboardMain', params: { activeTab: 2 } })} 
-        />
-        <StatBox 
-          title={t('Distributors')} count={counts.distributors} icon="domain" color={colors.warning} 
-          onPress={() => navigation.navigate('Dashboard', { screen: 'DashboardMain', params: { activeTab: 0 } })} 
-        />
+      {/* 🚀 MOVED STATBOXES HERE - 2x2 GRID FOR ALL 4 ENTITIES */}
+      <View style={{ marginBottom: spacing.xl }}>
+        <View style={{ flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.sm }}>
+          <StatBox 
+            title={t('Distributors')} count={counts.distributors} icon="domain" color={colors.warning} 
+            onPress={() => navigation.navigate('Dashboard', { screen: 'DashboardMain', params: { activeTab: 0 } })} 
+          />
+          <StatBox 
+            title={t('Dealers')} count={counts.dealers} icon="storefront" color={colors.primary} 
+            onPress={() => navigation.navigate('Dashboard', { screen: 'DashboardMain', params: { activeTab: 1 } })} 
+          />
+        </View>
+        <View style={{ flexDirection: 'row', gap: spacing.sm }}>
+          <StatBox 
+            title={t('Farmers')} count={counts.farmers} icon="agriculture" color={colors.success} 
+            onPress={() => navigation.navigate('Dashboard', { screen: 'DashboardMain', params: { activeTab: 2 } })} 
+          />
+          <StatBox 
+            title={t('FPOs')} count={counts.fpos} icon="groups" color={colors.info || '#0EA5E9'} 
+            onPress={() => navigation.navigate('Dashboard', { screen: 'DashboardMain', params: { activeTab: 3 } })} 
+          />
+        </View>
       </View>
 
       {!isProfileComplete ? (

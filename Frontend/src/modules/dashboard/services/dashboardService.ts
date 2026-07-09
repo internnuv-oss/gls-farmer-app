@@ -141,20 +141,31 @@ export async function deleteDealer(id: string) {
 }
 
 export async function fetchNetworkSummary(seId: string) {
-  const fetchCount = async (table: string, statusCheck: boolean = false) => {
-    let query = supabase.from(table).select("*", { count: "exact", head: true }).eq("se_id", seId);
-    if (statusCheck) query = query.eq("status", "SUBMITTED");
-    
-    const { count, error } = await query;
-    if (error) return 0; 
-    return count || 0;
+  // 🚀 Helper to fetch both submitted (main table) and drafts (drafts table)
+  const fetchCombinedCount = async (table: string, draftEntityType: string) => {
+    // 1. Count all completed/submitted rows in the main table
+    const { count: mainCount } = await supabase
+      .from(table)
+      .select("*", { count: "exact", head: true })
+      .eq("se_id", seId);
+      
+    // 2. Count all draft rows in the unified drafts table for this entity type
+    const { count: draftCount } = await supabase
+      .from('drafts')
+      .select("*", { count: "exact", head: true })
+      .eq("se_id", seId)
+      .eq("entity_type", draftEntityType);
+
+    // Return the combined sum
+    return (mainCount || 0) + (draftCount || 0);
   };
 
+  // Fetch all combined counts simultaneously
   const [dealers, farmers, distributors, fpos] = await Promise.all([
-    fetchCount("dealers", true),
-    fetchCount("farmers"),
-    fetchCount("distributors"),
-    fetchCount("fpos")
+    fetchCombinedCount("dealers", "dealer"),
+    fetchCombinedCount("farmers", "farmer"),
+    fetchCombinedCount("distributors", "distributor"),
+    fetchCombinedCount("fpos", "fpo") // Added FPOs
   ]);
 
   return { dealers, farmers, distributors, fpos };

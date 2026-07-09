@@ -5,7 +5,7 @@ import { Input, MultiSelectField, SelectField } from '../../../../../design-syst
 import { MaterialIcons } from '@expo/vector-icons';
 import { colors, radius, spacing } from '../../../../../design-system/tokens';
 
-const WEST_INDIA_CROPS = ["Paddy", "Bajra", "Jowar", "Maize", "Other Cereals", "Tur", "Moong", "Math", "Udid", "Other pulses", "Groundnut", "Sesamum", "Castor", "Soyabean", "Other Oilseeds", "Cotton", "Tobacco", "Guar", "Vegetable", "Fodder", "Irri. Wheat", "Unirri. Wheat", "Gram", "Mustard", "Sugarcane", "Cumin", "Coriander", "Garlic", "Sawa", "Isabgul", "Fennel", "Onion", "Potato"];
+const WEST_INDIA_CROPS = ["Paddy", "Bajra", "Jowar", "Maize", "Other Cereals", "Tur", "Moong", "Math", "Udid", "Other Pulses", "Groundnut", "Sesamum", "Castor", "Soyabean", "Other Oilseeds", "Cotton", "Tobacco", "Guar", "Vegetable", "Fodder", "Irri. Wheat", "Unirri. Wheat", "Gram", "Mustard", "Sugarcane", "Cumin", "Coriander", "Garlic", "Sawa", "Isabgul", "Fennel", "Onion", "Potato"];
 const SOIL_TYPES = ["Black", "Sandy", "Red", "Loamy", "Others"];
 const WATER_SOURCES = ["Canal", "Borewell", "Rain", "Tube-well" ,"Well", "Tank", "Pond","River","Others"];
 
@@ -18,10 +18,29 @@ const LAND_UNITS = ["Acres", "Bigha"];
 const FARM_EQUIPMENTS = ["Mini Tractor", "Tractor", "Cultivation Equipments", "Others"];
 const BIOFERTILIZER_OPTS = ["Don't Know", "He/She knows", "Using"];
 
+const OTHER_CROP_OPTIONS = ["Other Cereals", "Other Pulses", "Other Oilseeds"];
+
 export const Step2FarmDetails = ({ control, errors, t, watch }: any) => {
   const selectedSoilType = watch('soilType') || [];
   const selectedWaterSource = watch('waterSource') || [];
   const selectedEquipments = watch('farmEquipments') || [];
+
+  const selectedMajorCrops = watch('majorCrops') || [];
+  const hasOtherCrop = selectedMajorCrops.some((crop: string) => OTHER_CROP_OPTIONS.includes(crop));
+
+  // 🚀 NEW: Real-time watchers for Live Validation
+  const totalArea = parseFloat(watch('totalLand') || '0');
+  const irrArea = parseFloat(watch('irrigatedLand') || '0');
+  const rainArea = parseFloat(watch('rainFedLand') || '0');
+
+  const totalUnit = watch('landUnit');
+  const irrUnit = watch('irrigatedLandUnit');
+  const rainUnit = watch('rainFedLandUnit');
+
+  // Check if sum exceeds total (only when units are identical)
+  const isAreaExceeding = !isNaN(totalArea) && !isNaN(irrArea) && !isNaN(rainArea) && 
+                          (irrArea + rainArea > totalArea) && 
+                          (totalUnit === irrUnit && totalUnit === rainUnit);
 
   return (
     <View>
@@ -43,7 +62,15 @@ export const Step2FarmDetails = ({ control, errors, t, watch }: any) => {
       <View style={{ flexDirection: 'row', gap: spacing.sm, alignItems: 'flex-start' }}>
         <View style={{ flex: 2 }}>
           <Controller control={control} name="irrigatedLand" render={({field}) => (
-            <Input label={t("Irrigated Land ")} placeholder="e.g., 10" value={field.value} onChangeText={field.onChange} keyboardType="numeric" />
+            <Input 
+            label={t("Irrigated Land ")} 
+            placeholder="e.g., 10" 
+            value={field.value} 
+            onChangeText={field.onChange} 
+            keyboardType="numeric" 
+            // 🚀 Instantly flags red if exceeding, otherwise falls back to Zod error
+            error={isAreaExceeding ? t("Sum exceeds Total Land") : (errors.irrigatedLand?.message as string)}
+          />
           )} />
         </View>
         <View style={{ flex: 1 }}>
@@ -56,7 +83,15 @@ export const Step2FarmDetails = ({ control, errors, t, watch }: any) => {
       <View style={{ flexDirection: 'row', gap: spacing.sm, alignItems: 'flex-start' }}>
         <View style={{ flex: 2 }}>
           <Controller control={control} name="rainFedLand" render={({field}) => (
-            <Input label={t("Rain-fed Land ")} placeholder="e.g., 5" value={field.value} onChangeText={field.onChange} keyboardType="numeric" />
+            <Input 
+            label={t("Rain-fed Land ")} 
+            placeholder="e.g., 5" 
+            value={field.value} 
+            onChangeText={field.onChange} 
+            keyboardType="numeric" 
+            // 🚀 Instantly flags red if exceeding, otherwise falls back to Zod error
+            error={isAreaExceeding ? t("Sum exceeds Total Land") : (errors.rainFedLand?.message as string)}
+          />
           )} />
         </View>
         <View style={{ flex: 1 }}>
@@ -67,6 +102,12 @@ export const Step2FarmDetails = ({ control, errors, t, watch }: any) => {
       </View>
       
       <Controller control={control} name="majorCrops" render={({field}) => <MultiSelectField label={t("Major Crops (This Season) *")} options={WEST_INDIA_CROPS} value={field.value} onChange={field.onChange} searchable error={errors.majorCrops?.message} />} />
+      {/* 🚀 NEW: Conditional Input for Other Crops */}
+      {hasOtherCrop && (
+        <Controller control={control} name="otherCrops" render={({field}) => (
+          <Input label={t("Specify Other Crop(s) *")} placeholder={t("e.g., Quinoa, Chia")} value={field.value} onChangeText={field.onChange} error={errors.otherCrops?.message} />
+        )} />
+      )}
       <Controller control={control} name="soilType" render={({field}) => <MultiSelectField label={t("Soil Type *")} options={SOIL_TYPES} value={field.value} onChange={field.onChange} error={errors.soilType?.message} />} />
       
       {selectedSoilType.includes('Others') && (

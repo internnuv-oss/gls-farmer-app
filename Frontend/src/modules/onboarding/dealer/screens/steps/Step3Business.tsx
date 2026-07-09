@@ -180,20 +180,31 @@ export const Step3Business = ({ form, uploading, handleUpload }: Props) => {
               </View>
               {demoFarmers.map((farmer, i) => (
                 <View key={i} style={{ flexDirection: 'row', borderBottomWidth: i === demoFarmers.length - 1 ? 0 : 1, borderBottomColor: colors.border, backgroundColor: '#FFF' }}>
-                  <TextInput value={farmer.name} onChangeText={(val) => { const f = [...demoFarmers]; f[i].name = val; setValue('demoFarmers', f); }} style={{ flex: 1.5, padding: 8, fontSize: 13, borderRightWidth: 1, borderColor: colors.border }} />
+                  
+                  {/* 🚀 FIXED: Replaced manual mutation with Controller */}
+                  <Controller control={control} name={`demoFarmers.${i}.name`} render={({field}) => (
+                    <TextInput value={field.value} onChangeText={field.onChange} style={{ flex: 1.5, padding: 8, fontSize: 13, borderRightWidth: 1, borderColor: colors.border }} />
+                  )} />
                   
                   <View style={{ flex: 1.5, flexDirection: 'row', alignItems: 'center', borderRightWidth: 1, borderColor: colors.border, paddingHorizontal: 8 }}>
                     <Text style={{ color: colors.text, fontSize: 13, fontWeight: '600' }}>+91 </Text>
-                    <TextInput 
-                      value={farmer.contact} 
-                      onChangeText={(val) => { const f = [...demoFarmers]; f[i].contact = val; setValue('demoFarmers', f); }} 
-                      keyboardType="phone-pad" 
-                      maxLength={10}
-                      style={{ flex: 1, paddingVertical: 8, fontSize: 13, color: colors.text }} 
-                    />
+                    {/* 🚀 FIXED: Replaced manual mutation with Controller */}
+                    <Controller control={control} name={`demoFarmers.${i}.contact`} render={({field}) => (
+                      <TextInput 
+                        value={field.value} 
+                        onChangeText={field.onChange} 
+                        keyboardType="phone-pad" 
+                        maxLength={10}
+                        style={{ flex: 1, paddingVertical: 8, fontSize: 13, color: colors.text }} 
+                      />
+                    )} />
                   </View>
 
-                  <TextInput value={farmer.address} onChangeText={(val) => { const f = [...demoFarmers]; f[i].address = val; setValue('demoFarmers', f); }} style={{ flex: 2, padding: 8, fontSize: 13 }} />
+                  {/* 🚀 FIXED: Replaced manual mutation with Controller */}
+                  <Controller control={control} name={`demoFarmers.${i}.address`} render={({field}) => (
+                    <TextInput value={field.value} onChangeText={field.onChange} style={{ flex: 2, padding: 8, fontSize: 13 }} />
+                  )} />
+                  
                 </View>
               ))}
             </View>

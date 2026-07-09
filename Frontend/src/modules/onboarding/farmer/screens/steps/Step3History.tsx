@@ -5,10 +5,12 @@ import { Input, SelectField, MultiSelectField } from '../../../../../design-syst
 import { MaterialIcons } from '@expo/vector-icons';
 import { colors, radius, spacing, shadows } from '../../../../../design-system/tokens';
 
-const PAST_CROPS = ["Paddy", "Bajra", "Jowar", "Maize", "Other Cereals", "Tur", "Moong", "Math", "Udid", "Other pulses", "Groundnut", "Sesamum", "Castor", "Soyabean", "Other Oilseeds", "Cotton", "Tobacco", "Guar", "Vegetable", "Fodder", "Irri. Wheat", "Unirri. Wheat", "Gram", "Mustard", "Sugarcane", "Cumin", "Coriander", "Garlic", "Sawa", "Isabgul", "Fennel", "Onion", "Potato"];
+const PAST_CROPS = ["Paddy", "Bajra", "Jowar", "Maize", "Other Cereals", "Tur", "Moong", "Math", "Udid", "Other Pulses", "Groundnut", "Sesamum", "Castor", "Soyabean", "Other Oilseeds", "Cotton", "Tobacco", "Guar", "Vegetable", "Fodder", "Irri. Wheat", "Unirri. Wheat", "Gram", "Mustard", "Sugarcane", "Cumin", "Coriander", "Garlic", "Sawa", "Isabgul", "Fennel", "Onion", "Potato"];
 const LAND_UNITS = ["Acres", "Bigha"];
 const YIELD_UNITS = ["Quintals", "Tonnes", "Kg"];
 const INPUTS_USED = ["DAP", "Urea", "NPK", "SSP", "MOP", "Compost", "Others"];
+
+const OTHER_CROP_OPTIONS = ["Other Cereals", "Other Pulses", "Other Oilseeds"];
 
 export const Step3History = ({ control, t, dealers, isLocked }: any) => {
   return (
@@ -40,6 +42,16 @@ export const Step3History = ({ control, t, dealers, isLocked }: any) => {
                   </View>
 
                   <SelectField label={t("Crop Name")} options={PAST_CROPS} value={crop.cropName} onChange={(val: string) => { const newArr = [...crops]; newArr[index].cropName = val; field.onChange(newArr); }} />
+                  
+                  {/* 🚀 NEW: Conditional Input for Other Past Crops */}
+                  {OTHER_CROP_OPTIONS.includes(crop.cropName) && (
+                    <Input 
+                      label={t("Specify Other Crop *")} 
+                      placeholder={t("e.g., Quinoa")} 
+                      value={crop.otherCropName} 
+                      onChangeText={(val: string) => { const newArr = [...crops]; newArr[index].otherCropName = val; field.onChange(newArr); }} 
+                    />
+                  )}
                   
                   <View style={{ flexDirection: 'row', gap: spacing.sm }}>
                   <View style={{ flex: 2 }}>
