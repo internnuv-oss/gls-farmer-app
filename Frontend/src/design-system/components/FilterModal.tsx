@@ -7,7 +7,7 @@ import { colors, radius, shadows, spacing, typography } from '../tokens';
 export type FilterState = {
   sortBy: string;
   completionStatus: string[];
-  routeId: string[]; // 🚀 Added Route ID for Farmers
+  routeId: string[]; 
   category: string[];
   firmType: string[];
   linkedStatus: string[];
@@ -21,12 +21,19 @@ export type FilterState = {
   distributorBand: string[];
   distributorStatus: string[];
   distributorColdChain: string[]; 
+  // 🚀 NEW: Advanced Farmer Filters
+  fsppStatus: string[];
+  farmCardStatus: string[];
+  // 🚀 NEW: Advanced FPO Filters
+  fpoScale: string[];
+  fpoBusiness: string[];
+  fpoPromotingAgency: string[];
 };
 
 export const defaultFilters: FilterState = {
   sortBy: "latest",
   completionStatus: [],
-  routeId: [], // 🚀 Added Route ID
+  routeId: [], 
   category: [],
   firmType: [],
   linkedStatus: [],
@@ -36,10 +43,16 @@ export const defaultFilters: FilterState = {
   scale: [],
   farmerCrops: [], 
   farmerSoil: [],  
-  farmerWater: [] ,
+  farmerWater: [],
   distributorBand: [],
   distributorStatus: [],
   distributorColdChain: [], 
+  // 🚀 NEW: Default empty arrays
+  fsppStatus: [],
+  farmCardStatus: [],
+  fpoScale: [],
+  fpoBusiness: [],
+  fpoPromotingAgency: [],
 };
 
 type FilterModalProps = {
@@ -48,7 +61,7 @@ type FilterModalProps = {
   currentFilters: FilterState;
   onApply: (filters: FilterState) => void;
   onClose: () => void;
-  routesList?: { label: string, value: string }[]; // 🚀 Added routesList Prop
+  routesList?: { label: string, value: string }[]; 
 };
 
 const CheckboxRow = ({ label, isSelected, onToggle }: { label: string, isSelected: boolean, onToggle: () => void }) => (
@@ -266,7 +279,6 @@ export const FilterModal: React.FC<FilterModalProps> = ({ visible, entityType, c
 
               {entityType === "Farmers" && (
                 <>
-                  {/* 🚀 New Route Filter logic */}
                   {routesList && routesList.length > 0 && (
                     <FilterAccordionGroup 
                       title="Assigned Routes" 
@@ -323,8 +335,59 @@ export const FilterModal: React.FC<FilterModalProps> = ({ visible, entityType, c
                       { label: "Others", value: "Others" }
                     ]} 
                   />
+                  {/* 🚀 NEW: Advanced Farmer Filters */}
+                  <FilterAccordionGroup 
+                    title="FSPP Assessment Status" 
+                    selectedValues={localFilters.fsppStatus} 
+                    onToggleItem={(val) => toggleFilter('fsppStatus', val)}
+                    options={[
+                      { label: "Completed", value: "Completed" },
+                      { label: "Pending", value: "Pending" }
+                    ]} 
+                  />
                 </>
               )}
+
+              {/* 🚀 NEW: FPO Specific Filters */}
+              {entityType === "FPOs" && (
+                <>
+                  <FilterAccordionGroup 
+                    title="FPO Member Scale" 
+                    selectedValues={localFilters.fpoScale} 
+                    onToggleItem={(val) => toggleFilter('fpoScale', val)}
+                    options={[
+                      { label: "Small (<250)", value: "Small (<250)" },
+                      { label: "Medium (250-1000)", value: "Medium (250-1000)" },
+                      { label: "Large (>1000)", value: "Large (>1000)" }
+                    ]} 
+                  />
+                  <FilterAccordionGroup 
+                    title="Business Activities" 
+                    selectedValues={localFilters.fpoBusiness} 
+                    onToggleItem={(val) => toggleFilter('fpoBusiness', val)}
+                    options={[
+                      { label: "Input Retailing", value: "Input Retailing" },
+                      { label: "Output Procurement", value: "Output Procurement" },
+                      { label: "Custom Hiring Center", value: "Custom Hiring Center" },
+                      { label: "Value Addition / Processing", value: "Value Addition / Processing" }
+                    ]} 
+                  />
+                  <FilterAccordionGroup 
+                    title="Promoting Agency" 
+                    selectedValues={localFilters.fpoPromotingAgency} 
+                    onToggleItem={(val) => toggleFilter('fpoPromotingAgency', val)}
+                    options={[
+                      { label: "NABARD", value: "NABARD" },
+                      { label: "SFAC", value: "SFAC" },
+                      { label: "NCDC", value: "NCDC" },
+                      { label: "State Govt", value: "State Govt" },
+                      { label: "NGO / CSR", value: "NGO / CSR" },
+                      { label: "Independent", value: "Independent" }
+                    ]} 
+                  />
+                </>
+              )}
+
             </ScrollView>
 
             <View style={styles.footer}>

@@ -321,18 +321,18 @@ export const DashboardScreen = ({ navigation, route }: any) => {
 
     if (filters.completionStatus.length > 0) result = result.filter(d => filters.completionStatus.includes(d.isDraft ? "Incomplete" : "Completed"));
     
-    // 🚀 Inject Route Filtering
+    // Inject Route Filtering
     if (filters.routeId && filters.routeId.length > 0) {
       const selectedRouteVillages = routes
         .filter(r => filters.routeId.includes(r.id))
         .flatMap(r => extractVillages(r))
-        .map(v => v.trim().toLowerCase()); // Lowercase for safety
+        .map(v => v.trim().toLowerCase()); 
         
       result = result.filter(f => {
         const fVill = (f.raw?.village || f.raw?.personal_details?.village || '').trim().toLowerCase();
         return selectedRouteVillages.includes(fVill);
       });
-   }
+    }
 
     if (filters.scale.length > 0) {
       result = result.filter((f) => {
@@ -343,14 +343,25 @@ export const DashboardScreen = ({ navigation, route }: any) => {
         return filters.scale.includes(scale);
       });
     }
+    
     if (filters.farmerCrops.length > 0) result = result.filter((f) => filters.farmerCrops.some((c) => (f.raw?.farm_details?.majorCrops || f.raw?.farmDetails?.majorCrops || []).includes(c)));
+    
     if (filters.farmerSoil.length > 0) {
       const PREDEFINED_SOILS = ["Black", "Sandy", "Red", "Loamy"];
       result = result.filter((f) => filters.farmerSoil.some((s) => s === "Others" ? (f.raw?.farm_details?.soilType || f.raw?.farmDetails?.soilType || []).some((soil: string) => !PREDEFINED_SOILS.includes(soil)) : (f.raw?.farm_details?.soilType || f.raw?.farmDetails?.soilType || []).includes(s)));
     }
+    
     if (filters.farmerWater.length > 0) {
       const PREDEFINED_WATER = ["Canal", "Borewell", "Rain"];
       result = result.filter((f) => filters.farmerWater.some((w) => w === "Others" ? (f.raw?.farm_details?.waterSource || f.raw?.farmDetails?.waterSource || []).some((water: string) => !PREDEFINED_WATER.includes(water)) : (f.raw?.farm_details?.waterSource || f.raw?.farmDetails?.waterSource || []).includes(w)));
+    }
+
+    // 🚀 NEW: FSPP Status Filtering
+    if (filters.fsppStatus && filters.fsppStatus.length > 0) {
+      result = result.filter((f) => {
+        const hasFspp = !!(f.raw?.fspp_details?.statusLabel || f.raw?.fsppDetails?.statusLabel);
+        return filters.fsppStatus.includes(hasFspp ? 'Completed' : 'Pending');
+      });
     }
 
     result.sort((a, b) => {
@@ -435,6 +446,29 @@ export const DashboardScreen = ({ navigation, route }: any) => {
 
     if (filters.completionStatus.length > 0) {
       result = result.filter(d => filters.completionStatus.includes(d.isDraft ? "Incomplete" : "Completed"));
+    }
+
+    // 🚀 NEW: FPO Member Scale Filtering
+    if (filters.fpoScale && filters.fpoScale.length > 0) {
+      result = result.filter((f) => {
+        const members = parseInt(f.raw?.total_members || f.raw?.totalMembers || "0", 10);
+        let scale = "Large (>1000)";
+        if (members < 250) scale = "Small (<250)";
+        else if (members >= 250 && members <= 1000) scale = "Medium (250-1000)";
+        return filters.fpoScale.includes(scale);
+      });
+    }
+
+    // 🚀 NEW: FPO Business Activities Filtering
+    if (filters.fpoBusiness && filters.fpoBusiness.length > 0) {
+      result = result.filter((f) => 
+        filters.fpoBusiness.some((b: string) => (f.raw?.business_activities || f.raw?.businessActivities || []).includes(b))
+      );
+    }
+
+    // 🚀 NEW: FPO Promoting Agency Filtering
+    if (filters.fpoPromotingAgency && filters.fpoPromotingAgency.length > 0) {
+      result = result.filter((f) => filters.fpoPromotingAgency.includes(f.raw?.promoting_agency || f.raw?.promotingAgency));
     }
 
     result.sort((a, b) => {
