@@ -278,10 +278,11 @@ export function useFarmCardOnboarding(navigation: any, route: any) {
       
       const farmerName = data.farmerName || "Unknown Farmer";
       const villageName = data.village || "Unknown Village";
-      const plotInfo = [data.fieldNumber, data.plotNumber].filter(Boolean).join(' / ') || "Unknown Plot";
+      const fieldStr = data.fieldNumber ? `Field ${data.fieldNumber}` : "";
+      const plotStr = data.plotNumber ? `Plot ${data.plotNumber}` : "";
+      const plotInfo = [fieldStr, plotStr].filter(Boolean).join(' & ') || "No Field/Plot";
       
-      // Format: Farmer Name (Field/Plot) \n Route (Village)
-      const eventDesc = `${farmerName} (Plot: ${plotInfo})\n${routeName} (${villageName})`;
+      const eventDesc = `${farmerName} (${plotInfo})\n${routeName} (${villageName})`;
       
       await useShiftStore.getState().logShiftEvent('activity', 'Farm Card Generated', eventDesc);
       
@@ -339,10 +340,11 @@ export function useFarmCardOnboarding(navigation: any, route: any) {
       
       const farmerName = draftPayload.farmerName || "Unknown Farmer";
       const villageName = draftPayload.village || "Unknown Village";
-      const plotInfo = [draftPayload.fieldNumber, draftPayload.plotNumber].filter(Boolean).join(' / ') || "Unknown Plot";
+      const fieldStr = draftPayload.fieldNumber ? `Field ${draftPayload.fieldNumber}` : "";
+      const plotStr = draftPayload.plotNumber ? `Plot ${draftPayload.plotNumber}` : "";
+      const plotInfo = [fieldStr, plotStr].filter(Boolean).join(' & ') || "No Field/Plot";
       
-      // Format: Farmer Name (Field/Plot) \n Route (Village)
-      const eventDesc = `${farmerName} (Plot: ${plotInfo})\n${routeName} (${villageName})`;
+      const eventDesc = `${farmerName} (${plotInfo})\n${routeName} (${villageName})`;
       
       await useShiftStore.getState().logShiftEvent('activity', 'Saved Farm Card Draft', eventDesc);
 

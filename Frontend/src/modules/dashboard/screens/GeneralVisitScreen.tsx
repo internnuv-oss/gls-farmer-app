@@ -99,7 +99,7 @@ export const GeneralVisitScreen = ({ route, navigation }: any) => {
       const userId = useAuthStore.getState().user?.id;
       const { data: shiftForDate } = await supabase
         .from('shifts')
-        .select('id')
+        .select('id, assigned_route_id')
         .eq('se_id', userId)
         .eq('date', isoDate)
         .maybeSingle();
@@ -130,9 +130,19 @@ export const GeneralVisitScreen = ({ route, navigation }: any) => {
 
       if (updateError) throw updateError;
 
+      let routeName = "Others";
+      if (shiftForDate?.assigned_route_id) {
+        const { data: rData } = await supabase.from('routes').select('name').eq('id', shiftForDate.assigned_route_id).single();
+        if (rData?.name) routeName = rData.name;
+      }
+      
+      const raw = entity.raw || entity;
+      const villageName = raw.personal_details?.village || raw.village || raw.city || "Unknown Village";
+      const eventDesc = `${entity.name}\n${routeName} (${villageName})`;
+
       // Use logActivityForDate — works whether shift is active OR already punched out
       // logShiftEvent silently does nothing when activeShiftId is null (after punch-out)
-      await useShiftStore.getState().logActivityForDate(date, 'General Visit', `${entity.name} • ${date}`);
+      await useShiftStore.getState().logActivityForDate(date, 'General Visit', eventDesc);
 
       showAlert(
         t("Success"),

@@ -289,7 +289,8 @@ export const TravelReportScreen = ({ navigation }: any) => {
             });
             
             // Prevent double-wrapping if the string somehow already contains the prefix
-            if (!displayDescription.startsWith(`${assignedRoute.name} (`) && !displayDescription.startsWith('Others (')) {
+            const hasRoutePrefix = displayDescription.includes(`${assignedRoute.name} (`) || displayDescription.includes('Others (');
+            if (!hasRoutePrefix) {
                 if (isInRoute && assignedRoute.name !== 'Others') {
                     // Display: "RouteName (VillageName)"
                     displayDescription = `${assignedRoute.name} (${displayDescription})`;
@@ -377,7 +378,8 @@ export const TravelReportScreen = ({ navigation }: any) => {
                         return displayDescription.toLowerCase().includes(locName.toLowerCase());
                     });
                     
-                    if (!displayDescription.startsWith(`${assignedRoute.name} (`) && !displayDescription.startsWith('Others (')) {
+                    const hasRoutePrefix = displayDescription.includes(`${assignedRoute.name} (`) || displayDescription.includes('Others (');
+                    if (!hasRoutePrefix) {
                         if (isInRoute && assignedRoute.name !== 'Others') {
                             displayDescription = `${assignedRoute.name} (${displayDescription})`;
                         } else {

@@ -147,10 +147,9 @@ export const useFSPPEnrollment = (navigation: any, route: any) => {
       const farmerName = raw.fullName || raw.full_name || "Unknown Farmer";
       const villageName = raw.personal_details?.village || raw.village || "Unknown Village";
       
-      // Format: Farmer Name \n Score: X (Category) \n Route (Village)
       const eventDesc = `${farmerName}\nScore: ${result.score} (${result.category})\n${routeName} (${villageName})`;
       
-      await useShiftStore.getState().logShiftEvent('activity', 'Completed FSPP Assessment', eventDesc);
+      await useShiftStore.getState().logShiftEvent('activity', 'FSPP Enrollment', eventDesc);
 
       setShowSuccess(true);
     } catch (err: any) {
