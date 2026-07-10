@@ -364,9 +364,29 @@ export const TravelReportScreen = ({ navigation }: any) => {
                 const isLast = index === events.length - 1;
                 
                 let displayDescription = item.description || "";
+                
                 if (item.type === 'punch-in' && assignedRoute) {
-                    displayDescription = `Route: ${assignedRoute.name}${displayDescription ? `<br/>${displayDescription.replace(/\n/g, '<br/>')}` : ''}`;
-                } else if (displayDescription) {
+                    const routeText = `Route: ${assignedRoute.name}`;
+                    displayDescription = displayDescription ? `${routeText}\n${displayDescription}` : routeText;
+                }
+
+                if (item.type === 'activity' && assignedRoute && displayDescription) {
+                    const isInRoute = (assignedRoute.locations || []).some((loc: any) => {
+                        const locName = typeof loc === 'string' ? loc : (loc?.name || loc?.village || '');
+                        if (!locName || typeof locName !== 'string') return false;
+                        return displayDescription.toLowerCase().includes(locName.toLowerCase());
+                    });
+                    
+                    if (!displayDescription.startsWith(`${assignedRoute.name} (`) && !displayDescription.startsWith('Others (')) {
+                        if (isInRoute && assignedRoute.name !== 'Others') {
+                            displayDescription = `${assignedRoute.name} (${displayDescription})`;
+                        } else {
+                            displayDescription = `Others (${displayDescription})`;
+                        }
+                    }
+                }
+
+                if (displayDescription) {
                     displayDescription = displayDescription.replace(/\n/g, '<br/>'); // Preserve newlines
                 }
                 
