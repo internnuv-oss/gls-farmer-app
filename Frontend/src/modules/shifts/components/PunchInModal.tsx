@@ -219,10 +219,24 @@ export const PunchInModal = ({ visible, onClose, onConfirm }: any) => {
       });
       onClose();
     } catch (e: any) {
-      // 🚀 FIX: Display the exact error message thrown by the store or Supabase
+      const rawError = e.message?.toLowerCase() || "";
+      let friendlyMessage = t("Failed to punch in. Please try again.");
+
+      // 🚀 Map ugly technical errors to user-friendly explanations
+      if (rawError.includes("unique_shift_per_day")) {
+        friendlyMessage = t("You have already logged a shift today. You cannot punch in twice on the same day.");
+      } else if (rawError.includes("network") || rawError.includes("fetch")) {
+        friendlyMessage = t("Network connection issue. Please check your internet and try again.");
+      } else if (rawError.includes("timeout")) {
+        friendlyMessage = t("The request took too long. Please ensure you have a stable connection.");
+      } else {
+        // Log the actual error for developers, but don't show it to the user
+        console.error("Punch In Failed:", e.message);
+      }
+
       useAlertStore.getState().showAlert(
         t("Cannot Punch In"), 
-        e.message || t("Failed to punch in. Please try again.")
+        friendlyMessage
       );
     } finally {
       setIsCapturing(false);

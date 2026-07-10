@@ -21,10 +21,7 @@ export type FilterState = {
   distributorBand: string[];
   distributorStatus: string[];
   distributorColdChain: string[]; 
-  // 🚀 NEW: Advanced Farmer Filters
-  fsppStatus: string[];
-  farmCardStatus: string[];
-  // 🚀 NEW: Advanced FPO Filters
+  farmerStage: string[];
   fpoScale: string[];
   fpoBusiness: string[];
   fpoPromotingAgency: string[];
@@ -47,9 +44,7 @@ export const defaultFilters: FilterState = {
   distributorBand: [],
   distributorStatus: [],
   distributorColdChain: [], 
-  // 🚀 NEW: Default empty arrays
-  fsppStatus: [],
-  farmCardStatus: [],
+  farmerStage: [],
   fpoScale: [],
   fpoBusiness: [],
   fpoPromotingAgency: [],
@@ -64,6 +59,7 @@ type FilterModalProps = {
   routesList?: { label: string, value: string }[]; 
 };
 
+// Checkbox Logic for standard filters
 const CheckboxRow = ({ label, isSelected, onToggle }: { label: string, isSelected: boolean, onToggle: () => void }) => (
   <Pressable onPress={onToggle} style={styles.checkboxRow}>
     <View style={[styles.checkbox, isSelected && styles.checkboxActive]}>
@@ -100,6 +96,50 @@ const FilterAccordionGroup = ({ title, options, selectedValues, onToggleItem }: 
               isSelected={selectedValues.includes(opt.value)} 
               onToggle={() => onToggleItem(opt.value)} 
             />
+          ))}
+        </View>
+      )}
+    </View>
+  );
+};
+
+// 🚀 NEW: Radio Button Logic exclusively for single-selection filters (like Stage)
+const FilterRadioAccordionGroup = ({ title, options, selectedValues, onSelect }: { title: string, options: {label: string, value: string}[], selectedValues: string[], onSelect: (val: string) => void }) => {
+  const [expanded, setExpanded] = useState(false);
+  const selectedValue = selectedValues.length > 0 ? selectedValues[0] : "";
+  const count = selectedValue ? 1 : 0;
+
+  return (
+    <View style={styles.accordionContainer}>
+      <Pressable onPress={() => setExpanded(!expanded)} style={styles.accordionHeader}>
+        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+          <Text style={styles.accordionTitle}>{title}</Text>
+          {count > 0 && (
+            <View style={styles.badge}>
+              <Text style={styles.badgeText}>{count}</Text>
+            </View>
+          )}
+        </View>
+        <MaterialIcons name={expanded ? "keyboard-arrow-up" : "keyboard-arrow-down"} size={24} color={colors.textMuted} />
+      </Pressable>
+      
+      {expanded && (
+        <View style={styles.accordionBody}>
+          {/* Option to clear the radio selection completely */}
+          <Pressable onPress={() => onSelect("")} style={styles.radioRow}>
+            <View style={[styles.radio, selectedValue === "" && styles.radioActive]}>
+              {selectedValue === "" && <View style={styles.radioDot} />}
+            </View>
+            <Text style={[styles.radioLabel, selectedValue === "" && { color: colors.text, fontWeight: '700' }]}>All (No Filter)</Text>
+          </Pressable>
+
+          {options.map(opt => (
+            <Pressable key={opt.value} onPress={() => onSelect(opt.value)} style={styles.radioRow}>
+              <View style={[styles.radio, selectedValue === opt.value && styles.radioActive]}>
+                {selectedValue === opt.value && <View style={styles.radioDot} />}
+              </View>
+              <Text style={[styles.radioLabel, selectedValue === opt.value && { color: colors.text, fontWeight: '700' }]}>{opt.label}</Text>
+            </Pressable>
           ))}
         </View>
       )}
@@ -179,15 +219,17 @@ export const FilterModal: React.FC<FilterModalProps> = ({ visible, entityType, c
               <View style={styles.divider} />
               <Text style={[styles.sectionLabel, { marginBottom: 0 }]}>Filter Parameters</Text>
 
-              <FilterAccordionGroup 
-                title="Completion Status" 
-                selectedValues={localFilters.completionStatus} 
-                onToggleItem={(val) => toggleFilter('completionStatus', val)}
-                options={[
-                  { label: "Submitted Profiles", value: "Completed" },
-                  { label: "Draft Profiles", value: "Incomplete" }
-                ]} 
-              />
+              {entityType !== "Farmers" && (
+                <FilterAccordionGroup 
+                  title="Completion Status" 
+                  selectedValues={localFilters.completionStatus} 
+                  onToggleItem={(val) => toggleFilter('completionStatus', val)}
+                  options={[
+                    { label: "Submitted Profiles", value: "Completed" },
+                    { label: "Draft Profiles", value: "Incomplete" }
+                  ]} 
+                />
+              )}
 
               {entityType === "Dealers" && (
                 <>
@@ -287,25 +329,19 @@ export const FilterModal: React.FC<FilterModalProps> = ({ visible, entityType, c
                       options={routesList} 
                     />
                   )}
-                  {/* 🚀 NEW: Advanced Farmer Filters */}
-                  <FilterAccordionGroup 
-                    title="FSPP Assessment Status" 
-                    selectedValues={localFilters.fsppStatus} 
-                    onToggleItem={(val) => toggleFilter('fsppStatus', val)}
+                  
+                  {/* 🚀 NEW: Radio Button Stage Filter (Single Select) */}
+                  <FilterRadioAccordionGroup 
+                    title="Stage" 
+                    selectedValues={localFilters.farmerStage} 
+                    onSelect={(val) => setLocalFilters(prev => ({ ...prev, farmerStage: val ? [val] : [] }))}
                     options={[
-                      { label: "Completed", value: "Completed" },
-                      { label: "Pending", value: "Pending" }
+                      { label: "Submitted Profiles", value: "Submitted" },
+                      { label: "FSPP Enrolled", value: "FSPP" },
+                      { label: "Farm Card Added", value: "Farm Card" }
                     ]} 
                   />
-                  <FilterAccordionGroup 
-                    title="Farm Cards Status" 
-                    selectedValues={localFilters.farmCardStatus} 
-                    onToggleItem={(val) => toggleFilter('farmCardStatus', val)}
-                    options={[
-                      { label: "Added", value: "Added" },
-                      { label: "None", value: "None" }
-                    ]} 
-                  />
+                  
                   <FilterAccordionGroup 
                     title="Farm Scale" 
                     selectedValues={localFilters.scale} 
@@ -357,7 +393,6 @@ export const FilterModal: React.FC<FilterModalProps> = ({ visible, entityType, c
                 </>
               )}
 
-              {/* 🚀 NEW: FPO Specific Filters */}
               {entityType === "FPOs" && (
                 <>
                   <FilterAccordionGroup 

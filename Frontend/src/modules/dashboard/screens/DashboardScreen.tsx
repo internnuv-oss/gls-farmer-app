@@ -319,7 +319,31 @@ export const DashboardScreen = ({ navigation, route }: any) => {
       );
     }
 
-    if (filters.completionStatus.length > 0) result = result.filter(d => filters.completionStatus.includes(d.isDraft ? "Incomplete" : "Completed"));
+    // 🚀 NEW: Combined Stage Filtering logic (Replaces Completion, FSPP, and Farm Card statuses)
+    if (filters.farmerStage && filters.farmerStage.length > 0) {
+      result = result.filter((f) => {
+        let isMatch = false;
+        
+        // 1. Check if 'Submitted' is selected
+        if (filters.farmerStage.includes('Submitted') && !f.isDraft) {
+          isMatch = true;
+        }
+        
+        // 2. Check if 'FSPP' is selected
+        if (filters.farmerStage.includes('FSPP')) {
+          const hasFspp = !!(f.raw?.fspp_details?.statusLabel || f.raw?.fsppDetails?.statusLabel);
+          if (hasFspp) isMatch = true;
+        }
+        
+        // 3. Check if 'Farm Card' is selected
+        if (filters.farmerStage.includes('Farm Card')) {
+          const hasCards = Array.isArray(f.raw?.farm_cards) && f.raw.farm_cards.length > 0;
+          if (hasCards) isMatch = true;
+        }
+        
+        return isMatch;
+      });
+    }
     
     // Inject Route Filtering
     if (filters.routeId && filters.routeId.length > 0) {
@@ -354,23 +378,6 @@ export const DashboardScreen = ({ navigation, route }: any) => {
     if (filters.farmerWater.length > 0) {
       const PREDEFINED_WATER = ["Canal", "Borewell", "Rain"];
       result = result.filter((f) => filters.farmerWater.some((w) => w === "Others" ? (f.raw?.farm_details?.waterSource || f.raw?.farmDetails?.waterSource || []).some((water: string) => !PREDEFINED_WATER.includes(water)) : (f.raw?.farm_details?.waterSource || f.raw?.farmDetails?.waterSource || []).includes(w)));
-    }
-
-    // 🚀 NEW: FSPP Status Filtering
-    if (filters.fsppStatus && filters.fsppStatus.length > 0) {
-      result = result.filter((f) => {
-        const hasFspp = !!(f.raw?.fspp_details?.statusLabel || f.raw?.fsppDetails?.statusLabel);
-        return filters.fsppStatus.includes(hasFspp ? 'Completed' : 'Pending');
-      });
-    }
-
-    // 🚀 FIXED: Farm Cards Status Filtering
-    if (filters.farmCardStatus && filters.farmCardStatus.length > 0) {
-      result = result.filter((f) => {
-        // Since we updated the Supabase query, f.raw.farm_cards is now a real array!
-        const hasCards = Array.isArray(f.raw?.farm_cards) && f.raw.farm_cards.length > 0;
-        return filters.farmCardStatus.includes(hasCards ? 'Added' : 'None');
-      });
     }
 
     result.sort((a, b) => {
