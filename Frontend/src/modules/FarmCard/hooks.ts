@@ -185,22 +185,22 @@ export function useFarmCardOnboarding(navigation: any, route: any) {
   const submit = form.handleSubmit(async (data) => {
     if (!user?.id) return;
 
-    // 🚀 RULE 1: Strict Validation - Cannot submit until ALL required fields are inputted
+    // 🚀 RULE 1: Strict Validation - Cannot submit until ALL mandatory fields are inputted
     const missingKeys: string[] = [];
-    const optionalFields = ['digitalAdoption', 'media_gps']; // Fields that are allowed to be completely empty
+    
+    // 🚀 FIXED: Added 'boundary_polygon' to the allowed optional fields
+    const optionalFields = ['digitalAdoption', 'media_gps', 'boundary_polygon']; 
 
     for (const [key, val] of Object.entries(data)) {
       if (optionalFields.includes(key)) continue;
       if (key === 'soilTestDate' && data.soilTestStatus !== 'Yes') continue;
       if (key === 'biologicalCropBarrier' && data.edgePlantationPresent !== 'Yes') continue;
       
-      // Check Boundary Polygon
-      if (key === 'boundary_polygon' && (!val || (val as any[]).length === 0)) { missingKeys.push(key); continue; }
-      
       // Check Documents
       if (key === 'documents') {
         const docs = val as any;
-        if (!docs.field_boundary || !docs.soil_squeeze || !docs.lab_report) missingKeys.push(key);
+        // 🚀 FIXED: Removed !docs.field_boundary requirement
+        if (!docs.soil_squeeze || !docs.lab_report) missingKeys.push(key);
         continue;
       }
 
@@ -227,7 +227,7 @@ export function useFarmCardOnboarding(navigation: any, route: any) {
     if (missingKeys.length > 0) {
       useAlertStore.getState().showAlert(
         "Incomplete Farm Card", 
-        "You cannot submit until ALL fields are filled (put 'N/A' if not applicable) and all photographic evidence is captured."
+        "You cannot submit until ALL mandatory fields are filled and mandatory photographic evidence is captured."
       );
       return;
     }
