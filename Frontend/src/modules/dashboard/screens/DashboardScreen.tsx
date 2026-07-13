@@ -146,12 +146,15 @@ export const DashboardScreen = ({ navigation, route }: any) => {
     if (!user?.id || loadingPageRef.current === pageNumber) return; 
     
     loadingPageRef.current = pageNumber; 
+    
     if (isRefresh) setRefreshing(true);
-    else if (pageNumber === 0) setLoading(true);
-    else setLoadingMore(true);
+    else if (pageNumber === 0 && farmers.length === 0) setLoading(true);
+    else if (pageNumber > 0) setLoadingMore(true);
 
     try {
-      const PAGE_LIMIT = 5;
+      // 🚀 A healthy middle-ground. 5 is too small and causes jittery counting. 
+      // 50 loads instantly without choking the frontend memory.
+      const PAGE_LIMIT = 50; 
       
       const [dealersData, farmersData, distributorsData, fposData, draftsData, routesData] = await Promise.all([
         fetchMyDealers(user.id, pageNumber, PAGE_LIMIT),
@@ -186,18 +189,39 @@ export const DashboardScreen = ({ navigation, route }: any) => {
         updatedAt: f.updated_at || f.created_at
       }));
 
+      // 🚀 FIX: The Smart Merge Engine
+      // Prevents the "decreasing numbers" glitch by updating existing profiles 
+      // without deleting the pages the user has already scrolled to load!
+      const mergeById = (prevArray: any[], newArray: any[]) => {
+        const map = new Map(prevArray.map(item => [item.id, item]));
+        newArray.forEach(item => map.set(item.id, item));
+        return Array.from(map.values()).sort((a: any, b: any) => 
+          new Date(b.updatedAt || 0).getTime() - new Date(a.updatedAt || 0).getTime()
+        );
+      };
+
       if (pageNumber === 0) {
-        setDistributors(mappedDistributors);
-        setDealers(mappedDealers);
-        setFarmers(mappedFarmers);
-        setFpos(mappedFPOs); 
+        if (isRefresh) {
+          // 🚀 Merge on refresh so counts don't suddenly drop to 50
+          setDistributors(prev => mergeById(prev, mappedDistributors));
+          setDealers(prev => mergeById(prev, mappedDealers));
+          setFarmers(prev => mergeById(prev, mappedFarmers));
+          setFpos(prev => mergeById(prev, mappedFPOs));
+        } else {
+          // Fresh mount
+          setDistributors(mappedDistributors);
+          setDealers(mappedDealers);
+          setFarmers(mappedFarmers);
+          setFpos(mappedFPOs); 
+        }
         setDbDrafts(draftsData);
         setRoutes(routesData); 
       } else {
-        setDistributors(prev => [...prev, ...mappedDistributors]);
-        setDealers(prev => [...prev, ...mappedDealers]);
-        setFarmers(prev => [...prev, ...mappedFarmers]);
-        setFpos(prev => [...prev, ...mappedFPOs]); 
+        // Pagination scroll
+        setDistributors(prev => mergeById(prev, mappedDistributors));
+        setDealers(prev => mergeById(prev, mappedDealers));
+        setFarmers(prev => mergeById(prev, mappedFarmers));
+        setFpos(prev => mergeById(prev, mappedFPOs)); 
       }
 
       setHasMore(dealersData.length === PAGE_LIMIT || farmersData.length === PAGE_LIMIT || distributorsData.length === PAGE_LIMIT || fposData.length === PAGE_LIMIT);
