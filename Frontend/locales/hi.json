@@ -1920,5 +1920,8 @@
   "Walk Perimeter": "परिधि भ्रमण करें",
   "You cannot log a General Visit for a date on which you were not punched in.": "आप उस तारीख के लिए सामान्य विज़िट लॉग नहीं कर सकते जिस दिन आपने पंच-इन नहीं किया था।",
   "You cannot select a future date/time. Adjusted to current time.": "आप भविष्य की तिथि/समय का चयन नहीं कर सकते। वर्तमान समय के अनुसार समायोजित किया गया है।",
-  "You have already logged a shift today. You cannot punch in twice on the same day.": "आप आज पहले ही एक शिफ्ट लॉग कर चुके हैं। आप एक ही दिन में दो बार पंच-इन नहीं कर सकते।"
+  "You have already logged a shift today. You cannot punch in twice on the same day.": "आप आज पहले ही एक शिफ्ट लॉग कर चुके हैं। आप एक ही दिन में दो बार पंच-इन नहीं कर सकते।",
+  "Admin Approval Required": "एडमिन स्वीकृति आवश्यक है",
+  "Locked: Not Approved": "लॉक है: स्वीकृत नहीं",
+  "This farmer is classified as ${fsppCategory}. Admin must approve this profile before Farm Cards can be created.": "यह किसान ${fsppCategory} के रूप में वर्गीकृत है। फार्म कार्ड बनाने से पहले एडमिन को इस प्रोफाइल को स्वीकृति देनी होगी।"
 }
