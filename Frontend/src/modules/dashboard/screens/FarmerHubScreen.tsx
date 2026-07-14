@@ -46,8 +46,8 @@ export const FarmerHubScreen = ({ route, navigation }: any) => {
   // Check if admin has explicitly approved this profile (Checking standard fallback paths)
   const isProfileApproved = localEntity.raw?.fspp_approval_status === 'APPROVED' || fsppDetails?.approvalStatus === 'APPROVED';
   
-  // They can access if they are Category A, OR if they are another category but approved by Admin
-  const canAccessFarmCards = fsppCategory === 'Category A' || isProfileApproved;
+  // They can access if they are Category A or B, OR if they are another category but approved by Admin
+  const canAccessFarmCards = ['Category A', 'Category B'].includes(fsppCategory) || isProfileApproved;
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.screen }}>
@@ -193,7 +193,7 @@ export const FarmerHubScreen = ({ route, navigation }: any) => {
                     <Text style={{ fontSize: 12, color: '#D97706', fontWeight: '800', marginTop: 4 }}>
                       {t(`Locked: Not Approved`)}
                     </Text>
-                  ) : fsppCategory !== 'Category A' ? (
+                  ) : !['Category A', 'Category B'].includes(fsppCategory) ? (
                      <Text style={{ fontSize: 12, color: '#166534', fontWeight: '800', marginTop: 4 }}>
                       {t(`Approved`)}
                     </Text>

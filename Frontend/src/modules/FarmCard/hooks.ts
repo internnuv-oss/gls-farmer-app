@@ -32,8 +32,8 @@ export function useFarmCardOnboarding(navigation: any, route: any) {
   const historyCrops = rawData.history_details?.pastCrops || [];
 
   const inheritedSoil = Array.isArray(farmDetails.soilType) && farmDetails.soilType.length > 0 ? farmDetails.soilType[0] : '';
-  const inheritedWater = Array.isArray(farmDetails.waterSource) && farmDetails.waterSource.length > 0 ? farmDetails.waterSource[0] : '';
-  const inheritedIrrigation = Array.isArray(farmDetails.irrigationType) && farmDetails.irrigationType.length > 0 ? farmDetails.irrigationType[0] : '';
+  const inheritedWater = Array.isArray(farmDetails.waterSource) ? farmDetails.waterSource : [];
+  const inheritedIrrigation = Array.isArray(farmDetails.irrigationType) ? farmDetails.irrigationType : [];
 
   const cattleList = Array.isArray(farmDetails.cattles) ? farmDetails.cattles : [];
   const cowQty = cattleList.find((c: any) => c.type === 'Cow')?.quantity || '';
@@ -73,7 +73,7 @@ export function useFarmCardOnboarding(navigation: any, route: any) {
     legalOwnerName: '', landStatus: farmDetails.irrigatedLand ? 'Irrigated' : 'Rainfed',
     soilType: inheritedSoil, soilPh: '', soilEc: '', organicMatter: '', nitrogen: '', phosphorus: '', potassium: '', drainageCondition: '', 
     soilTestStatus: '', soilTestDate: '',
-    waterSource: inheritedWater, irrigationMethod: inheritedIrrigation, waterAvailability: '', irrigationFrequency: '', waterTds: '', pumpHp: '', dripArea: '', dripAreaUnit: 'Acres', waterPh: '',
+    waterSource: inheritedWater, irrigationMethod: inheritedIrrigation, waterAvailability: '', irrigationFrequency: '', waterTds: {}, pumpHp: '', dripArea: '', dripAreaUnit: 'Acres', waterPh: {},
     yieldHistory: initialHistory,
     preferredChemFert: [''], preferredChemCrop: [''], currentBioBrands: [''], decisionFactor: '',
     primarySalesChannel: [], distanceToMarket: '', transportMethod: [], paymentCycle: [],

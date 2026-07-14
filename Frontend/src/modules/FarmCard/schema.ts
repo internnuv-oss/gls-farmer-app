@@ -46,15 +46,15 @@ export const farmCardSchema = z.object({
   soilTestStatus: z.string().optional(),
   soilTestDate: z.string().optional(), // Added Soil Test Date
 
-  waterSource: z.string().optional(),
-  irrigationMethod: z.string().optional(),
+  waterSource: z.array(z.string()).optional(),
+  irrigationMethod: z.array(z.string()).optional(),
   waterAvailability: z.string().optional(),
   irrigationFrequency: z.string().optional(),
-  waterTds: z.string().optional(),
+  waterTds: z.record(z.string(), z.string()).optional(),
+  waterPh: z.record(z.string(), z.string()).optional(),
   pumpHp: z.string().optional(),
   dripArea: z.string().optional(),
   dripAreaUnit: z.string().optional(),
-  waterPh: z.string().optional(),
 
   yieldHistory: z.array(z.object({
     year: z.string().optional(), // Split Year

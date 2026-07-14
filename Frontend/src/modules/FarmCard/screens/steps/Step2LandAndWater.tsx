@@ -2,24 +2,24 @@
 import React from 'react';
 import { View, Text } from 'react-native';
 import { Controller, UseFormReturn } from 'react-hook-form';
-import { Input, SelectField } from '../../../../design-system/components';
-import { spacing, colors } from '../../../../design-system/tokens';
+import { Input, SelectField, MultiSelectField } from '../../../../design-system/components';
+import { spacing, colors, radius } from '../../../../design-system/tokens';
 import { FarmCardValues } from '../../schema';
 
 interface Props { form: UseFormReturn<FarmCardValues>; t: any; }
 
 export const Step2LandAndWater = ({ form, t }: Props) => {
-  const { control, watch, formState: { errors } } = form; // 🚀 Added watch
+  const { control, watch, formState: { errors } } = form; 
   const UNIT_OPTIONS = ['Acres', 'Bigha'];
 
-  // 🚀 Live Watchers for real-time validation
   const totalArea = parseFloat(watch('totalLandArea') || '0');
   const cultArea = parseFloat(watch('cultivatedArea') || '0');
   const totalUnit = watch('totalLandAreaUnit');
   const cultUnit = watch('cultivatedAreaUnit');
 
-  // 🚀 Check if the entered cultivated area exceeds the total area live
   const isCultAreaExceeding = !isNaN(totalArea) && !isNaN(cultArea) && cultArea > totalArea && totalUnit === cultUnit;
+
+  const selectedWaterSources = watch('waterSource') || [];
 
   return (
     <View>
@@ -51,7 +51,6 @@ export const Step2LandAndWater = ({ form, t }: Props) => {
               keyboardType="numeric" 
               value={field.value} 
               onChangeText={field.onChange} 
-              // 🚀 Instantly flags the input as red with a warning message while typing
               error={isCultAreaExceeding ? t("Exceeds Total Area") : (errors.cultivatedArea?.message as string)} 
             />
           )} />
@@ -67,11 +66,57 @@ export const Step2LandAndWater = ({ form, t }: Props) => {
       <Text style={{ fontWeight: '800', color: colors.primary, marginBottom: spacing.sm, marginTop: spacing.md }}>{t("Water Asset Configuration")}</Text>
       
       <View style={{ flexDirection: 'row', gap: 8 }}>
-        <View style={{ flex: 1 }}><Controller control={control} name="waterSource" render={({field}) => <SelectField label={t("Water Source")} placeholder={t("Select Source")} value={field.value ?? ''} options={['Borewell', 'Canal', 'Rain', 'Tank', 'River']} onChange={field.onChange} />} /></View>
-        <View style={{ flex: 1 }}><Controller control={control} name="irrigationMethod" render={({field}) => <SelectField label={t("Irrigation Method")} placeholder={t("Select Method")} value={field.value ?? ''} options={['Drip', 'Sprinkler', 'Flood', 'Furrow']} onChange={field.onChange} />} /></View>
+        <View style={{ flex: 1 }}>
+          <Controller control={control} name="waterSource" render={({field}) => (
+            <MultiSelectField 
+              label={t("Water Source")} 
+              placeholder={t("Select")} 
+              value={Array.isArray(field.value) ? field.value : []} 
+              options={['Borewell', 'Canal', 'Rain', 'Tank', 'River']} 
+              onChange={field.onChange} 
+            />
+          )} />
+        </View>
+        <View style={{ flex: 1 }}>
+          <Controller control={control} name="irrigationMethod" render={({field}) => (
+            <MultiSelectField 
+              label={t("Irrigation Method")} 
+              placeholder={t("Select")} 
+              value={Array.isArray(field.value) ? field.value : []} 
+              options={['Drip', 'Sprinkler', 'Flood', 'Furrow']} 
+              onChange={field.onChange} 
+            />
+          )} />
+        </View>
       </View>
 
-      <View style={{ flexDirection: 'row', gap: 8 }}>
+      {Array.isArray(selectedWaterSources) && selectedWaterSources.length > 0 && (
+        <View style={{ marginVertical: spacing.sm, padding: spacing.sm, backgroundColor: '#f3f4f6', borderRadius: radius.md }}>
+          <Text style={{ fontSize: 12, fontWeight: '800', color: colors.textMuted, marginBottom: spacing.sm }}>
+            {t("WATER QUALITY (PER SOURCE)")}
+          </Text>
+          
+          {selectedWaterSources.map((source) => (
+            <View key={source} style={{ marginBottom: spacing.xs }}>
+              <Text style={{ fontSize: 13, fontWeight: '700', color: colors.primary, marginBottom: 4 }}>{source}</Text>
+              <View style={{ flexDirection: 'row', gap: 8 }}>
+                <View style={{ flex: 1 }}>
+                  <Controller control={control} name={`waterTds.${source}`} render={({field}) => (
+                    <Input label="TDS" placeholder="e.g. 500" suffix="ppm" keyboardType="numeric" value={field.value} onChangeText={field.onChange} />
+                  )} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Controller control={control} name={`waterPh.${source}`} render={({field}) => (
+                    <Input label="pH" placeholder="e.g. 7.0" suffix="pH" keyboardType="numeric" value={field.value} onChangeText={field.onChange} />
+                  )} />
+                </View>
+              </View>
+            </View>
+          ))}
+        </View>
+      )}
+
+      <View style={{ flexDirection: 'row', gap: 8, marginTop: spacing.sm }}>
         <View style={{ flex: 1 }}><Controller control={control} name="waterAvailability" render={({field}) => <SelectField label={t("Water Availability")} placeholder={t("Select Avail.")} value={field.value ?? ''} options={['Sufficient', 'Moderate', 'Scarce']} onChange={field.onChange} />} /></View>
         <View style={{ flex: 1 }}><Controller control={control} name="irrigationFrequency" render={({field}) => <SelectField label={t("Irrigation Freq.")} placeholder={t("Select Freq.")} value={field.value ?? ''} options={['Daily', 'Alternate', 'Weekly']} onChange={field.onChange} />} /></View>
       </View>
@@ -83,10 +128,6 @@ export const Step2LandAndWater = ({ form, t }: Props) => {
         <View style={{ flex: 1 }}><Controller control={control} name="dripAreaUnit" render={({field}) => <SelectField label={t("Unit")} value={field.value ?? ''} options={UNIT_OPTIONS} onChange={field.onChange} />} /></View>
       </View>
       
-      <View style={{ flexDirection: 'row', gap: 8 }}>
-        <View style={{ flex: 1 }}><Controller control={control} name="waterTds" render={({field}) => <Input label={t("Water Quality (TDS)")} placeholder="e.g. 500" suffix="ppm" keyboardType="numeric" value={field.value} onChangeText={field.onChange} />} /></View>
-        <View style={{ flex: 1 }}><Controller control={control} name="waterPh" render={({field}) => <Input label={t("Water pH")} placeholder="e.g. 7.0" suffix="pH" keyboardType="numeric" value={field.value} onChangeText={field.onChange} />} /></View>
-      </View>
     </View>
   );
 };
