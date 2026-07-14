@@ -250,13 +250,20 @@ export const EntityCard = React.memo(({ item, navigation, t, onDeleteDraft }: En
           </View>
 
           {hasScore && (
-            <View style={{ alignItems: "flex-end" }}>
-              <Text style={{ fontSize: 10, color: colors.textMuted, fontWeight: "800", letterSpacing: 0.5, marginBottom: 2 }}>{t("SCORE")}</Text>
-              <View style={{ flexDirection: "row", alignItems: "baseline" }}>
-                <Text style={{ fontSize: 20, fontWeight: "900", color: getScoreColor(item.score) }}>{item.score}</Text>
-              </View>
+          <View style={{ alignItems: "flex-end" }}>
+            <Text style={{ fontSize: 10, color: colors.textMuted, fontWeight: "800", letterSpacing: 0.5, marginBottom: 2 }}>
+              {t("SCORE")} / CATEGORY
+            </Text>
+            <View style={{ flexDirection: "row", alignItems: "baseline" }}>
+              <Text style={{ fontSize: 20, fontWeight: "900", color: getScoreColor(item.score) }}>
+                {item.score}
+              </Text>
+              <Text style={{ fontSize: 12, fontWeight: "800", color: getScoreColor(item.score), marginLeft: 6 }}>
+                (Category {item.score >= 70 ? 'A' : item.score >= 50 ? 'B' : 'C'})
+              </Text>
             </View>
-          )}
+          </View>
+        )}
         </View>
 
         {!isFarmer && (

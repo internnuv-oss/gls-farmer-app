@@ -235,24 +235,26 @@ export function useFarmCardOnboarding(navigation: any, route: any) {
     setIsSubmitting(true);
     
     try {
-      // 🚀 CRITICAL FIX: Upload local images to Cloudinary BEFORE saving to DB
-      const finalDocuments: Record<string, string> = {};
       const currentDocs = data.documents || {};
 
-      for (const [key, uri] of Object.entries(currentDocs)) {
-        if (uri) {
-          if (uri.startsWith('file://')) {
-            // 🚀 Dynamically detect if the captured file is a video (.mp4 or .mov)
-            const isVideo = uri.toLowerCase().endsWith('.mp4') || uri.toLowerCase().endsWith('.mov');
-            
-            // Pass the correct resource_type to your Cloudinary uploader ('video' or 'image')
-            const cloudUrl = await uploadFileToCloudinary(uri, isVideo ? 'video' : 'image');
-            finalDocuments[key] = cloudUrl;
-          } else {
-            finalDocuments[key] = uri as string;
-          }
+      // 🚀 FIX: Create an array of upload promises to run in PARALLEL
+      const uploadPromises = Object.entries(currentDocs).map(async ([key, uri]) => {
+        if (uri && (uri as string).startsWith('file://')) {
+          const isVideo = (uri as string).toLowerCase().endsWith('.mp4') || (uri as string).toLowerCase().endsWith('.mov');
+          const cloudUrl = await uploadFileToCloudinary(uri as string, isVideo ? 'video' : 'image');
+          return { key, url: cloudUrl };
         }
-      }
+        return { key, url: uri }; // Already a cloud URL or empty
+      });
+
+      // 🚀 Wait for ALL uploads to finish at the exact same time
+      const uploadResults = await Promise.all(uploadPromises);
+      
+      // Reconstruct the final documents object
+      const finalDocuments: Record<string, string> = {};
+      uploadResults.forEach(result => {
+        if (result.url) finalDocuments[result.key] = result.url as string;
+      });
 
       // 🚀 Inject the newly uploaded Cloudinary URLs back into the payload
       const finalData = {
@@ -302,21 +304,26 @@ export function useFarmCardOnboarding(navigation: any, route: any) {
     
     try {
       const currentData = form.getValues(); 
-      
-      const finalDocuments: Record<string, string> = {};
       const currentDocs = currentData.documents || {};
 
-      for (const [key, uri] of Object.entries(currentDocs)) {
-        if (uri) {
-          if (uri.startsWith('file://')) {
-            const isVideo = uri.toLowerCase().endsWith('.mp4') || uri.toLowerCase().endsWith('.mov');
-            const cloudUrl = await uploadFileToCloudinary(uri, isVideo ? 'video' : 'image');
-            finalDocuments[key] = cloudUrl;
-          } else {
-            finalDocuments[key] = uri as string;
-          }
+      // 🚀 FIX: Create an array of upload promises to run in PARALLEL
+      const uploadPromises = Object.entries(currentDocs).map(async ([key, uri]) => {
+        if (uri && (uri as string).startsWith('file://')) {
+          const isVideo = (uri as string).toLowerCase().endsWith('.mp4') || (uri as string).toLowerCase().endsWith('.mov');
+          const cloudUrl = await uploadFileToCloudinary(uri as string, isVideo ? 'video' : 'image');
+          return { key, url: cloudUrl };
         }
-      }
+        return { key, url: uri }; // Already a cloud URL or empty
+      });
+
+      // 🚀 Wait for ALL uploads to finish concurrently
+      const uploadResults = await Promise.all(uploadPromises);
+      
+      // Reconstruct the final documents object
+      const finalDocuments: Record<string, string> = {};
+      uploadResults.forEach(result => {
+        if (result.url) finalDocuments[result.key] = result.url as string;
+      });
 
       const draftPayload = {
         ...currentData,
