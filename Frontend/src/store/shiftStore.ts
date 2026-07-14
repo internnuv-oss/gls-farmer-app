@@ -3,10 +3,9 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import * as Location from 'expo-location';
 import { supabase } from '../core/supabase';
 import { useAuthStore } from './authStore';
-import { SHIFT_LOCATION_TASK, calculateDistance } from '../core/locationUtils';
+import { startBackgroundTracking, stopBackgroundTracking } from '../core/locationTracker';
 
 export interface TimelineEvent {
   id: string;
@@ -38,7 +37,6 @@ interface ShiftState {
   activitiesLogged: number;
   shiftHistory: PastShift[];
   lastLocation: { lat: number, lng: number } | null;
-  pendingPoints: any[]; 
   totalDistance: number;
 
   hydrateShifts: () => Promise<void>;
@@ -47,12 +45,7 @@ interface ShiftState {
   incrementActivity: () => Promise<void>;
   logActivityForDate: (dateStr: string, title: string, description: string) => Promise<void>;
   logShiftEvent: (type: 'activity' | 'expense', title: string, description: string) => Promise<void>;
-  addRoutePoints: (points: any[]) => Promise<void>;
-  syncPendingRoutePoints: () => Promise<void>; 
 }
-
-let syncInterval: NodeJS.Timeout | null = null;
-let isSyncing = false;
 
 export const useShiftStore = create<ShiftState>()(
   persist(
@@ -66,48 +59,7 @@ export const useShiftStore = create<ShiftState>()(
       activitiesLogged: 0,
       shiftHistory: [],
       lastLocation: null,
-      pendingPoints: [],
       totalDistance: 0,
-
-      syncPendingRoutePoints: async () => {
-        if (isSyncing) return;
-        const { activeShiftId, pendingPoints, totalDistance } = get();
-        if (!activeShiftId || pendingPoints.length === 0) return;
-
-        isSyncing = true;
-        try {
-          const pointsToUpload = [...pendingPoints];
-
-          const payload = pointsToUpload.map(p => ({
-            shift_id: activeShiftId,
-            lat: p.lat,
-            lng: p.lng,
-            timestamp: p.timestamp,
-            accuracy: p.accuracy || null,
-            speed: p.speed || null,
-            heading: p.heading || null
-          }));
-
-          const { error: insertError } = await supabase.from('shift_locations').insert(payload);
-          if (insertError) throw insertError;
-
-          const { error: updateError } = await supabase.from('shifts')
-            .update({ total_distance: parseFloat(totalDistance.toFixed(2)) })
-            .eq('id', activeShiftId);
-          if (updateError) throw updateError;
-
-          // 🚀 FIX: Extract timestamps to filter safely regardless of JS object memory reference changes
-          const timestampsToUpload = pointsToUpload.map(p => p.timestamp);
-          
-          set((state) => ({
-            pendingPoints: state.pendingPoints.filter(p => !timestampsToUpload.includes(p.timestamp))
-          }));
-        } catch (e) {
-          console.log("Offline or sync failed: GPS points safely buffered.", e);
-        } finally {
-          isSyncing = false;
-        }
-      },
 
       hydrateShifts: async () => {
         const userId = useAuthStore.getState().user?.id;
@@ -145,15 +97,9 @@ export const useShiftStore = create<ShiftState>()(
           startKm: activeShift ? activeShift.start_km : '',
           transitMode: activeShift ? activeShift.transit_mode : '',
           activitiesLogged: activeShift ? activeShift.activities_logged : 0,
-          lastLocation: activeShift?.start_location || null, // 🚀 Tracks distance without array
-          pendingPoints: get().pendingPoints || [], 
+          lastLocation: activeShift?.start_location || null, 
           totalDistance: activeShift ? (activeShift.total_distance || 0) : 0
         });
-      
-        if (syncInterval) clearInterval(syncInterval);
-        if (activeShift) {
-          syncInterval = setInterval(() => get().syncPendingRoutePoints(), 60000);
-        }
       },
 
       startShift: async (isPersonal, km, transit, vehicleType, actualTime, editedTime, location, odoImageUrl, routeId) => {
@@ -196,28 +142,8 @@ export const useShiftStore = create<ShiftState>()(
           });
         }
 
-        const hasStarted = await Location.hasStartedLocationUpdatesAsync(SHIFT_LOCATION_TASK);
-        if (!hasStarted) {
-          await Location.startLocationUpdatesAsync(SHIFT_LOCATION_TASK, {
-            accuracy: Location.Accuracy.Balanced, 
-        
-            distanceInterval: 20, 
-        
-            timeInterval: 20000, 
-        
-            deferredUpdatesInterval: 60000, 
-        
-            deferredUpdatesDistance: 100, 
-        
-            pausesUpdatesAutomatically: false, 
-            showsBackgroundLocationIndicator: true,
-            foregroundService: {
-              notificationTitle: "Shift Active",
-              notificationBody: "Tracking route (Battery Optimized)",
-              notificationColor: "#16A34A",
-            },
-        });
-        }
+        // 🚀 NEW: Start the battery-optimized SQLite background tracker
+        await startBackgroundTracking(data.id);
 
         const newHistory = [...get().shiftHistory];
         const todayIndex = newHistory.findIndex(h => new Date(h.date).toDateString() === new Date(timeToUse).toDateString());
@@ -229,19 +155,16 @@ export const useShiftStore = create<ShiftState>()(
           isPersonalVehicle: isPersonal, startKm: km, transitMode: transit,
           activitiesLogged: 0, shiftHistory: newHistory,
           lastLocation: initialPoint ? { lat: initialPoint.lat, lng: initialPoint.lng } : null, 
-          pendingPoints: [], totalDistance: 0
+          totalDistance: 0
         });
-
-        if (syncInterval) clearInterval(syncInterval);
-        syncInterval = setInterval(() => get().syncPendingRoutePoints(), 60000);
       },
 
       endShift: async (endKm, actualTime, editedTime, location, odoImageUrl, comment) => {
         const { activeShiftId, shiftHistory, totalDistance, activitiesLogged } = get();
         if (!activeShiftId) return;
 
-        const hasStarted = await Location.hasStartedLocationUpdatesAsync(SHIFT_LOCATION_TASK);
-        if (hasStarted) await Location.stopLocationUpdatesAsync(SHIFT_LOCATION_TASK);
+        // 🚀 NEW: Stop the SQLite background tracker cleanly
+        await stopBackgroundTracking();
 
         const timeToUse = editedTime || actualTime || Date.now();
 
@@ -256,16 +179,9 @@ export const useShiftStore = create<ShiftState>()(
         };
 
         if (location) {
-          set((state) => ({
-            pendingPoints: [...state.pendingPoints, { lat: location.lat, lng: location.lng, timestamp: timeToUse }],
+          set({
             lastLocation: { lat: location.lat, lng: location.lng }
-          }));
-        }
-
-        await get().syncPendingRoutePoints();
-        if (syncInterval) {
-          clearInterval(syncInterval);
-          syncInterval = null;
+          });
         }
 
         let allowanceStatus = 'Pending';
@@ -308,7 +224,7 @@ export const useShiftStore = create<ShiftState>()(
           } as any;
         }
 
-        set({ activeShiftId: null, isActive: false, startTime: null, shiftHistory: newHistory, lastLocation: null, pendingPoints: [], totalDistance: 0 });
+        set({ activeShiftId: null, isActive: false, startTime: null, shiftHistory: newHistory, lastLocation: null, totalDistance: 0 });
       },
 
       logShiftEvent: async (type, title, description) => {
@@ -339,7 +255,6 @@ export const useShiftStore = create<ShiftState>()(
       },
 
       logActivityForDate: async (dateStr: string, title: string, description: string) => {
-        // Parse DD-MM-YYYY to YYYY-MM-DD
         const parts = dateStr.split('-');
         if (parts.length !== 3) return;
         const targetDate = `${parts[2]}-${parts[1]}-${parts[0]}`;
@@ -347,7 +262,6 @@ export const useShiftStore = create<ShiftState>()(
         const userId = useAuthStore.getState().user?.id;
         if (!userId) return;
 
-        // Fetch shift for that specific date
         const { data: shiftData, error: shiftError } = await supabase
           .from('shifts')
           .select('id, events, activities_logged')
@@ -355,10 +269,7 @@ export const useShiftStore = create<ShiftState>()(
           .eq('date', targetDate)
           .single();
 
-        if (shiftError || !shiftData) {
-          // If no shift exists for that date, we silently ignore as there's no travel report to attach to
-          return; 
-        }
+        if (shiftError || !shiftData) return;
 
         const newEvent: TimelineEvent = {
           id: Date.now().toString(),
@@ -371,18 +282,15 @@ export const useShiftStore = create<ShiftState>()(
         const updatedEvents = [...(shiftData.events || []), newEvent];
         const newCount = (shiftData.activities_logged || 0) + 1;
 
-        // Update Supabase
         await supabase.from('shifts').update({ 
           events: updatedEvents, 
           activities_logged: newCount 
         }).eq('id', shiftData.id);
 
-        // Update local state if the currently active shift is the one being updated
         if (shiftData.id === get().activeShiftId) {
           set({ activitiesLogged: newCount });
         }
 
-        // Update shiftHistory locally to reflect immediately on Travel Report
         const newHistory = [...get().shiftHistory];
         const shiftIndex = newHistory.findIndex(h => h.id === shiftData.id);
         if (shiftIndex >= 0) {
@@ -390,51 +298,8 @@ export const useShiftStore = create<ShiftState>()(
           (newHistory[shiftIndex] as any).activities_logged = newCount;
           set({ shiftHistory: newHistory });
         }
-      },
-
-      addRoutePoints: async (newPoints: any[]) => {
-        const { activeShiftId, lastLocation, pendingPoints, totalDistance } = get();
-        if (!activeShiftId) return;
-
-        let addedDistance = 0;
-        let currentLastPoint = lastLocation;
-        const validPoints = [];
-
-        for (const point of newPoints) {
-          if (!point.timestamp || point.timestamp > Date.now() + 300000) continue; 
-          if (point.accuracy && point.accuracy > 200) continue;
-
-          if (currentLastPoint) {
-            const distInKm = calculateDistance(currentLastPoint.lat, currentLastPoint.lng, point.lat, point.lng);
-            const distInMeters = distInKm * 1000;
-
-            if (distInMeters < 15) continue; // Noise filter
-
-            addedDistance += distInKm;
-          }
-
-          validPoints.push(point);
-          currentLastPoint = { lat: point.lat, lng: point.lng };
-        }
-
-        if (validPoints.length === 0) return;
-
-        const updatedPending = [...pendingPoints, ...validPoints];
-        const updatedDistance = totalDistance + addedDistance;
-
-        set({ 
-          lastLocation: currentLastPoint, 
-          totalDistance: updatedDistance,
-          pendingPoints: updatedPending 
-        });
-
-        try {
-          await get().syncPendingRoutePoints();
-        } catch (error) {
-          console.log("Background cloud sync failed, points safely buffered locally.");
-        }
       }
     }),
-    { name: 'shift-storage-v5', storage: createJSONStorage(() => AsyncStorage) }
+    { name: 'shift-storage-v6', storage: createJSONStorage(() => AsyncStorage) }
   )
 );

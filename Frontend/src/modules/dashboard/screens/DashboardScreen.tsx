@@ -23,6 +23,7 @@ import {
   fetchMyFPOs, 
   fetchMyRoutes 
 } from "../services/dashboardService";
+import { syncLocationsToSupabase } from '../../../core/locationUtils';
 
 import { FloatingActionMenu, EmptyState, EntityCard } from "../../../design-system/components";
 import { colors, radius, spacing, shadows } from "../../../design-system/tokens";
@@ -39,6 +40,20 @@ export const DashboardScreen = ({ navigation, route }: any) => {
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const pagerRef = useRef<FlatList>(null);
+
+  // 🚀 BACKGROUND SYNC HEARTBEAT
+  useEffect(() => {
+    // Sync immediately when the user opens the dashboard
+    syncLocationsToSupabase();
+
+    // Set a timer to sync every 60 seconds while the app is alive
+    const syncInterval = setInterval(() => {
+      syncLocationsToSupabase();
+    }, 60000);
+
+    // Cleanup the timer when they leave the dashboard
+    return () => clearInterval(syncInterval);
+  }, []);
   
   const incrementActivity = useShiftStore((state) => state.incrementActivity);
 
