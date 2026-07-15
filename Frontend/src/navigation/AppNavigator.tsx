@@ -35,6 +35,7 @@ import { TravelReportScreen } from '../modules/reports/screens/TravelReportScree
 import { FarmCardOnboardingScreen } from '../modules/FarmCard/screens/FarmCardOnboardingScreen';
 import { FarmCardDetailsScreen } from '../modules/FarmCard/screens/FarmCardDetailsScreen';
 import { FarmCardsListScreen } from '../modules/FarmCard/screens/FarmCardsListScreen';
+import { TempDealersListScreen } from '../modules/dashboard/screens/TempDealersListScreen';
 
 const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
@@ -51,6 +52,7 @@ const DashboardStackNavigator = () => (
     <DashboardStack.Screen name="EntityProfile" component={EntityProfileScreen} />
     <DashboardStack.Screen name="FarmerHub" component={FarmerHubScreen} />
     <DashboardStack.Screen name="GeneralVisit" component={GeneralVisitScreen} />
+    <DashboardStack.Screen name="TempDealersListScreen" component={TempDealersListScreen} />
   </DashboardStack.Navigator>
 );
 

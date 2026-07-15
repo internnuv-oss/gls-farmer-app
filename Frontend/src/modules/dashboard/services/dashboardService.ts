@@ -176,3 +176,20 @@ export const deleteDraft = async (entityId: string) => {
   const { error } = await supabase.from('drafts').delete().eq('entity_id', entityId);
   if (error) throw error;
 };
+
+export const fetchTempDealersByVillages = async (villages: string[]) => {
+  if (!villages || villages.length === 0) return [];
+  
+  const { data, error } = await supabase.from('temp_dealers').select('*');
+  if (error) {
+    console.error("Supabase Error fetching temp_dealers:", error);
+    throw error;
+  }
+
+  const lowerVillages = villages.map(v => v.toLowerCase().trim());
+  return (data || []).filter(d => {
+    // Check multiple variations of column names caused by CSV imports
+    const vName = d.village || d.Village || d['VILLAGE'] || '';
+    return vName && lowerVillages.includes(String(vName).toLowerCase().trim());
+  });
+};

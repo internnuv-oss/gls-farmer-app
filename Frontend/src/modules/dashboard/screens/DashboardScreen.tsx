@@ -787,23 +787,40 @@ export const DashboardScreen = ({ navigation, route }: any) => {
                     <Text style={{ fontSize: 22, fontWeight: '900', color: colors.text, flex: 1 }}>
                       {processedRoutes.find(r => r.id === selectedRouteId)?.name}
                     </Text>
-                    <Pressable 
-                      onPress={() => {
-                        const villageEntities = processedVillages.map(v => ({
-                          name: v.name,
-                          farmers: item.data.filter((f: any) => {
-                            const fVill = (f.raw?.village || f.raw?.personal_details?.village || '').trim().toLowerCase();
-                            return fVill === v.name.toLowerCase();
-                          }),
-                          villageCount: 1
-                        }));
-                        setAnalyticsModalConfig({ isOpen: true, entities: villageEntities, title: t('Villages Analysis') });
-                      }}
-                      style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: colors.surface, paddingHorizontal: 12, paddingVertical: 6, borderRadius: radius.pill, borderWidth: 1, borderColor: colors.border, ...shadows.soft }}
-                    >
-                      <MaterialIcons name="analytics" size={16} color={colors.primary} />
-                      <Text style={{ marginLeft: 6, fontSize: 13, fontWeight: '700', color: colors.primary }}>{t("Analysis")}</Text>
-                    </Pressable>
+                    
+                    <View style={{ flexDirection: 'row', gap: 8 }}>
+                      <Pressable 
+                        onPress={() => {
+                          const route = processedRoutes.find(r => r.id === selectedRouteId);
+                          navigation.navigate("TempDealersListScreen", { 
+                            title: `${route?.name || 'Route'} Dealers`, 
+                            villages: route?.villages || [] 
+                          });
+                        }}
+                        style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: colors.surface, paddingHorizontal: 12, paddingVertical: 6, borderRadius: radius.pill, borderWidth: 1, borderColor: colors.border, ...shadows.soft }}
+                      >
+                        <MaterialIcons name="storefront" size={16} color={colors.primary} />
+                        <Text style={{ marginLeft: 6, fontSize: 13, fontWeight: '700', color: colors.primary }}>{t("Dealers")}</Text>
+                      </Pressable>
+
+                      <Pressable 
+                        onPress={() => {
+                          const villageEntities = processedVillages.map(v => ({
+                            name: v.name,
+                            farmers: item.data.filter((f: any) => {
+                              const fVill = (f.raw?.village || f.raw?.personal_details?.village || '').trim().toLowerCase();
+                              return fVill === v.name.toLowerCase();
+                            }),
+                            villageCount: 1
+                          }));
+                          setAnalyticsModalConfig({ isOpen: true, entities: villageEntities, title: t('Villages Analysis') });
+                        }}
+                        style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: colors.surface, paddingHorizontal: 12, paddingVertical: 6, borderRadius: radius.pill, borderWidth: 1, borderColor: colors.border, ...shadows.soft }}
+                      >
+                        <MaterialIcons name="analytics" size={16} color={colors.primary} />
+                        <Text style={{ marginLeft: 6, fontSize: 13, fontWeight: '700', color: colors.primary }}>{t("Analysis")}</Text>
+                      </Pressable>
+                    </View>
                   </View>
                   <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: spacing.lg, paddingBottom: 100 }}>
                     {processedVillages.map(v => (
@@ -872,23 +889,39 @@ export const DashboardScreen = ({ navigation, route }: any) => {
                         <Text style={{ fontSize: 20, fontWeight: '900', color: colors.text, flex: 1 }}>
                           {t("Farmers in")} {selectedVillageName}
                         </Text>
-                        <Pressable 
-                          onPress={() => {
-                            const filteredFarmers = item.data.filter((f: any) => {
-                              const fVill = (f.raw?.village || f.raw?.personal_details?.village || '').trim().toLowerCase();
-                              return fVill === (selectedVillageName || '').trim().toLowerCase();
-                            });
-                            setAnalyticsModalConfig({ 
-                              isOpen: true, 
-                              entities: [{ name: selectedVillageName || '', farmers: filteredFarmers, villageCount: 1 }],
-                              title: `${selectedVillageName} Village Analysis`
-                            });
-                          }}
-                          style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: colors.surface, paddingHorizontal: 12, paddingVertical: 6, borderRadius: radius.pill, borderWidth: 1, borderColor: colors.border, ...shadows.soft }}
-                        >
-                          <MaterialIcons name="analytics" size={16} color={colors.primary} />
-                          <Text style={{ marginLeft: 6, fontSize: 13, fontWeight: '700', color: colors.primary }}>{t("Analysis")}</Text>
-                        </Pressable>
+                        
+                        <View style={{ flexDirection: 'row', gap: 8 }}>
+                          <Pressable 
+                            onPress={() => {
+                              navigation.navigate("TempDealersListScreen", { 
+                                title: `${selectedVillageName} Dealers`, 
+                                villages: [selectedVillageName] 
+                              });
+                            }}
+                            style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: colors.surface, paddingHorizontal: 12, paddingVertical: 6, borderRadius: radius.pill, borderWidth: 1, borderColor: colors.border, ...shadows.soft }}
+                          >
+                            <MaterialIcons name="storefront" size={16} color={colors.primary} />
+                            <Text style={{ marginLeft: 6, fontSize: 13, fontWeight: '700', color: colors.primary }}>{t("Dealers")}</Text>
+                          </Pressable>
+
+                          <Pressable 
+                            onPress={() => {
+                              const filteredFarmers = item.data.filter((f: any) => {
+                                const fVill = (f.raw?.village || f.raw?.personal_details?.village || '').trim().toLowerCase();
+                                return fVill === (selectedVillageName || '').trim().toLowerCase();
+                              });
+                              setAnalyticsModalConfig({ 
+                                isOpen: true, 
+                                entities: [{ name: selectedVillageName || '', farmers: filteredFarmers, villageCount: 1 }],
+                                title: `${selectedVillageName} Village Analysis`
+                              });
+                            }}
+                            style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: colors.surface, paddingHorizontal: 12, paddingVertical: 6, borderRadius: radius.pill, borderWidth: 1, borderColor: colors.border, ...shadows.soft }}
+                          >
+                            <MaterialIcons name="analytics" size={16} color={colors.primary} />
+                            <Text style={{ marginLeft: 6, fontSize: 13, fontWeight: '700', color: colors.primary }}>{t("Analysis")}</Text>
+                          </Pressable>
+                        </View>
                       </View>
                     </View>
                   }
