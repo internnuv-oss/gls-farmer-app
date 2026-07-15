@@ -308,7 +308,13 @@ export const ProfileScreen = () => {
       </View>
 
       <Button label={t('Logout')} variant="danger" onPress={logout} icon="logout" iconPosition="right" />
-      <View style={{ height: 40 }} />
+
+      {/* 🚀 App Version Code */}
+      <View style={{ alignItems: 'center', marginTop: spacing.xl, marginBottom: spacing.xl }}>
+        <Text style={{ color: colors.textMuted, fontSize: 13, fontWeight: '400' }}>
+          Field Commander v1.0.4
+        </Text>
+      </View>
 
       {/* Image Viewer Modal */}
       <Modal visible={!!viewerUrl} transparent animationType="fade" onRequestClose={() => setViewerUrl(null)}>
