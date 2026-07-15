@@ -1923,5 +1923,11 @@
   "You have already logged a shift today. You cannot punch in twice on the same day.": "आप आज पहले ही एक शिफ्ट लॉग कर चुके हैं। आप एक ही दिन में दो बार पंच-इन नहीं कर सकते।",
   "Admin Approval Required": "एडमिन स्वीकृति आवश्यक है",
   "Locked: Not Approved": "लॉक है: स्वीकृत नहीं",
-  "This farmer is classified as ${fsppCategory}. Admin must approve this profile before Farm Cards can be created.": "यह किसान ${fsppCategory} के रूप में वर्गीकृत है। फार्म कार्ड बनाने से पहले एडमिन को इस प्रोफाइल को स्वीकृति देनी होगी।"
+  "This farmer is classified as ${fsppCategory}. Admin must approve this profile before Farm Cards can be created.": "यह किसान ${fsppCategory} के रूप में वर्गीकृत है। फार्म कार्ड बनाने से पहले एडमिन को इस प्रोफाइल को स्वीकृति देनी होगी।",
+  "Back to Dashboard": "डैशबोर्ड पर वापस जाएँ",
+  "Dealers Located": "डीलर्स स्थित",
+  "Go Back": "वापस जाएँ",
+  "No Dealers Found": "कोई डीलर नहीं मिला",
+  "There are no registered prospect dealers in the selected location(s).": "चयनित स्थान(नों) में कोई भी पंजीकृत संभावित डीलर नहीं है।",
+  "WATER QUALITY (PER SOURCE)": "जल की गुणवत्ता (प्रति स्रोत)"
 }

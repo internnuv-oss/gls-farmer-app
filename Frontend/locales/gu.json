@@ -1904,5 +1904,11 @@
   "You have already logged a shift today. You cannot punch in twice on the same day.": "તમે આજે પહેલેથી જ શિફ્ટ લોગ કરી છે. તમે એક જ દિવસે બે વાર પંચ ઇન કરી શકતા નથી.",
   "Admin Approval Required": "એડમિનની મંજૂરી જરૂરી છે",
   "Locked: Not Approved": "લૉક કરેલ: મંજૂર નથી",
-  "This farmer is classified as ${fsppCategory}. Admin must approve this profile before Farm Cards can be created.": "આ ખેડૂતને ${fsppCategory} તરીકે વર્ગીકૃત કરવામાં આવેલ છે. ફાર્મ કાર્ડ બનાવી શકાય તે પહેલાં એડમિને આ પ્રોફાઇલને મંજૂર કરવી આવશ્યક છે."
+  "This farmer is classified as ${fsppCategory}. Admin must approve this profile before Farm Cards can be created.": "આ ખેડૂતને ${fsppCategory} તરીકે વર્ગીકૃત કરવામાં આવેલ છે. ફાર્મ કાર્ડ બનાવી શકાય તે પહેલાં એડમિને આ પ્રોફાઇલને મંજૂર કરવી આવશ્યક છે.",
+  "Back to Dashboard": "ડેશબોર્ડ પર પાછા ફરો",
+  "Dealers Located": "ડીલરો શોધાયા",
+  "Go Back": "પાછા જાઓ",
+  "No Dealers Found": "કોઈ ડીલર મળ્યા નથી",
+  "There are no registered prospect dealers in the selected location(s).": "પસંદ કરેલા સ્થાન(સ્થાનો)માં કોઈ નોંધાયેલા સંભવિત ડીલરો નથી.",
+  "WATER QUALITY (PER SOURCE)": "પાણીની ગુણવત્તા (પ્રતિ સ્ત્રોત)"
 }
