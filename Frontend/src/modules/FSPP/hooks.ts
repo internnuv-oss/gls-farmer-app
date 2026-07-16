@@ -3,6 +3,7 @@ import { useForm } from 'react-hook-form';
 import { useAlertStore } from '../../store/alertStore';
 import { useShiftStore } from '../../store/shiftStore';
 import { supabase } from '../../core/supabase';
+import { EXPENSE_OPTIONS_ACRES, EXPENSE_OPTIONS_BIGHA, BIO_OPTIONS, GLS_OPTIONS, MINDSET_OPTIONS, getPointsForOption } from './constants';
 
 export type FSPPFormData = {
   committedLand: string;
@@ -90,17 +91,18 @@ export const useFSPPEnrollment = (navigation: any, route: any) => {
     if (committedLandAcres >= 1) points += 15;
 
     // Seasonal Expense (Max 30)
-    points += parseInt(watch('seasonalExpense') || '0', 10);
+    const expenseOptions = watch('committedLandUnit') === 'Bigha' ? EXPENSE_OPTIONS_BIGHA : EXPENSE_OPTIONS_ACRES;
+    points += getPointsForOption(expenseOptions, watch('seasonalExpense'));
 
     // Awareness & Knowledge (Max 25)
-    points += parseInt(watch('bioAwareness') || '0', 10);
-    points += parseInt(watch('glsKnowledge') || '0', 10);
+    points += getPointsForOption(BIO_OPTIONS, watch('bioAwareness'));
+    points += getPointsForOption(GLS_OPTIONS, watch('glsKnowledge'));
 
     // Mindset (Max 20)
-    points += parseInt(watch('mindsetA') || '0', 10);
-    points += parseInt(watch('mindsetB') || '0', 10);
-    points += parseInt(watch('mindsetC') || '0', 10);
-    points += parseInt(watch('mindsetD') || '0', 10);
+    points += getPointsForOption(MINDSET_OPTIONS, watch('mindsetA'));
+    points += getPointsForOption(MINDSET_OPTIONS, watch('mindsetB'));
+    points += getPointsForOption(MINDSET_OPTIONS, watch('mindsetC'));
+    points += getPointsForOption(MINDSET_OPTIONS, watch('mindsetD'));
 
     // Status Assignment
     if (points >= 70) return { score: points, status: 'Category A (Highly Qualified) - Anchor/Demo Plot', category: 'Category A', isKnockout: false };
@@ -112,10 +114,11 @@ export const useFSPPEnrollment = (navigation: any, route: any) => {
     setIsSubmitting(true);
     try {
       const result = calculateScore();
+      const values = form.getValues();
       
       const fspp_details = {
         totalLand,
-        ...form.getValues(),
+        ...values,
         evaluationDate: new Date().toISOString(),
         score: result.score,
         category: result.category,

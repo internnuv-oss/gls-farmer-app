@@ -5,6 +5,7 @@ import { UseFormReturn } from 'react-hook-form';
 import { MaterialIcons } from '@expo/vector-icons';
 import { colors, radius, spacing, shadows } from '../../../../design-system/tokens';
 import { FSPPFormData } from '../../hooks';
+import { EXPENSE_OPTIONS_ACRES, EXPENSE_OPTIONS_BIGHA } from '../../constants';
 
 export const Step1Land = ({ form, totalLand }: { form: UseFormReturn<FSPPFormData>, totalLand: number }) => {
   const { t } = useTranslation();
@@ -16,17 +17,7 @@ export const Step1Land = ({ form, totalLand }: { form: UseFormReturn<FSPPFormDat
 
   const isBigha = committedUnit === 'Bigha';
 
-  const EXPENSE_OPTIONS = isBigha ? [
-    { label: "Below ₹4,000 per bigha", value: "0" },
-    { label: "₹4,000 to ₹5,999 per bigha", value: "10" },
-    { label: "₹6,000 to ₹8,000 per bigha", value: "20", tag: "Target Profile" },
-    { label: "Above ₹8,000 per bigha", value: "30" }
-  ] : [
-    { label: "Below ₹10,000 per acre", value: "0" },
-    { label: "₹10,000 to ₹14,999 per acre", value: "10" },
-    { label: "₹15,000 to ₹20,000 per acre", value: "20", tag: "Target Profile" },
-    { label: "Above ₹20,000 per acre", value: "30" }
-  ];
+  const EXPENSE_OPTIONS = isBigha ? EXPENSE_OPTIONS_BIGHA : EXPENSE_OPTIONS_ACRES;
 
   return (
     <View style={{ flex: 1 }}>
@@ -106,10 +97,10 @@ export const Step1Land = ({ form, totalLand }: { form: UseFormReturn<FSPPFormDat
   {t("2. Current Average Seasonal Expenditure per {{unit}}", { unit: isBigha ? 'Bigha' : 'Acre' })}
 </Text>  
     <View style={{ gap: spacing.md }}>
-        {EXPENSE_OPTIONS.map((opt, i) => (
-          <Pressable key={i} onPress={() => setValue('seasonalExpense', opt.value, { shouldValidate: true })} style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: expense === opt.value ? colors.primarySoft : colors.surface, padding: spacing.md, borderRadius: radius.md, borderWidth: 1, borderColor: expense === opt.value ? colors.primary : colors.border }}>
-            <View style={{ width: 24, height: 24, borderRadius: 12, borderWidth: 2, borderColor: expense === opt.value ? colors.primary : colors.border, justifyContent: 'center', alignItems: 'center', marginRight: spacing.md }}>
-              {expense === opt.value && <View style={{ width: 12, height: 12, borderRadius: 6, backgroundColor: colors.primary }} />}
+        {EXPENSE_OPTIONS.map((opt: any, i: number) => (
+          <Pressable key={i} onPress={() => setValue('seasonalExpense', opt.label, { shouldValidate: true })} style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: expense === opt.label ? colors.primarySoft : colors.surface, padding: spacing.md, borderRadius: radius.md, borderWidth: 1, borderColor: expense === opt.label ? colors.primary : colors.border }}>
+            <View style={{ width: 24, height: 24, borderRadius: 12, borderWidth: 2, borderColor: expense === opt.label ? colors.primary : colors.border, justifyContent: 'center', alignItems: 'center', marginRight: spacing.md }}>
+              {expense === opt.label && <View style={{ width: 12, height: 12, borderRadius: 6, backgroundColor: colors.primary }} />}
             </View>
             <View style={{ flex: 1 }}>
               <Text style={{ fontSize: 15, fontWeight: '700', color: colors.text }}>{t(opt.label)}</Text>
