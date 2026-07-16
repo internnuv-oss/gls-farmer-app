@@ -1,9 +1,7 @@
-// Frontend/src/core/locationTracker.ts
-
 import * as TaskManager from 'expo-task-manager';
 import * as Location from 'expo-location';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { SHIFT_LOCATION_TASK, calculateDistance } from './locationUtils';
+import { SHIFT_LOCATION_TASK, calculateDistance, syncLocationsToSupabase } from './locationUtils';
 import { insertLocation } from './database';
 
 TaskManager.defineTask(SHIFT_LOCATION_TASK, async ({ data, error }) => {
@@ -16,20 +14,21 @@ TaskManager.defineTask(SHIFT_LOCATION_TASK, async ({ data, error }) => {
     const { locations } = data as any;
     if (locations && locations.length > 0) {
       
-      const activeShiftId = await AsyncStorage.getItem('active_shift_id');
+      // Keep trying to get the shift ID (AsyncStorage can be slow to wake up in background)
+      let activeShiftId = await AsyncStorage.getItem('active_shift_id');
       if (!activeShiftId) return;
 
-      // 🚀 1. Fetch the last valid location from deep storage
       const lastLocStr = await AsyncStorage.getItem('last_valid_location');
       let lastLoc = lastLocStr ? JSON.parse(lastLocStr) : null;
+      let addedNewPoint = false;
 
       for (const loc of locations) {
         const accuracy = loc.coords.accuracy ?? 999;
         
-        // 🚀 NOISE FILTER 1: Ignore terrible GPS signals (e.g., deep indoors)
-        if (accuracy > 200) continue; 
+        // NOISE FILTER 1: Ignore terrible GPS signals
+        if (accuracy > 150) continue; 
 
-        // 🚀 NOISE FILTER 2: Ignore stationary GPS bounce
+        // NOISE FILTER 2: Ignore stationary GPS bounce
         if (lastLoc) {
           const distInKm = calculateDistance(
             lastLoc.lat, lastLoc.lng, 
@@ -37,12 +36,11 @@ TaskManager.defineTask(SHIFT_LOCATION_TASK, async ({ data, error }) => {
           );
           const distInMeters = distInKm * 1000;
 
-          // If they moved less than 15 meters, it's just drift. Ignore it!
+          // If moved less than 15 meters, ignore
           if (distInMeters < 15) continue; 
         }
 
         try {
-          // If it passes the filters, lock it in the vault!
           insertLocation(
             activeShiftId,
             loc.coords.latitude,
@@ -52,16 +50,21 @@ TaskManager.defineTask(SHIFT_LOCATION_TASK, async ({ data, error }) => {
             loc.coords.speed ?? 0
           );
           
-          // Update the last valid location for the next loop
           lastLoc = { lat: loc.coords.latitude, lng: loc.coords.longitude };
+          addedNewPoint = true;
         } catch (dbError) {
           console.error("Failed to insert location into SQLite:", dbError);
         }
       }
 
-      // 🚀 2. Save the updated last location back to deep storage
       if (lastLoc) {
         await AsyncStorage.setItem('last_valid_location', JSON.stringify(lastLoc));
+      }
+
+      // 🚀 CRITICAL FIX: Trigger sync immediately from the background thread
+      // If we added a valid point, push it to Supabase while the OS is keeping us awake!
+      if (addedNewPoint) {
+        await syncLocationsToSupabase();
       }
     }
   }
@@ -69,18 +72,17 @@ TaskManager.defineTask(SHIFT_LOCATION_TASK, async ({ data, error }) => {
 
 export const startBackgroundTracking = async (shiftId: string) => {
   await AsyncStorage.setItem('active_shift_id', shiftId);
-  // Clear any old location data from previous shifts
   await AsyncStorage.removeItem('last_valid_location'); 
   
   await Location.startLocationUpdatesAsync(SHIFT_LOCATION_TASK, {
-    accuracy: Location.Accuracy.High,
-    timeInterval: 60000, 
-    distanceInterval: 50, 
-    deferredUpdatesInterval: 300000, 
-    deferredUpdatesDistance: 500,
+    accuracy: Location.Accuracy.Balanced, // High drains battery and gets killed faster by OS
+    timeInterval: 30000,  // Every 30 seconds
+    distanceInterval: 25, // Or every 25 meters
+    showsBackgroundLocationIndicator: true, // Forces iOS to keep it alive
     foregroundService: {
-      notificationTitle: "Shift Active",
-      notificationBody: "Tracking route in the background.",
+      notificationTitle: "Field Commander Active",
+      notificationBody: "Tracking your shift route.",
+      notificationColor: "#16A34A",
     },
   });
 };

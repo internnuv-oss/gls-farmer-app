@@ -6,6 +6,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase } from '../core/supabase';
 import { useAuthStore } from './authStore';
 import { startBackgroundTracking, stopBackgroundTracking } from '../core/locationTracker';
+import { syncLocationsToSupabase } from '../core/locationUtils';
 
 export interface TimelineEvent {
   id: string;
@@ -166,6 +167,8 @@ export const useShiftStore = create<ShiftState>()(
 
         // 🚀 NEW: Stop the SQLite background tracker cleanly
         await stopBackgroundTracking();
+
+        await syncLocationsToSupabase();
 
         const timeToUse = editedTime || actualTime || Date.now();
 
