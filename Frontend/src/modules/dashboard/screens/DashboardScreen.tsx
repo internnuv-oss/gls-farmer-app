@@ -215,28 +215,16 @@ export const DashboardScreen = ({ navigation, route }: any) => {
         );
       };
 
+      // 🚀 CRITICAL FIX: Always merge by ID, even on screen focus.
+      // This stops the array from dropping items from local state!
+      setDistributors(prev => mergeById(prev, mappedDistributors));
+      setDealers(prev => mergeById(prev, mappedDealers));
+      setFarmers(prev => mergeById(prev, mappedFarmers));
+      setFpos(prev => mergeById(prev, mappedFPOs));
+
       if (pageNumber === 0) {
-        if (isRefresh) {
-          // 🚀 Merge on refresh so counts don't suddenly drop to 50
-          setDistributors(prev => mergeById(prev, mappedDistributors));
-          setDealers(prev => mergeById(prev, mappedDealers));
-          setFarmers(prev => mergeById(prev, mappedFarmers));
-          setFpos(prev => mergeById(prev, mappedFPOs));
-        } else {
-          // Fresh mount
-          setDistributors(mappedDistributors);
-          setDealers(mappedDealers);
-          setFarmers(mappedFarmers);
-          setFpos(mappedFPOs); 
-        }
         setDbDrafts(draftsData);
         setRoutes(routesData); 
-      } else {
-        // Pagination scroll
-        setDistributors(prev => mergeById(prev, mappedDistributors));
-        setDealers(prev => mergeById(prev, mappedDealers));
-        setFarmers(prev => mergeById(prev, mappedFarmers));
-        setFpos(prev => mergeById(prev, mappedFPOs)); 
       }
 
       setHasMore(dealersData.length === PAGE_LIMIT || farmersData.length === PAGE_LIMIT || distributorsData.length === PAGE_LIMIT || fposData.length === PAGE_LIMIT);
@@ -430,6 +418,9 @@ export const DashboardScreen = ({ navigation, route }: any) => {
 
   // Generate UI data blocks for Route Views
   const processedRoutes = useMemo(() => {
+    // 🚀 We combine the raw submitted farmers + raw drafts here to get a stable, un-fluctuating count
+    const stableFarmersList = [...farmers, ...mappedDrafts.Farmers];
+
     // 1. Sort the defined routes alphabetically by name
     let routeCards = [...routes]
       .sort((a, b) => (a.name || '').localeCompare(b.name || ''))
@@ -437,8 +428,9 @@ export const DashboardScreen = ({ navigation, route }: any) => {
         const vills = extractVillages(r);
         const villsLower = vills.map(v => v.trim().toLowerCase());
         
-        const count = processedFarmers.filter(f => {
-          const fVill = (f.raw?.village || f.raw?.personal_details?.village || '').trim().toLowerCase();
+        // 🚀 Count from the stable list, ignoring active filters/search
+        const count = stableFarmersList.filter(f => {
+          const fVill = (f.raw?.village || f.raw?.personal_details?.village || f.city || '').trim().toLowerCase();
           return villsLower.includes(fVill);
         }).length;
         
@@ -447,14 +439,14 @@ export const DashboardScreen = ({ navigation, route }: any) => {
 
     // 2. Calculate Unrouted / Other Villages
     const allRoutedVillagesLower = routeCards.flatMap(r => r.villages).map(v => v.trim().toLowerCase());
-    const unroutedFarmers = processedFarmers.filter(f => {
-       const fVill = (f.raw?.village || f.raw?.personal_details?.village || '').trim().toLowerCase();
+    const unroutedFarmers = stableFarmersList.filter(f => {
+       const fVill = (f.raw?.village || f.raw?.personal_details?.village || f.city || '').trim().toLowerCase();
        return fVill && !allRoutedVillagesLower.includes(fVill);
     });
 
     // 3. Append Unrouted at the very end
     if (unroutedFarmers.length > 0) {
-      const unroutedVills = Array.from(new Set(unroutedFarmers.map(f => f.raw?.village || f.raw?.personal_details?.village).filter(Boolean)));
+      const unroutedVills = Array.from(new Set(unroutedFarmers.map(f => f.raw?.village || f.raw?.personal_details?.village || f.city).filter(Boolean)));
       routeCards.push({
         id: 'unrouted',
         name: t('Others'),
@@ -464,21 +456,25 @@ export const DashboardScreen = ({ navigation, route }: any) => {
       });
     }
     return routeCards;
- }, [routes, processedFarmers]);
+ }, [routes, farmers, mappedDrafts.Farmers, t]);
 
  const processedVillages = useMemo(() => {
     if (!selectedRouteId) return [];
     const route = processedRoutes.find(r => r.id === selectedRouteId);
     if (!route) return [];
 
+    // 🚀 We use the stable list for villages too
+    const stableFarmersList = [...farmers, ...mappedDrafts.Farmers];
+
     return route.villages.map(vName => {
-      const count = processedFarmers.filter(f => {
-        const fVill = (f.raw?.village || f.raw?.personal_details?.village || '').trim().toLowerCase();
+      // 🚀 Count from the stable list, ignoring active filters/search
+      const count = stableFarmersList.filter(f => {
+        const fVill = (f.raw?.village || f.raw?.personal_details?.village || f.city || '').trim().toLowerCase();
         return fVill === vName.trim().toLowerCase();
       }).length;
       return { name: vName, count };
     }).filter(v => v.count > 0 || !route.isUnrouted); 
- }, [selectedRouteId, processedRoutes, processedFarmers]);
+ }, [selectedRouteId, processedRoutes, farmers, mappedDrafts.Farmers]);
 
 
   // --- FPO FILTERING & SORTING ---
