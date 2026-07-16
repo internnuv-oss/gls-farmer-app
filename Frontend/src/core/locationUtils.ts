@@ -32,12 +32,14 @@ export const syncLocationsToSupabase = async () => {
       return; 
     }
 
+    pending.sort((a, b) => a.timestamp - b.timestamp);
+
     // 2. Format for Supabase
     const payload = pending.map(loc => ({
       shift_id: loc.shift_id,
-      latitude: loc.latitude,
-      longitude: loc.longitude,
-      recorded_at: new Date(loc.timestamp).toISOString(), 
+      lat: loc.latitude,       // 🚀 FIXED
+      lng: loc.longitude,      // 🚀 FIXED
+      timestamp: loc.timestamp, // 🚀 FIXED (Keep as raw number/bigint)
       accuracy: loc.accuracy,
       speed: loc.speed
     }));

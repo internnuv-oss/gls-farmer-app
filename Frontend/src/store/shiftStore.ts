@@ -24,6 +24,7 @@ export interface PastShift {
   date: string;
   events: TimelineEvent[];
   routePath?: any[];
+  total_distance?: number;
   assigned_route_id?: string | null;
 }
 
@@ -201,7 +202,6 @@ export const useShiftStore = create<ShiftState>()(
         const payload = {
           end_time: timeToUse, end_km: endKm, end_location: location,
           end_odo_image: odoImageUrl, status: 'COMPLETED', updated_at: new Date().toISOString(),
-          total_distance: parseFloat(get().totalDistance.toFixed(2)),
           activities_logged: activitiesLogged,
           allowance_status: allowanceStatus
         };
@@ -219,7 +219,7 @@ export const useShiftStore = create<ShiftState>()(
             ...newHistory[shiftIndex],
             events: updatedEvents,
             end_km: endKm,
-            total_distance: parseFloat(totalDistance.toFixed(2)),
+            total_distance: currentShiftRecord?.total_distance || 0,
             activities_logged: activitiesLogged
           } as any;
         }
