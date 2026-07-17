@@ -36,6 +36,13 @@ import { FarmCardOnboardingScreen } from '../modules/FarmCard/screens/FarmCardOn
 import { FarmCardDetailsScreen } from '../modules/FarmCard/screens/FarmCardDetailsScreen';
 import { FarmCardsListScreen } from '../modules/FarmCard/screens/FarmCardsListScreen';
 import { TempDealersListScreen } from '../modules/dashboard/screens/TempDealersListScreen';
+import { FarmDiaryHubScreen } from '../modules/FarmDiary/screens/FarmDiaryHubScreen';
+import { FarmDiarySetupScreen } from '../modules/FarmDiary/screens/setup/FarmDiarySetupScreen';
+import { FarmDiaryDashboardScreen } from '../modules/FarmDiary/screens/visit/FarmDiaryDashboardScreen';
+import { FarmDiaryProfileScreen } from '../modules/FarmDiary/screens/visit/FarmDiaryProfileScreen';
+import { MandatoryBaseVisitScreen } from '../modules/FarmDiary/screens/visit/MandatoryBaseVisitScreen';
+import { CropObservationScreen } from '../modules/FarmDiary/screens/visit/CropObservationScreen';
+import { VisitDetailsScreen } from '../modules/FarmDiary/screens/visit/VisitDetailsScreen';
 
 const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
@@ -161,6 +168,13 @@ export const AppNavigator = () => {
             <Stack.Screen name="FarmCardOnboardingScreen" component={FarmCardOnboardingScreen} />
             <Stack.Screen name="FarmCardsListScreen" component={FarmCardsListScreen} />
             <Stack.Screen name="FarmCardDetailsScreen" component={FarmCardDetailsScreen} />
+            <Stack.Screen name="FarmDiaryHubScreen" component={FarmDiaryHubScreen} />
+            <Stack.Screen name="FarmDiarySetupScreen" component={FarmDiarySetupScreen} />
+            <Stack.Screen name="FarmDiaryDashboardScreen" component={FarmDiaryDashboardScreen} />
+            <Stack.Screen name="FarmDiaryProfileScreen" component={FarmDiaryProfileScreen} />
+            <Stack.Screen name="MandatoryBaseVisitScreen" component={MandatoryBaseVisitScreen} />
+            <Stack.Screen name="CropObservationScreen" component={CropObservationScreen} />
+            <Stack.Screen name="VisitDetailsScreen" component={VisitDetailsScreen} />
           </>
         ) : (
           <>

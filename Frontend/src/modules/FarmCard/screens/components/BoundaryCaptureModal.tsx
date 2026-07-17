@@ -10,7 +10,7 @@ import { colors, radius, spacing, shadows } from '../../../../design-system/toke
 import { Button } from '../../../../design-system/components';
 import { useAlertStore } from '../../../../store/alertStore';
 
-export const BoundaryCaptureModal = ({ visible, onClose, onSave }: any) => {
+export const BoundaryCaptureModal = ({ visible, onClose, onSave, parentBoundary }: any) => {
   const { t } = useTranslation();
   const viewShotRef = useRef<any>(null);
   const mapRef = useRef<MapView>(null);
@@ -35,10 +35,27 @@ export const BoundaryCaptureModal = ({ visible, onClose, onSave }: any) => {
       setCaptureMode('walk');
       setSearchQuery("");
       (async () => {
-        const { status } = await Location.requestForegroundPermissionsAsync();
-        if (status !== 'granted') return;
-        const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.BestForNavigation });
-        setRegion({ latitude: loc.coords.latitude, longitude: loc.coords.longitude, latitudeDelta: ZOOM_DELTA, longitudeDelta: ZOOM_DELTA });
+        if (parentBoundary && parentBoundary.length > 0) {
+          // Calculate center of parent boundary for initial region
+          const lats = parentBoundary.map((p: any) => p.latitude);
+          const lons = parentBoundary.map((p: any) => p.longitude);
+          const minLat = Math.min(...lats);
+          const maxLat = Math.max(...lats);
+          const minLon = Math.min(...lons);
+          const maxLon = Math.max(...lons);
+          
+          setRegion({
+            latitude: (minLat + maxLat) / 2,
+            longitude: (minLon + maxLon) / 2,
+            latitudeDelta: Math.max((maxLat - minLat) * 1.5, ZOOM_DELTA),
+            longitudeDelta: Math.max((maxLon - minLon) * 1.5, ZOOM_DELTA),
+          });
+        } else {
+          const { status } = await Location.requestForegroundPermissionsAsync();
+          if (status !== 'granted') return;
+          const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.BestForNavigation });
+          setRegion({ latitude: loc.coords.latitude, longitude: loc.coords.longitude, latitudeDelta: ZOOM_DELTA, longitudeDelta: ZOOM_DELTA });
+        }
       })();
     } else {
       stopTracking();
@@ -193,6 +210,9 @@ export const BoundaryCaptureModal = ({ visible, onClose, onSave }: any) => {
               showsMyLocationButton={true}
               pitchEnabled={false} 
             >
+              {parentBoundary && parentBoundary.length > 0 && (
+                <Polygon coordinates={parentBoundary} strokeColor="#64748B" fillColor="rgba(100, 116, 139, 0.1)" strokeWidth={2} />
+              )}
               {path.length > 0 && (
                 <Polygon coordinates={path} strokeColor={colors.primary} fillColor="rgba(34, 197, 94, 0.4)" strokeWidth={3} />
               )}
