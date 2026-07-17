@@ -107,9 +107,10 @@ export const PunchOutModal = ({ visible, onClose, onConfirm }: any) => {
     const actualTime = Date.now();
     const editedTime = isTimeEdited ? customTime.getTime() : null;
     const timeToUse = editedTime || actualTime;
+    const safeStartTime = Number(startTime);
 
     // 🚀 CRITICAL FIX: Final check to prevent submission of illegal backdated times
-    if (startTime && timeToUse < startTime) {
+    if (safeStartTime && timeToUse < safeStartTime) {
       useAlertStore.getState().showAlert(
         t("Invalid Time"), 
         t("Your Punch Out time cannot be earlier than your Punch In time.")
@@ -258,8 +259,8 @@ export const PunchOutModal = ({ visible, onClose, onConfirm }: any) => {
                       t("Auto-Adjusted"),
                       t("You cannot select a future date/time. Adjusted to current time.")
                     );
-                  } else if (startTime && newDate.getTime() < startTime) {
-                    newDate = new Date(startTime); // Clamp exactly to the Punch-In time
+                  } else if (startTime && newDate.getTime() < Number(startTime)) {
+                    newDate = new Date(Number(startTime)); // 🚀 FIX: Safely cast to Number to prevent Invalid Date crashes
                     useAlertStore.getState().showAlert(
                       t("Auto-Adjusted"),
                       t("Time cannot be earlier than your Punch In. Adjusted to your Punch In time.")

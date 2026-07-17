@@ -79,6 +79,7 @@ export const startBackgroundTracking = async (shiftId: string) => {
     timeInterval: 30000,  // Every 30 seconds
     distanceInterval: 25, // Or every 25 meters
     showsBackgroundLocationIndicator: true, // Forces iOS to keep it alive
+    pausesUpdatesAutomatically: false,
     foregroundService: {
       notificationTitle: "Field Commander Active",
       notificationBody: "Tracking your shift route.",

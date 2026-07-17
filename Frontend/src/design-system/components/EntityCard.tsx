@@ -266,6 +266,45 @@ export const EntityCard = React.memo(({ item, navigation, t, onDeleteDraft }: En
         )}
         </View>
 
+        {/* 🚀 NEW: 3-Stage Dots/Blocks Progress for Farmers */}
+        {isFarmer && !item.isDraft && (() => {
+          const isStage1 = true;
+          const isStage2 = !!(item.raw.fspp_details && Object.keys(item.raw.fspp_details).length > 0);
+          const isStage3 = item.raw.has_farm_card === true || (Array.isArray(item.raw.farm_cards) && item.raw.farm_cards.length > 0);
+
+          return (
+            <View style={{ marginTop: spacing.lg, paddingTop: spacing.md, borderTopWidth: 1, borderTopColor: colors.border }}>
+              <View style={{ position: 'relative', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                
+                {/* Background Connecting Line */}
+                <View style={{ position: 'absolute', top: 7, left: '16.6%', right: '16.6%', height: 2, backgroundColor: colors.border }} />
+                
+                {/* Active Connecting Line */}
+                <View style={{ position: 'absolute', top: 7, left: '16.6%', width: isStage3 ? '66.6%' : isStage2 ? '33.3%' : '0%', height: 2, backgroundColor: colors.primary }} />
+
+                {/* Stage 1 */}
+                <View style={{ flex: 1, alignItems: 'center' }}>
+                  <View style={{ width: 16, height: 16, borderRadius: 8, backgroundColor: isStage1 ? colors.primary : colors.border, borderWidth: 3, borderColor: colors.surface, zIndex: 1, marginBottom: 6 }} />
+                  <Text style={{ fontSize: 10, fontWeight: '800', color: isStage1 ? colors.primary : colors.textMuted, textAlign: 'center' }}>{t("Onboarded")}</Text>
+                </View>
+
+                {/* Stage 2 */}
+                <View style={{ flex: 1, alignItems: 'center' }}>
+                  <View style={{ width: 16, height: 16, borderRadius: 8, backgroundColor: isStage2 ? colors.primary : colors.border, borderWidth: 3, borderColor: colors.surface, zIndex: 1, marginBottom: 6 }} />
+                  <Text style={{ fontSize: 10, fontWeight: '800', color: isStage2 ? colors.primary : colors.textMuted, textAlign: 'center' }}>{t("FSPP Enrollment")}</Text>
+                </View>
+
+                {/* Stage 3 */}
+                <View style={{ flex: 1, alignItems: 'center' }}>
+                  <View style={{ width: 16, height: 16, borderRadius: 8, backgroundColor: isStage3 ? colors.primary : colors.border, borderWidth: 3, borderColor: colors.surface, zIndex: 1, marginBottom: 6 }} />
+                  <Text style={{ fontSize: 10, fontWeight: '800', color: isStage3 ? colors.primary : colors.textMuted, textAlign: 'center' }}>{t("Farm Card")}</Text>
+                </View>
+
+              </View>
+            </View>
+          );
+        })()}
+
         {!isFarmer && (
           <>
             <View style={{ height: 1, backgroundColor: colors.border, marginVertical: spacing.md }} />

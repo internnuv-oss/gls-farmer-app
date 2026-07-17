@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, Modal, Pressable, TextInput, ActivityIndicator, Linking, AppState } from 'react-native';
+import { View, Text, Modal, Pressable, TextInput, ActivityIndicator, Linking, AppState, Platform } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
 import * as Location from 'expo-location';
 import * as ImagePicker from 'expo-image-picker'; // 🚀 Import ImagePicker for real camera launch
+import * as IntentLauncher from 'expo-intent-launcher';
 import { colors, radius, spacing } from '../../../design-system/tokens';
 import { SelectField } from '../../../design-system/components';
 import { Button } from '../../../design-system/components';
@@ -102,6 +103,27 @@ export const PunchInModal = ({ visible, onClose, onConfirm }: any) => {
          );
          setLocationStr(t("Location permission denied"));
          return; 
+      }
+
+      // 🚀 CRITICAL FIX: Prompt for Battery Exemption on Android
+      if (Platform.OS === 'android') {
+        // Use a global flag so we only annoy the user once per app session
+        if (!(global as any).hasAskedBatteryExemption) {
+          useAlertStore.getState().showAlert(
+            t("Battery Settings Needed"),
+            t("To track your route accurately while your phone is in your pocket, please set Field Commander to 'Unrestricted' or turn off battery optimization for it."),
+            [
+              { text: t("Done"), style: "cancel" },
+              { 
+                text: t("Open Settings"), 
+                onPress: () => {
+                  IntentLauncher.startActivityAsync(IntentLauncher.ActivityAction.IGNORE_BATTERY_OPTIMIZATION_SETTINGS);
+                } 
+              }
+            ]
+          );
+          (global as any).hasAskedBatteryExemption = true;
+        }
       }
 
       // Try to get a cached location first for instant loading

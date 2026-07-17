@@ -94,5 +94,5 @@ const styles = StyleSheet.create({
   title: { color: colors.text, marginBottom: 8, textAlign: 'center' },
   message: { color: colors.textMuted, textAlign: 'center', fontSize: 14, lineHeight: 22, marginBottom: 24 },
   button: { paddingVertical: 12, paddingHorizontal: 32, width: '100%', borderRadius: 999, alignItems: 'center', justifyContent: 'center', backgroundColor: '#F1F5F9' },
-  buttonText: { fontWeight: '700', color: colors.text, fontSize: 15 }
+  buttonText: { fontWeight: '700', color: colors.text, fontSize: 15, textAlign: 'center' }
 });
