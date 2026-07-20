@@ -12,41 +12,57 @@ import { Button, Input, SelectField, MultiSelectField, DatePickerField } from '.
 
 export const FarmDiarySetupScreen = ({ route, navigation }: any) => {
   const { t } = useTranslation();
-  const { farmer, preselectedFarmCardId } = route.params;
-  const farmerId = farmer?.id || farmer?.entityId;
+  const { farmer, preselectedFarmCardId, isEditMode, existingDiary } = route.params;
+  const farmerId = farmer?.id || farmer?.entityId || existingDiary?.farmer_id;
 
   const [step, setStep] = useState(1);
   const [farmCards, setFarmCards] = useState<any[]>([]);
-  const [selectedFarmCardId, setSelectedFarmCardId] = useState<string | null>(preselectedFarmCardId || null);
+  const [selectedFarmCardId, setSelectedFarmCardId] = useState<string | null>(preselectedFarmCardId || (existingDiary?.farm_card_id) || null);
   const [masterCrops, setMasterCrops] = useState<string[]>([]);
   
-  const [formData, setFormData] = useState<any>({
-    farmer_id: farmerId,
-    farm_name: '',
-    plot_area: '',
-    plot_area_unit: 'Acres',
-    land_status: '',
-    is_sowing_done: false,
-    sowing_date: null,
-    
-    soil_type: '',
-    soil_ph: '',
-    soil_ec_ms_cm: '',
-    organic_matter_percentage: '',
-    nitrogen_kg_ha: '',
-    phosphorus_kg_ha: '',
-    potassium_kg_ha: '',
-    drainage_condition: '',
-    soil_test_status: '',
-    
-    water_source: [],
-    irrigation_method: [],
-    water_tds: '',
-    water_ph: '',
-    
-    decision_making_factor: '',
-    diary_polygon: [],
-  });
+  const [formData, setFormData] = useState<any>(
+    isEditMode && existingDiary ? {
+      ...existingDiary,
+      plot_area: existingDiary.plot_area ? String(existingDiary.plot_area) : '',
+      soil_ph: existingDiary.soil_ph ? String(existingDiary.soil_ph) : '',
+      soil_ec_ms_cm: existingDiary.soil_ec_ms_cm ? String(existingDiary.soil_ec_ms_cm) : '',
+      organic_matter_percentage: existingDiary.organic_matter_percentage ? String(existingDiary.organic_matter_percentage) : '',
+      nitrogen_kg_ha: existingDiary.nitrogen_kg_ha ? String(existingDiary.nitrogen_kg_ha) : '',
+      phosphorus_kg_ha: existingDiary.phosphorus_kg_ha ? String(existingDiary.phosphorus_kg_ha) : '',
+      potassium_kg_ha: existingDiary.potassium_kg_ha ? String(existingDiary.potassium_kg_ha) : '',
+      water_tds: existingDiary.water_tds ? String(existingDiary.water_tds) : '',
+      water_ph: existingDiary.water_ph ? String(existingDiary.water_ph) : '',
+      water_source: existingDiary.water_source ? existingDiary.water_source.split(', ') : [],
+      irrigation_method: existingDiary.irrigation_method ? existingDiary.irrigation_method.split(', ') : [],
+      is_sowing_done: existingDiary.is_sowing_done || false,
+    } : {
+      farmer_id: farmerId,
+      farm_name: '',
+      plot_area: '',
+      plot_area_unit: 'Acres',
+      land_status: '',
+      is_sowing_done: false,
+      sowing_date: null,
+      
+      soil_type: '',
+      soil_ph: '',
+      soil_ec_ms_cm: '',
+      organic_matter_percentage: '',
+      nitrogen_kg_ha: '',
+      phosphorus_kg_ha: '',
+      potassium_kg_ha: '',
+      drainage_condition: '',
+      soil_test_status: '',
+      
+      water_source: [],
+      irrigation_method: [],
+      water_tds: '',
+      water_ph: '',
+      
+      decision_making_factor: '',
+      diary_polygon: [],
+    }
+  );
 
   const [isMapModalVisible, setIsMapModalVisible] = useState(false);
   const [mapSnapshot, setMapSnapshot] = useState<string | null>(null);
@@ -58,7 +74,7 @@ export const FarmDiarySetupScreen = ({ route, navigation }: any) => {
 
   const preferredChemCrop = selectedFarmCard?.card_data?.preferredChemCrop || [];
 
-  const { createDiary, isLoading } = useFarmDiaryStore();
+  const { createDiary, updateDiary, isLoading } = useFarmDiaryStore();
 
   useEffect(() => {
     const fetchCards = async () => {
@@ -119,16 +135,20 @@ export const FarmDiarySetupScreen = ({ route, navigation }: any) => {
       if (payload[key] === '') payload[key] = null;
     });
 
-    const id = await createDiary(payload);
-    if (id) {
+    const success = isEditMode 
+      ? await updateDiary(existingDiary.id, payload)
+      : await createDiary(payload);
+      
+    if (success) {
       navigation.goBack();
     }
   };
 
   const handleNext = () => {
     if (step === 1) {
-      if (!selectedFarmCardId || !formData.farm_name || !formData.plot_area || !formData.land_status || !mapSnapshot) {
-        Alert.alert('Incomplete Form', 'Please fill all mandatory fields in Step 1.');
+      const hasMap = mapSnapshot || (isEditMode && formData.diary_polygon && formData.diary_polygon.length > 0);
+      if (!selectedFarmCardId || !formData.farm_name || !formData.plot_area || !formData.land_status || !hasMap) {
+        Alert.alert('Incomplete Form', 'Please fill all mandatory fields and ensure diary area is plotted in Step 1.');
         return;
       }
       if (formData.is_sowing_done && !formData.sowing_date) {

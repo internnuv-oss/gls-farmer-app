@@ -91,14 +91,29 @@ export const FarmDiaryProfileScreen = ({ route, navigation }: any) => {
 
       {/* HEADER */}
       <View style={{ padding: spacing.xl, backgroundColor: colors.surface, borderBottomWidth: 1, borderBottomColor: colors.border }}>
-        <Pressable onPress={() => navigation.goBack()} style={{ flexDirection: 'row', alignItems: 'center', marginBottom: spacing.lg }}>
-          <MaterialIcons name="arrow-back" size={24} color={colors.primary} />
-          <Text style={{ fontSize: 16, fontWeight: '700', color: colors.primary, marginLeft: spacing.sm }}>{t("Back")}</Text>
-        </Pressable>
-        <Text style={{ fontSize: 24, fontWeight: '900', color: colors.text }}>{t("Farm Diary Profile")}</Text>
-        <Text style={{ fontSize: 14, color: colors.textMuted, marginTop: 4 }}>
-          {diary.farm_name || "Farm Diary"}
-        </Text>
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+          <View style={{ flex: 1 }}>
+            <Pressable onPress={() => navigation.goBack()} style={{ flexDirection: 'row', alignItems: 'center', marginBottom: spacing.lg }}>
+              <MaterialIcons name="arrow-back" size={24} color={colors.primary} />
+              <Text style={{ fontSize: 16, fontWeight: '700', color: colors.primary, marginLeft: spacing.sm }}>{t("Back")}</Text>
+            </Pressable>
+            <Text style={{ fontSize: 24, fontWeight: '900', color: colors.text }}>{t("Farm Diary Profile")}</Text>
+            <Text style={{ fontSize: 14, color: colors.textMuted, marginTop: 4 }}>
+              {diary.farm_name || "Farm Diary"}
+            </Text>
+          </View>
+          <Pressable 
+            onPress={() => navigation.navigate("FarmDiarySetupScreen", { 
+               isEditMode: true, 
+               existingDiary: diary, 
+               farmer: { id: diary.farmer_id }, 
+               preselectedFarmCardId: diary.farm_card_id 
+            })}
+            style={{ padding: 8, backgroundColor: '#EFF6FF', borderRadius: radius.pill }}
+          >
+            <MaterialIcons name="edit" size={24} color={colors.primary} />
+          </Pressable>
+        </View>
       </View>
 
       <ScrollView contentContainerStyle={{ padding: spacing.xl }}>

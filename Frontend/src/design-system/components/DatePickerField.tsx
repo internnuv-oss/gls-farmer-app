@@ -101,7 +101,7 @@ export const DatePickerField: React.FC<Props> = ({
         <DateTimePicker 
           value={dateValue} 
           mode="date" 
-          display="spinner" /* 🚀 CHANGED BACK TO SPINNER: You can swipe the Year wheel independently! */
+          display="default" 
           onChange={handleChange} 
           maximumDate={maximumDate} 
           minimumDate={safeMinimumDate} 
@@ -120,7 +120,7 @@ export const DatePickerField: React.FC<Props> = ({
               <DateTimePicker 
                 value={dateValue} 
                 mode="date" 
-                display="spinner" 
+                display="inline" 
                 onChange={handleChange} 
                 maximumDate={maximumDate} 
                 minimumDate={safeMinimumDate} 

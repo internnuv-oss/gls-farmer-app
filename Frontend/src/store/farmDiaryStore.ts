@@ -23,6 +23,7 @@ export interface FarmDiaryState {
   
   fetchDiaries: (farmerId: string) => Promise<void>;
   createDiary: (diaryData: any) => Promise<string | null>;
+  updateDiary: (diaryId: string, diaryData: any) => Promise<boolean>;
   startBaseVisit: (diaryId: string, visitData: any) => Promise<string | null>;
   fetchDynamicParameters: (cropId: string, stageId: string) => Promise<any>;
   saveCropObservation: (sessionData: any, samples: any[]) => Promise<boolean>;
@@ -73,6 +74,31 @@ export const useFarmDiaryStore = create<FarmDiaryState>((set, get) => ({
       console.error('Create Diary Error:', error);
       useAlertStore.getState().showAlert('Error', 'Failed to create farm diary.');
       return null;
+    } finally {
+      set({ isLoading: false });
+    }
+  },
+
+  updateDiary: async (diaryId, diaryData) => {
+    set({ isLoading: true });
+    try {
+      const { error } = await supabase
+        .from('farm_diary')
+        .update(diaryData)
+        .eq('id', diaryId);
+
+      if (error) throw error;
+      
+      // Refresh list
+      if (diaryData.farmer_id) {
+        get().fetchDiaries(diaryData.farmer_id);
+      }
+      
+      return true;
+    } catch (error: any) {
+      console.error('Update Diary Error:', error);
+      useAlertStore.getState().showAlert('Error', 'Failed to update farm diary.');
+      return false;
     } finally {
       set({ isLoading: false });
     }
