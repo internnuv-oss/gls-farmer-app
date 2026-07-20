@@ -106,28 +106,33 @@ export const FarmDiarySetupScreen = ({ route, navigation }: any) => {
     // Convert numeric fields properly
     const parseNum = (val: any) => val ? parseFloat(val) : null;
     
-    const payload = {
-      ...formData,
+    const payload: any = {
+      farmer_id: formData.farmer_id,
       farm_card_id: selectedFarmCardId,
       farm_name: formData.farm_name,
       plot_area: parseNum(formData.plot_area),
       plot_area_unit: formData.plot_area_unit,
       land_status: formData.land_status,
+      is_sowing_done: formData.is_sowing_done,
+      sowing_date: formData.sowing_date,
+      soil_type: formData.soil_type,
       soil_ph: parseNum(formData.soil_ph),
       soil_ec_ms_cm: parseNum(formData.soil_ec_ms_cm),
       organic_matter_percentage: parseNum(formData.organic_matter_percentage),
       nitrogen_kg_ha: parseNum(formData.nitrogen_kg_ha),
       phosphorus_kg_ha: parseNum(formData.phosphorus_kg_ha),
       potassium_kg_ha: parseNum(formData.potassium_kg_ha),
-      water_tds: parseNum(formData.water_tds),
-      water_ph: parseNum(formData.water_ph),
+      drainage_condition: formData.drainage_condition,
+      soil_test_status: formData.soil_test_status,
       water_source: Array.isArray(formData.water_source) ? formData.water_source.join(', ') : formData.water_source,
       irrigation_method: Array.isArray(formData.irrigation_method) ? formData.irrigation_method.join(', ') : formData.irrigation_method,
+      water_tds: parseNum(formData.water_tds),
+      water_ph: parseNum(formData.water_ph),
+      decision_making_factor: formData.decision_making_factor,
+      diary_polygon: formData.diary_polygon,
       
-      
-      // Defaults for JSONB
-      multi_season_yield_history: [],
-      historical_input_preferences: {},
+      multi_season_yield_history: formData.multi_season_yield_history || [],
+      historical_input_preferences: formData.historical_input_preferences || {},
     };
     
     // Clean up empty strings for optional fields that shouldn't be empty strings in DB

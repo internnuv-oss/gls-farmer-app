@@ -4,12 +4,16 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
 import { colors, spacing, radius, shadows } from '../../../../design-system/tokens';
+import { useFarmDiaryStore } from '../../../../store/farmDiaryStore';
 import { HistoryLedgerList } from '../../components/HistoryLedgerList';
 import { Button } from '../../../../design-system/components';
 
 export const FarmDiaryDashboardScreen = ({ route, navigation }: any) => {
   const { t } = useTranslation();
-  const { diary } = route.params;
+  const routeDiary = route.params.diary;
+
+  const diaries = useFarmDiaryStore(state => state.diaries);
+  const diary = diaries.find(d => d.id === routeDiary.id) || routeDiary;
 
   // Removed DataRow as it will move to FarmDiaryProfileScreen
 

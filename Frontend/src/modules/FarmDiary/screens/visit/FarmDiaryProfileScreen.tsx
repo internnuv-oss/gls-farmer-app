@@ -5,10 +5,15 @@ import { MaterialIcons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
 import MapView, { Polygon, PROVIDER_GOOGLE } from 'react-native-maps';
 import { colors, radius, spacing, shadows } from '../../../../design-system/tokens';
+import { useFarmDiaryStore } from '../../../../store/farmDiaryStore';
 
 export const FarmDiaryProfileScreen = ({ route, navigation }: any) => {
   const { t } = useTranslation();
-  const { diary } = route.params;
+  const routeDiary = route.params.diary;
+  
+  const diaries = useFarmDiaryStore(state => state.diaries);
+  const diary = diaries.find(d => d.id === routeDiary.id) || routeDiary;
+
   const [isMapExpanded, setIsMapExpanded] = useState(false);
 
   // Validate the polygon
@@ -153,12 +158,12 @@ export const FarmDiaryProfileScreen = ({ route, navigation }: any) => {
         <View style={styles.card}>
           <Text style={styles.sectionTitle}>{t("Farm Profile")}</Text>
           <DataRow label={t("Farm Name")} value={diary.farm_name} />
-          <DataRow label={t("Legal Owner")} value={diary.legal_owner_name} />
-          <DataRow label={t("Survey No.")} value={diary.survey_khasra_no} />
-          <DataRow label={t("Field & Plot")} value={[diary.field_number, diary.plot_number].filter(Boolean).join(' / ')} />
-          <DataRow label={t("Total Area")} value={diary.total_land_area_acres ? `${diary.total_land_area_acres} Acres` : null} />
-          <DataRow label={t("Cultivated Area")} value={diary.cultivated_area_acres ? `${diary.cultivated_area_acres} Acres` : null} />
+          <DataRow label={t("Plot Area")} value={diary.plot_area ? `${diary.plot_area} ${diary.plot_area_unit || 'Acres'}` : null} />
           <DataRow label={t("Land Status")} value={diary.land_status} />
+          <DataRow label={t("Sowing Done?")} value={diary.is_sowing_done ? t('Yes') : t('No')} />
+          {diary.is_sowing_done && diary.sowing_date && (
+            <DataRow label={t("Sowing Date")} value={diary.sowing_date} />
+          )}
         </View>
 
         {/* SOIL & WATER PROFILE */}

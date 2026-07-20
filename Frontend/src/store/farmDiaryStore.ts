@@ -82,16 +82,30 @@ export const useFarmDiaryStore = create<FarmDiaryState>((set, get) => ({
   updateDiary: async (diaryId, diaryData) => {
     set({ isLoading: true });
     try {
-      const { error } = await supabase
+      console.log('Sending update for diaryId:', diaryId);
+      console.log('Update payload:', JSON.stringify(diaryData, null, 2));
+      
+      const { data, error, status, statusText } = await supabase
         .from('farm_diary')
         .update(diaryData)
-        .eq('id', diaryId);
+        .eq('id', diaryId)
+        .select();
+
+      console.log('Update response data:', data);
+      console.log('Update response error:', error);
+      console.log('Update response status:', status, statusText);
 
       if (error) throw error;
       
+      if (!data || data.length === 0) {
+        console.warn('Update successful but 0 rows were updated (possibly RLS or invalid ID)');
+        useAlertStore.getState().showAlert('Warning', 'Update did not affect any rows.');
+        return false;
+      }
+      
       // Refresh list
       if (diaryData.farmer_id) {
-        get().fetchDiaries(diaryData.farmer_id);
+        await get().fetchDiaries(diaryData.farmer_id);
       }
       
       return true;
