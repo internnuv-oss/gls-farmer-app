@@ -245,7 +245,11 @@ export const DashboardScreen = ({ navigation, route }: any) => {
     }, [user?.id])
   );
   
-  const onRefresh = () => loadData(0, true);
+  const onRefresh = async () => {
+    // 🚀 FIX: Force the shift state to resync with the DB whenever they refresh the dashboard
+    await useShiftStore.getState().hydrateShifts();
+    loadData(0, true);
+  };
 
   const extractVillages = (routeData: any) => {
     let v: string[] = [];
