@@ -17,6 +17,23 @@ export const CropObservationScreen = ({ route, navigation }: any) => {
   const [stages, setStages] = useState<any[]>([]);
   const [selectedCropId, setSelectedCropId] = useState<string | null>(null);
   const [selectedStageId, setSelectedStageId] = useState<string | null>(null);
+  const [currentVisitNumber, setCurrentVisitNumber] = useState<string>('--');
+  
+  useEffect(() => {
+    const fetchVisitNumber = async () => {
+      if (baseVisitId) {
+        const { data, error } = await supabase
+          .from('mandatory_base_visits')
+          .select('visit_number')
+          .eq('id', baseVisitId)
+          .single();
+        if (data && !error) {
+          setCurrentVisitNumber(data.visit_number.toString().padStart(2, '0'));
+        }
+      }
+    };
+    fetchVisitNumber();
+  }, [baseVisitId]);
   
   const [parameters, setParameters] = useState<any[]>([]);
   const [samplesData, setSamplesData] = useState<any>({
@@ -217,7 +234,7 @@ export const CropObservationScreen = ({ route, navigation }: any) => {
             <Text style={{ fontSize: 18, fontWeight: '800', color: colors.text, marginLeft: spacing.sm }}>Gujarat Life Sciences</Text>
           </Pressable>
           <View style={{ backgroundColor: '#065F46', paddingHorizontal: spacing.md, paddingVertical: 4, borderRadius: radius.pill }}>
-             <Text style={{ color: '#FFFFFF', fontSize: 12, fontWeight: '700' }}>Visit #04</Text>
+             <Text style={{ color: '#FFFFFF', fontSize: 12, fontWeight: '700' }}>Visit #{currentVisitNumber}</Text>
           </View>
         </View>
         

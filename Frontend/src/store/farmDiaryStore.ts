@@ -3,6 +3,20 @@ import { supabase } from '../core/supabase';
 import { useAuthStore } from './authStore';
 import { useAlertStore } from './alertStore';
 import { uploadFileToCloudinary } from '../modules/onboarding/services/cloudinaryService';
+import { useShiftStore } from './shiftStore';
+
+const getActiveRouteName = async (): Promise<string> => {
+  let routeName = "Others";
+  const shiftId = useShiftStore.getState().activeShiftId;
+  if (shiftId) {
+    const { data: sData } = await supabase.from('shifts').select('assigned_route_id').eq('id', shiftId).single();
+    if (sData?.assigned_route_id) {
+      const { data: rData } = await supabase.from('routes').select('name').eq('id', sData.assigned_route_id).single();
+      if (rData?.name) routeName = rData.name;
+    }
+  }
+  return routeName;
+};
 
 export interface FarmDiary {
   id: string;
@@ -65,6 +79,15 @@ export const useFarmDiaryStore = create<FarmDiaryState>((set, get) => ({
 
       if (error) throw error;
       
+      // 🚀 NEW: Log Farm Diary Creation Activity for Travel Report
+      const routeName = await getActiveRouteName();
+      await useShiftStore.getState().incrementActivity();
+      await useShiftStore.getState().logShiftEvent(
+        'activity',
+        'Farm Diary Created',
+        `Farm: ${diaryData.farm_name || 'Unknown'}\nRoute: ${routeName}`
+      );
+
       // Refresh list
       if (diaryData.farmer_id) {
         get().fetchDiaries(diaryData.farmer_id);
@@ -171,6 +194,19 @@ export const useFarmDiaryStore = create<FarmDiaryState>((set, get) => ({
         .single();
 
       if (error) throw error;
+      
+      // 🚀 NEW: Log Base Visit Activity for Travel Report
+      const routeName = await getActiveRouteName();
+      const diary = get().diaries.find(d => d.id === diaryId);
+      const farmName = diary?.farm_name || 'Unknown Farm';
+      
+      await useShiftStore.getState().incrementActivity();
+      await useShiftStore.getState().logShiftEvent(
+        'activity',
+        `Farm Diary Base Visit`,
+        `Farm: ${farmName}\nVisit #${nextVisitNumber}\nRoute: ${routeName}`
+      );
+
       useAlertStore.getState().showAlert('Success', 'Base visit started successfully.');
       return data.id;
     } catch (error: any) {
@@ -293,6 +329,24 @@ export const useFarmDiaryStore = create<FarmDiaryState>((set, get) => ({
           if (valuesError) throw valuesError;
         }
       }
+
+      // 🚀 NEW: Log Crop Observation Activity for Travel Report
+      const routeName = await getActiveRouteName();
+      const diary = get().diaries.find(d => d.id === sessionData.farm_diary_id);
+      const farmName = diary?.farm_name || 'Unknown Farm';
+      
+      let stageName = "Observation";
+      if (sessionData.selected_stage_id) {
+         const { data: sData } = await supabase.from('master_crop_stages').select('stage_name').eq('id', sessionData.selected_stage_id).single();
+         if (sData?.stage_name) stageName = sData.stage_name;
+      }
+      
+      await useShiftStore.getState().incrementActivity();
+      await useShiftStore.getState().logShiftEvent(
+        'activity',
+        `Farm Diary Crop Observation`,
+        `Farm: ${farmName}\nStage: ${stageName}\nRoute: ${routeName}`
+      );
 
       useAlertStore.getState().showAlert('Success', 'Crop observation saved successfully.');
       return true;
