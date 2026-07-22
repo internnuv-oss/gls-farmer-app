@@ -42,13 +42,13 @@ export function useDealerOnboarding(navigation: any, route: any) {
   const defaultFormValues = editData 
     ? mapDealerDbToForm(editData)
     : (draftData ? draftData : {
-        shopName: '', firmType: '', estYear: '', state: '', city: '', taluka: '', village: [], address: '', landmark: '',
+        shopName: '', firmType: '', estYear: '', state: '', city: '', taluka: '', village: '', address: '', landmark: '',
         contactMobile: '', landlineNumber: '', gstNumber: '', panNumber: '',
         owners: [{ name: '' }], 
         bankAccounts: [{ isActive: true, accountType: '', bankName: '', bankBranch: '', accountName: '', accountNumber: '', bankIfsc: '' }],
-        scoreFinancial: 5, scoreReputation: 5, scoreOperations: 5, scoreFarmerNetwork: 5,
-        scoreTeam: 5, scorePortfolio: 5, scoreExperience: 5, scoreGrowth: 5,
-        hasAdditionalLocations: undefined, additionalShops: [], godowns: [], 
+        scoreFinancial: 0, scoreReputation: 0, scoreOperations: 0, scoreFarmerNetwork: 0,
+        scoreTeam: 0, scorePortfolio: 0, scoreExperience: 0, scoreGrowth: 0,
+        hasAdditionalLocations: undefined, additionalShops: [], godowns: [],
         isLinkedToDistributor: undefined, linkedDistributors: [{ name: '', contact: '' }],
         proposedStatus: '', willingDemoFarmers: undefined, demoFarmers: Array(5).fill({ name: '', contact: '', address: '' }),
         glsCommitments: [], complianceChecklist: [], documents: {}, shopLocations: {},
@@ -266,10 +266,18 @@ export function useDealerOnboarding(navigation: any, route: any) {
     
     const isStep7Valid = !!(validTerritories && Array.isArray(values.sePrincipalSuppliers) && values.sePrincipalSuppliers.length > 0 && Array.isArray(values.seChemicalProducts) && values.seChemicalProducts.length > 0 && Array.isArray(values.seBioProducts) && values.seBioProducts.length > 0 && Array.isArray(values.seOtherProducts) && values.seOtherProducts.length > 0 && validCreditRefs && hasPaymentProof && (values.seWillShareSales !== undefined));
     
+    // Ensure all 8 mandatory parameters are scored
+    const isStep2Valid = [
+      values.scoreFinancial, values.scoreReputation, values.scoreOperations,
+      values.scoreFarmerNetwork, values.scoreTeam, values.scorePortfolio,
+      values.scoreExperience, values.scoreGrowth
+    ].every(s => typeof s === 'number' && s >= 0 && s <= 10);
+
     const isStep8Valid = !!(values.agreementAccepted && values.dealerSignature && values.seSignature);
-  
+    
     return [
       { isValid: isStep1Valid, name: "Step 1: Basic Profile (Check PAN/GST/Bank formats)" },
+      { isValid: isStep2Valid, name: "Step 2: Profiling & Scoring (All 8 parameters must be scored)" },
       { isValid: isStep3Valid, name: "Step 3: Business Area (Check dropdown options)" },
       { isValid: isStep4Valid, name: "Step 4: GLS Commitments (Must check all)" },
       { isValid: isStep6Valid, name: "Step 6: Documents & Location (Check GPS & Required files)" },
@@ -757,7 +765,7 @@ export function useDealerOnboarding(navigation: any, route: any) {
     }
   };
 
-  // 🚀 HARD LOCK REFERENCE TO PREVENT DOUBLE TAPS
+  //   HARD LOCK REFERENCE TO PREVENT DOUBLE TAPS
   const submitLockedRef = useRef(false);
 
   const submit = async () => {
@@ -765,64 +773,97 @@ export function useDealerOnboarding(navigation: any, route: any) {
     
     const check = checkRestrictions();
     if (!check.pass) return useAlertStore.getState().showAlert("Restricted Action", check.error);
+
     const missingSteps = validationStatus.filter(v => !v.isValid).map(v => v.name);
     
     if (missingSteps.length > 0) {
-      useAlertStore.getState().showAlert("Missing Information", "Please complete the following sections before submitting:\n\n• " + missingSteps.join("\n• "));
+      useAlertStore.getState().showAlert("Missing Information", "Please complete the following sections before submitting:\n\n  " + missingSteps.join("\n  "));
       return; 
     }
 
-    await form.handleSubmit(async (data) => {
-      if (!user?.id) return useAlertStore.getState().showAlert("Error", "User session not found.");
-      
-      if (submitLockedRef.current) return;
-      submitLockedRef.current = true;
-      setIsSubmitting(true);
-
-      try {
-        // 🚀 1. GENERATE PDF FIRST
-        useAlertStore.getState().showAlert("Processing", "Generating and securing PDF dossier...");
-        const html = generateHTML();
-        const { uri } = await Print.printToFileAsync({ html });
-        const pdfUrl = await uploadFileToCloudinary(uri, 'raw');
-
-        // 🚀 2. SAVE ATOMICALLY
-        useAlertStore.getState().showAlert("Saving", "Uploading complete profile to database...");
-        const dbResult = await saveDealerOnboarding(data, "SUBMITTED", scoreData.percentage, scoreData.band, user.id, editData?.id || fetchedRecordId, check.dirtyKeys, pdfUrl);
+    await form.handleSubmit(
+      // ✅ ON VALID CALLBACK
+      async (data) => {
+        if (!user?.id) return useAlertStore.getState().showAlert("Error", "User session not found.");
         
-        await useShiftStore.getState().incrementActivity(); // 🚀 NEW: Log valid activity!
-        // 🚀 FORMAT TIMELINE DESCRIPTION (Route & Village)
-        let routeName = "";
-        const shiftId = useShiftStore.getState().activeShiftId;
-        if (shiftId) {
-          const { data: sData } = await supabase.from('shifts').select('assigned_route_id').eq('id', shiftId).single();
-          if (sData?.assigned_route_id) {
-            const { data: rData } = await supabase.from('routes').select('name').eq('id', sData.assigned_route_id).single();
-            if (rData?.name) routeName = rData.name;
+        if (submitLockedRef.current) return;
+        submitLockedRef.current = true;
+        setIsSubmitting(true);
+
+        try {
+          //   1. GENERATE PDF FIRST
+          useAlertStore.getState().showAlert("Processing", "Generating and securing PDF dossier...");
+          const html = generateHTML();
+          const { uri } = await Print.printToFileAsync({ html });
+          const pdfUrl = await uploadFileToCloudinary(uri, 'raw');
+
+          //   2. SAVE ATOMICALLY
+          useAlertStore.getState().showAlert("Saving", "Uploading complete profile to database...");
+          const dbResult = await saveDealerOnboarding(data, "SUBMITTED", scoreData.percentage, scoreData.band, user.id, editData?.id || fetchedRecordId, check.dirtyKeys, pdfUrl);
+          
+          await useShiftStore.getState().incrementActivity(); 
+
+          //   FORMAT TIMELINE DESCRIPTION
+          let routeName = "";
+          const shiftId = useShiftStore.getState().activeShiftId;
+          if (shiftId) {
+            const { data: sData } = await supabase.from('shifts').select('assigned_route_id').eq('id', shiftId).single();
+            if (sData?.assigned_route_id) {
+              const { data: rData } = await supabase.from('routes').select('name').eq('id', sData.assigned_route_id).single();
+              if (rData?.name) routeName = rData.name;
+            }
           }
-        }
-        const locName = data.village || "Unknown Village";
-        const eventDesc = routeName ? `${routeName} (${locName})` : locName;
 
-        await useShiftStore.getState().logShiftEvent('activity', (editData || fetchedRecordId) ? 'Updated Dealer Profile' : 'Onboarded Dealer', eventDesc);
-        
-        // 🚀 3. DELETE DRAFT
-        if (draftIdRef.current) {
-          await supabase.from('drafts').delete().eq('entity_id', draftIdRef.current);
-          draftIdRef.current = undefined; 
-        }
+          const locName = data.village || "Unknown Village";
+          const eventDesc = routeName ? `${routeName} (${locName})` : locName;
+          await useShiftStore.getState().logShiftEvent('activity', (editData || fetchedRecordId) ? 'Updated Dealer Profile' : 'Onboarded Dealer', eventDesc);
+          
+          //   3. DELETE DRAFT
+          if (draftIdRef.current) {
+            await supabase.from('drafts').delete().eq('entity_id', draftIdRef.current);
+            draftIdRef.current = undefined; 
+          }
 
-        showSuccessRef.current = true;
-        useAlertStore.getState().hideAlert();
-        setShowSuccess(true);
-      } catch (error: any) {
-        console.error("Submission Error:", error);
-        useAlertStore.getState().showAlert("Submission Failed", error.message || "An error occurred during submission. Please check your connection and try again.");
-      } finally {
+          showSuccessRef.current = true;
+          useAlertStore.getState().hideAlert();
+          setShowSuccess(true);
+
+        } catch (error: any) {
+          console.error("Submission Error:", error);
+          useAlertStore.getState().showAlert("Submission Failed", error.message || "An error occurred during submission. Please check your connection and try again.");
+        } finally {
+          submitLockedRef.current = false;
+          setIsSubmitting(false);
+        }
+      },
+      
+      // 🚨 ON INVALID CALLBACK (CATCHES ZOD SILENT FAILURES)
+      (errors) => {
         submitLockedRef.current = false;
         setIsSubmitting(false);
+        console.error("Zod Validation Errors:", errors);
+
+        // Flatten the nested Zod error object for the alert
+        const formatErrors = (obj: any, prefix = ''): string[] => {
+          let errs: string[] = [];
+          for (const key in obj) {
+            if (obj[key].message) {
+              errs.push(`- ${prefix}${key}: ${obj[key].message}`);
+            } else if (typeof obj[key] === 'object') {
+              errs = errs.concat(formatErrors(obj[key], `${prefix}${key}.`));
+            }
+          }
+          return errs;
+        };
+
+        const errorMessages = formatErrors(errors).join('\n');
+        
+        useAlertStore.getState().showAlert(
+          "Strict Validation Failed", 
+          "Some fields did not pass strict database validation. Please fix the following hidden errors:\n\n" + errorMessages
+        );
       }
-    })();
+    )();
   };
 
   return { form, step, setStep, jumpBackTo, setJumpBackTo, saveDraft, submit, scoreData, handleUpload, handleAudioUpload, uploading, isSubmitting, isNextEnabled, showSuccess, setShowSuccess, generatePDF, isEditing: !!editData || !!fetchedRecordId, saveAndExit, isLocked };

@@ -44,14 +44,14 @@ export const dealerOnboardingSchema = z.object({
   })).min(1, "At least one bank account is required"),
 
   // ---> STEP 2: Scoring <---
-  scoreFinancial: z.number().min(1).max(10), remFinancial: z.string().optional(), audioFinancial: z.string().optional(),
-  scoreReputation: z.number().min(1).max(10), remReputation: z.string().optional(), audioReputation: z.string().optional(),
-  scoreOperations: z.number().min(1).max(10), remOperations: z.string().optional(), audioOperations: z.string().optional(),
-  scoreFarmerNetwork: z.number().min(1).max(10), remFarmerNetwork: z.string().optional(), audioFarmerNetwork: z.string().optional(),
-  scoreTeam: z.number().min(1).max(10), remTeam: z.string().optional(), audioTeam: z.string().optional(),
-  scorePortfolio: z.number().min(1).max(10), remPortfolio: z.string().optional(), audioPortfolio: z.string().optional(),
-  scoreExperience: z.number().min(1).max(10), remExperience: z.string().optional(), audioExperience: z.string().optional(),
-  scoreGrowth: z.number().min(1).max(10), remGrowth: z.string().optional(), audioGrowth: z.string().optional(),
+  scoreFinancial: z.number().min(0).max(10), remFinancial: z.string().optional(), audioFinancial: z.string().optional(),
+  scoreReputation: z.number().min(0).max(10), remReputation: z.string().optional(), audioReputation: z.string().optional(),
+  scoreOperations: z.number().min(0).max(10), remOperations: z.string().optional(), audioOperations: z.string().optional(),
+  scoreFarmerNetwork: z.number().min(0).max(10), remFarmerNetwork: z.string().optional(), audioFarmerNetwork: z.string().optional(),
+  scoreTeam: z.number().min(0).max(10), remTeam: z.string().optional(), audioTeam: z.string().optional(),
+  scorePortfolio: z.number().min(0).max(10), remPortfolio: z.string().optional(), audioPortfolio: z.string().optional(),
+  scoreExperience: z.number().min(0).max(10), remExperience: z.string().optional(), audioExperience: z.string().optional(),
+  scoreGrowth: z.number().min(0).max(10), remGrowth: z.string().optional(), audioGrowth: z.string().optional(),
   redFlags: z.string().optional(), audioRedFlags: z.string().optional(),
 
   // ---> STEP 3: Business Details <---

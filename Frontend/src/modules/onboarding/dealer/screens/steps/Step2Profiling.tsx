@@ -108,7 +108,7 @@ export const Step2Profiling = ({ form, scoreData, uploading, handleAudioUpload, 
       </View>
 
       {SCORING_ASPECTS.map((aspect) => {
-        const tableData = getDynamicTableData(aspect.key, watch(aspect.key as any) || 5);
+        const tableData = getDynamicTableData(aspect.key, watch(aspect.key as any) || 0);
         return (
           <View key={aspect.key} style={{ backgroundColor: colors.surface, padding: spacing.md, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.border, marginBottom: spacing.lg, ...shadows.soft }}>
             {/* 🚀 Wrapped aspect labels */}

@@ -73,6 +73,10 @@ export const Step9Review = ({ form, scoreData, setJumpBackTo, setStep, getCatego
   const complianceDocs = (watch('complianceChecklist') || []).map((item: string) => item.replace(/[^a-zA-Z0-9]/g, '_').toLowerCase());
   const allRequiredDocs = [...coreDocs, ...complianceDocs];
 
+  // Score Validation Checks
+  const scoreKeys = ['scoreFinancial', 'scoreReputation', 'scoreOperations', 'scoreFarmerNetwork', 'scoreTeam', 'scorePortfolio', 'scoreExperience', 'scoreGrowth'];
+  const missingScores = scoreKeys.filter(k => typeof watch(k as any) !== 'number');
+
   // Complex Nested Array Checks
   const isOwnersMissing = owners.length === 0 || owners.some((o: any) => !o.name);
   
@@ -159,6 +163,15 @@ export const Step9Review = ({ form, scoreData, setJumpBackTo, setStep, getCatego
            <Text style={{ fontSize: 16, fontWeight: '800', color: colors.primary }}>{t("2. Profiling & Scoring")}</Text>
            {renderEditBtn(2)}
         </View>
+        
+        {missingScores.length > 0 && (
+           <View style={{ paddingLeft: 8, borderLeftWidth: 2, borderColor: colors.danger, marginBottom: 8 }}>
+             <Text style={{ color: colors.danger, fontWeight: '800', fontSize: 12 }}>
+               {t("Missing Required Scores:")} {missingScores.map(s => s.replace('score', '')).join(', ')}
+             </Text>
+           </View>
+        )}
+
         <Text style={{ fontWeight: '900', fontSize: 18, color: getCategoryColor(scoreData.band), marginBottom: 8 }}>
           {t("Overall: ")} {scoreData.raw} {t("Points")} ({scoreData.band})
         </Text>

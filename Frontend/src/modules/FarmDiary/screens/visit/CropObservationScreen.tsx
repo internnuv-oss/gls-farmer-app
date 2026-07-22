@@ -448,22 +448,6 @@ export const CropObservationScreen = ({ route, navigation }: any) => {
              </View>
              
            </ScrollView>
-
-           {/* Bottom Tab Bar Mimic */}
-           <View style={{ flexDirection: 'row', backgroundColor: '#FFFFFF', borderTopWidth: 1, borderTopColor: '#E2E8F0', paddingBottom: 20, paddingTop: spacing.sm }}>
-              <Pressable style={{ flex: 1, alignItems: 'center' }}>
-                 <Feather name="grid" size={24} color="#94A3B8" />
-                 <Text style={{ fontSize: 10, color: '#94A3B8', marginTop: 4 }}>Dashboard</Text>
-              </Pressable>
-              <Pressable style={{ flex: 1, alignItems: 'center' }}>
-                 <Feather name="check-square" size={24} color="#065F46" />
-                 <Text style={{ fontSize: 10, color: '#065F46', marginTop: 4, fontWeight: '700' }}>Tasks</Text>
-              </Pressable>
-              <Pressable style={{ flex: 1, alignItems: 'center' }}>
-                 <Feather name="user" size={24} color="#94A3B8" />
-                 <Text style={{ fontSize: 10, color: '#94A3B8', marginTop: 4 }}>Profile</Text>
-              </Pressable>
-           </View>
         </>
       )}
 
