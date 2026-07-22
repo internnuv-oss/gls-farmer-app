@@ -44,6 +44,9 @@ import { FarmDiaryCalendarScreen } from '../modules/FarmDiary/screens/visit/Farm
 import { MandatoryBaseVisitScreen } from '../modules/FarmDiary/screens/visit/MandatoryBaseVisitScreen';
 import { CropObservationScreen } from '../modules/FarmDiary/screens/visit/CropObservationScreen';
 import { VisitDetailsScreen } from '../modules/FarmDiary/screens/visit/VisitDetailsScreen';
+import { InventoryScreen } from '../modules/retail/screens/InventoryScreen';
+import { RetailInvoicingScreen } from '../modules/retail/screens/RetailInvoicingScreen';
+import { NewInvoiceScreen } from '../modules/retail/screens/NewInvoiceScreen';
 
 const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
@@ -177,6 +180,9 @@ export const AppNavigator = () => {
             <Stack.Screen name="MandatoryBaseVisitScreen" component={MandatoryBaseVisitScreen} />
             <Stack.Screen name="CropObservationScreen" component={CropObservationScreen} />
             <Stack.Screen name="VisitDetailsScreen" component={VisitDetailsScreen} />
+            <Stack.Screen name="InventoryScreen" component={InventoryScreen} />
+            <Stack.Screen name="RetailInvoicingScreen" component={RetailInvoicingScreen} />
+            <Stack.Screen name="NewInvoiceScreen" component={NewInvoiceScreen} />
           </>
         ) : (
           <>

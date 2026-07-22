@@ -76,6 +76,30 @@ export const ReportsHubScreen = ({ navigation }: any) => {
         </View>
         <MaterialIcons name="chevron-right" size={24} color={colors.textMuted} />
       </Pressable>
+
+      {/* Live Stock / Inventory */}
+      <Pressable onPress={() => navigation.navigate('InventoryScreen')} style={{ backgroundColor: colors.surface, padding: spacing.lg, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.border, ...shadows.soft, flexDirection: 'row', alignItems: 'center', marginTop: spacing.md }}>
+        <View style={{ backgroundColor: '#FEF3C7', padding: 12, borderRadius: radius.md, marginRight: spacing.md }}>
+          <MaterialIcons name="inventory-2" size={28} color="#D97706" />
+        </View>
+        <View style={{ flex: 1 }}>
+          <Text style={{ fontSize: 18, fontWeight: '800', color: colors.text }}>{t('My Inventory')}</Text>
+          <Text style={{ fontSize: 13, color: colors.textMuted, fontWeight: '500', marginTop: 2 }}>{t('View live stock & transfers')}</Text>
+        </View>
+        <MaterialIcons name="chevron-right" size={24} color={colors.textMuted} />
+      </Pressable>
+
+      {/* Retail Invoicing */}
+      <Pressable onPress={() => navigation.navigate('RetailInvoicingScreen')} style={{ backgroundColor: colors.surface, padding: spacing.lg, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.border, ...shadows.soft, flexDirection: 'row', alignItems: 'center', marginTop: spacing.md }}>
+        <View style={{ backgroundColor: '#E0E7FF', padding: 12, borderRadius: radius.md, marginRight: spacing.md }}>
+          <MaterialIcons name="receipt-long" size={28} color="#4F46E5" />
+        </View>
+        <View style={{ flex: 1 }}>
+          <Text style={{ fontSize: 18, fontWeight: '800', color: colors.text }}>{t('Retail Invoicing')}</Text>
+          <Text style={{ fontSize: 13, color: colors.textMuted, fontWeight: '500', marginTop: 2 }}>{t('Generate bills & view order history')}</Text>
+        </View>
+        <MaterialIcons name="chevron-right" size={24} color={colors.textMuted} />
+      </Pressable>
     </ScrollView>
   );
 };

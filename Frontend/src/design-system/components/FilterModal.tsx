@@ -6,6 +6,7 @@ import { colors, radius, shadows, spacing, typography } from '../tokens';
 
 export type FilterState = {
   sortBy: string;
+  paymentMode: string[];
   completionStatus: string[];
   routeId: string[]; 
   category: string[];
@@ -29,6 +30,7 @@ export type FilterState = {
 
 export const defaultFilters: FilterState = {
   sortBy: "latest",
+  paymentMode: [],
   completionStatus: [],
   routeId: [], 
   category: [],
@@ -194,18 +196,28 @@ export const FilterModal: React.FC<FilterModalProps> = ({ visible, entityType, c
 
             <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: spacing.xl }}>
               
-              <View style={styles.sectionBlock}>
+            <View style={styles.sectionBlock}>
                 <Text style={styles.sectionLabel}>Sort {entityType}</Text>
                 {[
-                  { label: "Newest First", value: "latest" },
-                  ...(entityType === "Dealers" || entityType === "Distributors" ? [
-                    { label: "Highest Score", value: "score_high" },
-                    { label: "Lowest Score", value: "score_low" }
-                  ] : []),
-                  ...(entityType === "Farmers" ? [
-                    { label: "Largest Land Holding", value: "land_high" },
-                    { label: "Smallest Land Holding", value: "land_low" }
-                  ] : [])
+                  ...(entityType === "Inventory" ? [
+                    { label: "A-Z", value: "name_asc" },
+                    { label: "Quantity (High to Low)", value: "qty_desc" },
+                    { label: "Quantity (Low to High)", value: "qty_asc" }
+                  ] : entityType === "Invoices" ? [
+                    { label: "Newest First", value: "date_desc" },
+                    { label: "Oldest First", value: "date_asc" },
+                    { label: "Highest Amount", value: "amount_desc" }
+                  ] : [
+                    { label: "Newest First", value: "latest" },
+                    ...(entityType === "Dealers" || entityType === "Distributors" ? [
+                      { label: "Highest Score", value: "score_high" },
+                      { label: "Lowest Score", value: "score_low" }
+                    ] : []),
+                    ...(entityType === "Farmers" ? [
+                      { label: "Largest Land Holding", value: "land_high" },
+                      { label: "Smallest Land Holding", value: "land_low" }
+                    ] : [])
+                  ])
                 ].map(opt => (
                   <Pressable key={opt.value} onPress={() => handleSortUpdate(opt.value)} style={styles.radioRow}>
                     <View style={[styles.radio, localFilters.sortBy === opt.value && styles.radioActive]}>
@@ -216,10 +228,14 @@ export const FilterModal: React.FC<FilterModalProps> = ({ visible, entityType, c
                 ))}
               </View>
 
-              <View style={styles.divider} />
-              <Text style={[styles.sectionLabel, { marginBottom: 0 }]}>Filter Parameters</Text>
+              {entityType !== "Inventory" && (
+                <>
+                  <View style={styles.divider} />
+                  <Text style={[styles.sectionLabel, { marginBottom: 0 }]}>Filter Parameters</Text>
+                </>
+              )}
 
-              {entityType !== "Farmers" && (
+              {entityType !== "Farmers" && entityType !== "Inventory" && entityType !== "Invoices" && (
                 <FilterAccordionGroup 
                   title="Completion Status" 
                   selectedValues={localFilters.completionStatus} 
@@ -227,6 +243,18 @@ export const FilterModal: React.FC<FilterModalProps> = ({ visible, entityType, c
                   options={[
                     { label: "Submitted Profiles", value: "Completed" },
                     { label: "Draft Profiles", value: "Incomplete" }
+                  ]} 
+                />
+              )}
+
+{entityType === "Invoices" && (
+                <FilterAccordionGroup 
+                  title="Payment Mode" 
+                  selectedValues={localFilters.paymentMode} 
+                  onToggleItem={(val) => toggleFilter('paymentMode', val)}
+                  options={[
+                    { label: "CASH Payment", value: "CASH" },
+                    { label: "UPI Payment", value: "UPI" }
                   ]} 
                 />
               )}
