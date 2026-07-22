@@ -28,6 +28,11 @@ export function useDealerOnboarding(navigation: any, route: any) {
   const draftData = route?.params?.draftData;
   const draftId = route?.params?.draftId;
 
+  // 🚀 Auto-repair old drafts that had village as an array
+  if (draftData && Array.isArray(draftData.village)) {
+    draftData.village = draftData.village.length > 0 ? draftData.village[0] : '';
+  }
+
   const [step, setStep] = useState(route?.params?.initialStep || 1);
   const [jumpBackTo, setJumpBackTo] = useState<number | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -86,7 +91,12 @@ export function useDealerOnboarding(navigation: any, route: any) {
           useAlertStore.getState().showAlert("Profile Found", "An existing profile was found and has been loaded.");
           
           if (existingProfile.source === 'draft') {
-            reset(existingProfile.data.draft_data);
+            const loadedDraft = existingProfile.data.draft_data;
+            // 🚀 Auto-repair old db drafts
+            if (Array.isArray(loadedDraft.village)) {
+              loadedDraft.village = loadedDraft.village.length > 0 ? loadedDraft.village[0] : '';
+            }
+            reset(loadedDraft);
             draftIdRef.current = existingProfile.data.entity_id;
             setStep(existingProfile.data.current_step || 1);
             setIsLocked(false);
