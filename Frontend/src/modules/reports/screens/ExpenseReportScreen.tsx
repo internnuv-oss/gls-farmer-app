@@ -8,11 +8,18 @@ import { useExpenseStore, Expense } from '../../../store/expenseStore';
 import { useShiftStore } from '../../../store/shiftStore'; // 🚀 Added to trace shift state
 import { useAlertStore } from '../../../store/alertStore';
 import { EmptyState, Button } from '../../../design-system/components';
+import { usePermissions } from '../../../core/usePermissions';
+import { useAuthStore } from '../../../store/authStore';
 
 export const ExpenseReportScreen = ({ navigation }: any) => {
   const { t } = useTranslation();
   const expenses = useExpenseStore((state) => state.expenses);
   const { isActive } = useShiftStore(); // 🚀 Trace active attendance state
+
+  // 🚀 ADD THIS: Fetch Permissions
+  const userId = useAuthStore((s) => s.user?.id);
+  const { getModulePerm } = usePermissions(userId);
+  const expensePerm = getModulePerm('mobile_travel_activity');
 
   const [startDate, setStartDate] = useState(new Date());
   const [endDate, setEndDate] = useState(new Date());
@@ -219,9 +226,11 @@ export const ExpenseReportScreen = ({ navigation }: any) => {
       )}
 
       {/* FIXED BOTTOM BUTTON - 🚀 REQ 7: Evaluates single point action protection mapping */}
+      {expensePerm.can_edit && (
       <View style={{ padding: spacing.lg, backgroundColor: colors.surface, borderTopWidth: 1, borderTopColor: colors.border }}>
         <Button label={t("Add New Expense")} icon="add" onPress={handleAddNewExpenseAction} />
       </View>
+    )}
     </View>
   );
 };

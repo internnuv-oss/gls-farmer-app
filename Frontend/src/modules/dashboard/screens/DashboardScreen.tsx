@@ -11,6 +11,7 @@ import { useFocusEffect } from "@react-navigation/native";
 import { useAuthStore } from "../../../store/authStore";
 import { useAlertStore } from "../../../store/alertStore";
 import { useDraftStore } from "../../../store/draftStore";
+import { usePermissions } from '../../../core/usePermissions';
 import { supabase } from "../../../core/supabase";
 import { ActiveShiftWidget } from '../../shifts/components/ActiveShiftWidget';
 import { useShiftStore } from '../../../store/shiftStore';
@@ -35,6 +36,19 @@ const { width } = Dimensions.get("window");
 export const DashboardScreen = ({ navigation, route }: any) => {
   const { t } = useTranslation();
   const user = useAuthStore((state) => state.user);
+
+  // 1. FETCH PERMISSIONS
+  const { getModulePerm, loading: permsLoading, refreshPermissions } = usePermissions(user?.id);
+  
+  const distPerm = getModulePerm('mobile_distributor');
+  const dealerPerm = getModulePerm('mobile_dealer');
+  const farmerPerm = getModulePerm('mobile_farmer');
+  const fpoPerm = getModulePerm('mobile_fpo');
+  const travelPerm = getModulePerm('mobile_travel_activity');
+  const farmerOnboardPerm = getModulePerm('mobile_farmer_onboard');
+
+  const hasFarmerTabAccess = farmerPerm.can_view || farmerOnboardPerm.can_view;
+  const hasFarmerAddAccess = farmerPerm.can_edit || farmerOnboardPerm.can_edit;
 
   const [activeTab, setActiveTab] = useState(0); 
   const [loading, setLoading] = useState(false);
@@ -172,12 +186,12 @@ export const DashboardScreen = ({ navigation, route }: any) => {
       const PAGE_LIMIT = 50; 
       
       const [dealersData, farmersData, distributorsData, fposData, draftsData, routesData] = await Promise.all([
-        fetchMyDealers(user.id, pageNumber, PAGE_LIMIT),
-        fetchMyFarmers(user.id, pageNumber, PAGE_LIMIT),
-        fetchMyDistributors(user.id, pageNumber, PAGE_LIMIT),
-        fetchMyFPOs(user.id, pageNumber, PAGE_LIMIT),
+        dealerPerm.can_view ? fetchMyDealers(user.id, pageNumber, PAGE_LIMIT) : Promise.resolve([]),
+        hasFarmerTabAccess ? fetchMyFarmers(user.id, pageNumber, PAGE_LIMIT) : Promise.resolve([]), // 🚀 UPDATED
+        distPerm.can_view ? fetchMyDistributors(user.id, pageNumber, PAGE_LIMIT) : Promise.resolve([]),
+        fpoPerm.can_view ? fetchMyFPOs(user.id, pageNumber, PAGE_LIMIT) : Promise.resolve([]),
         pageNumber === 0 ? fetchMyDrafts(user.id) : Promise.resolve([]),
-        pageNumber === 0 ? fetchMyRoutes(user.id) : Promise.resolve([]) 
+        pageNumber === 0 && hasFarmerTabAccess ? fetchMyRoutes(user.id) : Promise.resolve([]) // 🚀 UPDATED
       ]);
 
       const mappedDistributors = distributorsData.map((d: any) => ({
@@ -241,11 +255,17 @@ export const DashboardScreen = ({ navigation, route }: any) => {
   
   useFocusEffect(
     useCallback(() => {
-      loadData(0);
-    }, [user?.id])
+      // 🚀 FIX: Wait until permissions are fully loaded before fetching data
+      // This prevents the initial load from skipping queries due to temporary 'false' permissions
+      if (!permsLoading) {
+        loadData(0);
+      }
+    }, [user?.id, permsLoading]) // <-- Added permsLoading as a dependency
   );
   
   const onRefresh = async () => {
+    // 🚀 NEW: Re-fetch RBAC rules from the database
+    await refreshPermissions();
     // 🚀 FIX: Force the shift state to resync with the DB whenever they refresh the dashboard
     await useShiftStore.getState().hydrateShifts();
     loadData(0, true);
@@ -535,46 +555,50 @@ export const DashboardScreen = ({ navigation, route }: any) => {
 
   const isFilterActive = JSON.stringify(filters) !== JSON.stringify(defaultFilters);
 
-  const tabPages = [
-    {
-      key: "Distributors",
-      data: processedDistributors,
-      emptyMsg: "Onboard distributors to streamline your agricultural supply chain.",
-      icon: "domain",
-      actionId: "distributor",
-      actionLabel: "Add Distributor",
-      actionIcon: "domain",
-    },
-    {
-      key: "Dealers",
-      data: processedDealers, 
-      emptyMsg: "Start building your network by onboarding your first dealer.",
-      icon: "storefront",
-      actionId: "dealer",
-      actionLabel: "Add Dealer",
-      actionIcon: "storefront",
-    },
-    {
-      key: "Farmers",
-      data: processedFarmers, 
-      emptyMsg: "Connect with farmers and manage their profiles efficiently here.",
-      icon: "agriculture",
-      actionId: "farmer",
-      actionLabel: "Add Farmer",
-      actionIcon: "agriculture",
-    },
-    {
-      key: "FPOs",
-      data: processedFPOs, 
-      emptyMsg: "Partner with Farmer Producer Organizations to scale your reach.",
-      icon: "groups",
-      actionId: "fpo",
-      actionLabel: "Add FPO",
-      actionIcon: "groups",
-    },
-  ];
+  const tabPages = useMemo(() => {
+    const pages = [];
+    if (distPerm.can_view) {
+      pages.push({
+        key: "Distributors", data: processedDistributors, emptyMsg: "Onboard distributors to streamline your agricultural supply chain.", icon: "domain", actionId: "distributor", actionLabel: "Add Distributor", actionIcon: "domain",
+      });
+    }
+    if (dealerPerm.can_view) {
+      pages.push({
+        key: "Dealers", data: processedDealers, emptyMsg: "Start building your network by onboarding your first dealer.", icon: "storefront", actionId: "dealer", actionLabel: "Add Dealer", actionIcon: "storefront",
+      });
+    }
+    if (hasFarmerTabAccess) {
+      pages.push({
+        key: "Farmers", data: processedFarmers, emptyMsg: "Connect with farmers and manage their profiles efficiently here.", icon: "agriculture", actionId: "farmer", actionLabel: "Add Farmer", actionIcon: "agriculture",
+      });
+    }
+    if (fpoPerm.can_view) {
+      pages.push({
+        key: "FPOs", data: processedFPOs, emptyMsg: "Partner with Farmer Producer Organizations to scale your reach.", icon: "groups", actionId: "fpo", actionLabel: "Add FPO", actionIcon: "groups",
+      });
+    }
+    return pages;
+  }, [distPerm.can_view, dealerPerm.can_view, farmerPerm.can_view, fpoPerm.can_view, processedDistributors, processedDealers, processedFarmers, processedFPOs]);
 
+  // Adjust active tab if permissions change and current index is out of bounds
+  useEffect(() => {
+    if (tabPages.length > 0 && activeTab >= tabPages.length) {
+      setActiveTab(0);
+    }
+  }, [tabPages.length, activeTab]);
 
+  // Dynamically build FAB Actions based on edit permissions
+  const fabActions = useMemo(() => {
+    // 1. Add the explicit type definition here
+    const actions: Array<{ id: string; label: string; icon: any }> = [];
+    
+    if (hasFarmerAddAccess) actions.push({ id: "farmer", label: t("Add Farmer"), icon: "agriculture" });
+    if (dealerPerm.can_edit) actions.push({ id: "dealer", label: t("Add Dealer"), icon: "storefront" });
+    if (distPerm.can_edit) actions.push({ id: "distributor", label: t("Add Distributor"), icon: "domain" });
+    if (fpoPerm.can_edit) actions.push({ id: "fpo", label: t("Add FPO"), icon: "groups" });
+    
+    return actions;
+  }, [farmerPerm.can_edit, dealerPerm.can_edit, distPerm.can_edit, fpoPerm.can_edit, t]);
 
   const handleDeleteDraft = useCallback((entityId: string) => {
     useAlertStore.getState().showAlert(
@@ -605,7 +629,7 @@ export const DashboardScreen = ({ navigation, route }: any) => {
     <EntityCard item={item} navigation={navigation} t={t} onDeleteDraft={handleDeleteDraft} /> 
   ), [navigation, t, handleDeleteDraft]);
 
-
+  const hasAnyDashboardAccess = distPerm.can_view || dealerPerm.can_view || farmerPerm.can_view || fpoPerm.can_view || hasFarmerTabAccess;
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.screen, paddingTop: 50 }}>
@@ -627,9 +651,27 @@ export const DashboardScreen = ({ navigation, route }: any) => {
       </View>
 
       <View style={{ flex: 1, alignItems: "flex-end", justifyContent: "center" }}>
-        <ActiveShiftWidget />
+      <ActiveShiftWidget canEditAttendance={travelPerm.can_edit} />
       </View>
     </View>
+
+    {permsLoading ? (
+        // SHOW SPINNER WHILE PERMISSIONS ARE LOADING
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: spacing.xl }}>
+          <ActivityIndicator size="large" color={colors.primary} />
+          <Text style={{ marginTop: 12, color: colors.textMuted, fontWeight: '700' }}>{t("Verifying Access...")}</Text>
+        </View>
+      ) : !hasAnyDashboardAccess ? (
+        // FALLBACK UI
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: spacing.xl }}>
+          <MaterialIcons name="block" size={64} color={colors.textMuted} />
+          <Text style={{ fontSize: 20, fontWeight: '900', color: colors.text, marginTop: 16 }}>{t("No Modules Assigned")}</Text>
+          <Text style={{ fontSize: 14, color: colors.textMuted, textAlign: 'center', marginTop: 8, fontWeight: '500', lineHeight: 20 }}>
+            {t("Your role currently has no dashboard modules assigned. Please contact the administrator.")}
+          </Text>
+        </View>
+      ) : (// NORMAL DASHBOARD UI
+        <>
 
       <View style={{ flexDirection: "row", paddingHorizontal: spacing.lg, marginBottom: spacing.md, gap: spacing.sm }}>
         <View style={{ flex: 1, flexDirection: "row", alignItems: "center", backgroundColor: colors.surface, borderRadius: radius.md, borderWidth: 1, borderColor: colors.border, paddingHorizontal: spacing.md, height: 48 }}>
@@ -664,25 +706,25 @@ export const DashboardScreen = ({ navigation, route }: any) => {
         }}
       >
         {tabPages.map((tab, index) => (
-          <Pressable
-            key={tab.key}
-            onPress={() => {
-              setActiveTab(index);
-              pagerRef.current?.scrollToIndex({ index, animated: true });
-            }}
-            style={{
-              flex: 1,
-              paddingVertical: 12,
-              borderBottomWidth: 2,
-              borderBottomColor: activeTab === index ? colors.primary : "transparent",
-              alignItems: "center",
-            }}
-          >
-            <Text style={{ fontWeight: "800", color: activeTab === index ? colors.primary : colors.textMuted }}>
-              {t(tab.key)}
-            </Text>
-          </Pressable>
-        ))}
+              <Pressable
+                key={tab.key}
+                onPress={() => {
+                  setActiveTab(index);
+                  pagerRef.current?.scrollToIndex({ index, animated: true });
+                }}
+                style={{
+                  flex: 1,
+                  paddingVertical: 12,
+                  borderBottomWidth: 2,
+                  borderBottomColor: activeTab === index ? colors.primary : "transparent",
+                  alignItems: "center",
+                }}
+              >
+                <Text style={{ fontWeight: "800", color: activeTab === index ? colors.primary : colors.textMuted }}>
+                  {t(tab.key)}
+                </Text>
+              </Pressable>
+            ))}
       </View>
 
       <FlatList
@@ -765,8 +807,9 @@ export const DashboardScreen = ({ navigation, route }: any) => {
                         title={t("No Routes Assigned")}
                         description={t("No routes have been assigned to you yet.")}
                         iconName="map"
-                        actionLabel={t("Add Farmer Manually")}
-                        onAction={() => navigation.navigate("FarmerOnboarding")}
+                        // HIDDEN IF NO FARMER EDIT PERMISSION
+                        actionLabel={farmerPerm.can_edit ? t("Add Farmer Manually") : undefined}
+                        onAction={farmerPerm.can_edit ? () => navigation.navigate("FarmerOnboarding") : undefined}
                       />
                     )
                   }
@@ -957,8 +1000,25 @@ export const DashboardScreen = ({ navigation, route }: any) => {
                       title={t(searchQuery ? "No Results Found" : `No ${item.key} Yet`)}
                       description={t(searchQuery ? "Try adjusting your search criteria." : item.emptyMsg)}
                       iconName={item.icon as any}
-                      actionLabel={t(item.actionLabel)}
-                      actionIcon={item.actionIcon as any}
+                      
+                      // HIDDEN IF NO EDIT PERMISSION
+                      actionLabel={
+                        (item.actionId === "dealer" && !dealerPerm.can_edit) || 
+                        (item.actionId === "farmer" && !hasFarmerAddAccess) || 
+                        (item.actionId === "distributor" && !distPerm.can_edit) || 
+                        (item.actionId === "fpo" && !fpoPerm.can_edit) 
+                          ? undefined 
+                          : t(item.actionLabel)
+                      }
+                      actionIcon={
+                        (item.actionId === "dealer" && !dealerPerm.can_edit) || 
+                        (item.actionId === "farmer" && !hasFarmerAddAccess) || 
+                        (item.actionId === "distributor" && !distPerm.can_edit) || 
+                        (item.actionId === "fpo" && !fpoPerm.can_edit) 
+                          ? undefined 
+                          : (item.actionIcon as any)
+                      }
+                      
                       onAction={() => {
                         if (item.actionId === "dealer") navigation.navigate("DealerOnboarding");
                         else if (item.actionId === "farmer") navigation.navigate("FarmerOnboarding");
@@ -975,29 +1035,21 @@ export const DashboardScreen = ({ navigation, route }: any) => {
         )}
       />
 
-      <FloatingActionMenu
-        actions={[
-          { id: "expense", label: t("Log Expense"), icon: "receipt" },
-          { id: "dealer", label: t("Add Dealer"), icon: "storefront" },
-          { id: "farmer", label: t("Add Farmer"), icon: "agriculture" },
-          { id: "distributor", label: t("Add Distributor"), icon: "domain" },
-          { id: "fpo", label: t("Add FPO"), icon: "groups" },
-        ]}
-        onActionPress={(id) => {
-          if (id === "expense") navigation.navigate("AddExpenseScreen");
-          else {
-            if (id === "dealer") navigation.navigate("DealerOnboarding");
-            else if (id === "farmer") navigation.navigate("FarmerOnboarding");
-            else if (id === "distributor") navigation.navigate("DistributorOnboarding");
-            else if (id === "fpo") navigation.navigate("FPOOnboarding");
-            else navigation.navigate("ComingSoonScreen");
-          }}
-        }
-      />
+{fabActions.length > 0 && (
+            <FloatingActionMenu
+              actions={fabActions}
+              onActionPress={(id) => {
+                if (id === "farmer") navigation.navigate("FarmerOnboarding");
+                else if (id === "dealer") navigation.navigate("DealerOnboarding");
+                else if (id === "distributor") navigation.navigate("DistributorOnboarding");
+                else if (id === "fpo") navigation.navigate("FPOOnboarding");
+              }}
+            />
+          )}
 
       <FilterModal
         visible={isFilterModalOpen}
-        entityType={tabPages[activeTab].key} 
+        entityType={tabPages[activeTab]?.key || "Dashboard"} 
         currentFilters={filters}
         onApply={(newFilters) => setFilters(newFilters)}
         onClose={() => setIsFilterModalOpen(false)}
@@ -1026,6 +1078,8 @@ export const DashboardScreen = ({ navigation, route }: any) => {
           <AnalyticsTable entities={analyticsModalConfig.entities} title={analyticsModalConfig.title} />
         </View>
       </Modal>
+      </>
+    )}
     </View>
   );
 };

@@ -8,14 +8,23 @@ import { PunchInModal } from './PunchInModal';
 import { PunchOutModal } from './PunchOutModal';
 import { useAlertStore } from '../../../store/alertStore';
 import { useAuthStore } from '../../../store/authStore';
+import { usePermissions } from '../../../core/usePermissions';
 import { uploadFileToCloudinary } from '../../onboarding/services/cloudinaryService';
 
 let lastOpenedLoginStamp: number | null = null;
 
-export const ActiveShiftWidget = () => {
+export const ActiveShiftWidget = ({ canEditAttendance }: { canEditAttendance?: boolean }) => {
   const { t } = useTranslation();
   const { isActive, startTime, startShift, endShift, activitiesLogged, shiftHistory, transitMode } = useShiftStore();
+  const userId = useAuthStore((s) => s.user?.id);
   const loginTimestamp = useAuthStore((s) => s.loginTimestamp);
+
+  // 🚀 Fetch Permissions internally as a fallback
+  const { getModulePerm } = usePermissions(userId);
+  const internalPerm = getModulePerm('mobile_travel_activity').can_edit;
+
+  // 🚀 Evaluate if they are allowed to edit (Prop takes priority over internal fetch)
+  const isAllowedToEdit = canEditAttendance !== undefined ? canEditAttendance : internalPerm;
 
   const [showInModal, setShowInModal] = useState(false);
   const [showOutModal, setShowOutModal] = useState(false);
@@ -82,6 +91,11 @@ export const ActiveShiftWidget = () => {
       ).start();
     }
   }, [isActive, bounceAnim, pulseAnim]);
+
+  // 🚀 UPDATE THIS: Check the dynamically passed/calculated permission variable
+  if (!isAllowedToEdit) {
+    return null; 
+  }
 
   return (
     <View style={{ width: '100%', alignItems: 'flex-end' }}>

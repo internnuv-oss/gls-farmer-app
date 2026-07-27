@@ -1,3 +1,5 @@
+// Frontend/src/design-system/components/EmptyState.tsx
+
 import React, { useEffect, useRef } from 'react';
 import { View, Text, Animated, Easing, StyleSheet } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
@@ -8,9 +10,9 @@ type Props = {
   title: string;
   description: string;
   iconName: React.ComponentProps<typeof MaterialIcons>['name'];
-  actionLabel: string;
+  actionLabel?: string;
   actionIcon?: React.ComponentProps<typeof MaterialIcons>['name'];
-  onAction: () => void;
+  onAction?: () => void;
 };
 
 export const EmptyState: React.FC<Props> = ({ title, description, iconName, actionLabel, actionIcon, onAction }) => {
@@ -35,15 +37,19 @@ export const EmptyState: React.FC<Props> = ({ title, description, iconName, acti
       </Animated.View>
       <Text style={styles.title}>{title}</Text>
       <Text style={styles.description}>{description}</Text>
-      <View style={{ marginTop: spacing.xl, width: '100%', maxWidth: 220 }}>
-      <Button 
-  label={actionLabel} 
-  onPress={onAction} 
-  variant="secondary"
-  icon={actionIcon}
-  iconPosition="left"
-/>
-      </View>
+      
+      {/* CONDITIONALLY RENDER THE BUTTON */}
+      {actionLabel && onAction && (
+        <View style={{ marginTop: spacing.xl, width: '100%', maxWidth: 220 }}>
+          <Button 
+            label={actionLabel} 
+            onPress={onAction} 
+            variant="secondary"
+            icon={actionIcon}
+            iconPosition="left"
+          />
+        </View>
+      )}
     </View>
   );
 };

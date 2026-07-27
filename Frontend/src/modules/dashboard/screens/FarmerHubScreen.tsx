@@ -1,3 +1,5 @@
+// Frontend/src/modules/dashboard/screens/FarmerHubScreen.tsx
+
 import React, { useState } from 'react';
 import { View, Text, Pressable, ScrollView, RefreshControl } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -6,8 +8,21 @@ import { useTranslation } from 'react-i18next';
 import { colors, radius, spacing, shadows } from '../../../design-system/tokens';
 import { supabase } from '../../../core/supabase';
 
+// 1. IMPORT PERMISSION HOOKS
+import { usePermissions } from '../../../core/usePermissions';
+import { useAuthStore } from '../../../store/authStore';
+
 export const FarmerHubScreen = ({ route, navigation }: any) => {
   const { t } = useTranslation();
+  
+  // 2. INITIALIZE PERMISSIONS
+  const user = useAuthStore(s => s.user);
+  const { getModulePerm } = usePermissions(user?.id);
+
+  const farmerPerm = getModulePerm('mobile_farmer');
+  const farmerOnboardPerm = getModulePerm('mobile_farmer_onboard');
+
+  const canEditBaseFarmer = farmerPerm.can_edit || farmerOnboardPerm.can_edit;
   
   const [localEntity, setLocalEntity] = useState(route.params.entity);
   const [refreshing, setRefreshing] = useState(false);
@@ -32,11 +47,9 @@ export const FarmerHubScreen = ({ route, navigation }: any) => {
     }
   };
 
-  // 🚀 NEW: Pull-to-refresh handler
   const onRefresh = async () => {
     setRefreshing(true);
     try {
-      // Assuming your table is named 'farmers'. Adjust if it's 'profiles'.
       const { data, error } = await supabase
         .from('farmers')
         .select('*')
@@ -44,7 +57,6 @@ export const FarmerHubScreen = ({ route, navigation }: any) => {
         .single();
         
       if (data && !error) {
-        // Merge the fresh database row into the `raw` property
         setLocalEntity((prev: any) => ({ ...prev, raw: data }));
       }
       await checkFarmCards();
@@ -55,20 +67,16 @@ export const FarmerHubScreen = ({ route, navigation }: any) => {
     }
   };
 
-  // 🚀 Update these to use localEntity instead of entity
   const isDraft = localEntity.isDraft;
   const village = localEntity.raw?.personal_details?.village || localEntity.city || localEntity.village || "Unknown Village";
   const state = localEntity.raw?.personal_details?.state || localEntity.state || "Unknown State";
 
-  // 🚀 NEW: Extract FSPP and Approval Logic
   const fsppDetails = localEntity.raw?.fspp_details;
   const hasFspp = !!fsppDetails?.statusLabel;
-  const fsppCategory = fsppDetails?.category; // e.g., 'Category A', 'Category B'
+  const fsppCategory = fsppDetails?.category; 
   
-  // Check if admin has explicitly approved this profile (Checking standard fallback paths)
   const isProfileApproved = localEntity.raw?.fspp_approval_status === 'APPROVED' || fsppDetails?.approvalStatus === 'APPROVED';
   
-  // They can access if they are Category A or B, OR if they are another category but approved by Admin
   const canAccessFarmCards = ['Category A', 'Category B'].includes(fsppCategory) || isProfileApproved;
 
   return (
@@ -96,7 +104,6 @@ export const FarmerHubScreen = ({ route, navigation }: any) => {
         }
       >
         
-        {/* Action Cards Container */}
         <View style={{ flex: 1 }}>
             
             {/* The primary Action Card */}
@@ -144,40 +151,42 @@ export const FarmerHubScreen = ({ route, navigation }: any) => {
               </View>
             </Pressable>
 
-            {/* General Visit Card */}
-            <Pressable
-              onPress={() => {
-                navigation.navigate("GeneralVisit", { entity: localEntity });
-              }}
-              style={{
-                flexDirection: 'row',
-                alignItems: 'center',
-                backgroundColor: colors.surface,
-                padding: spacing.xl,
-                borderRadius: radius.lg,
-                borderWidth: 1,
-                borderColor: '#DC2626', // 🚀 Matching red border
-                marginBottom: spacing.lg,
-                ...shadows.soft,
-              }}
-            >
-              <View style={{ width: 48, height: 48, borderRadius: 12, backgroundColor: '#FEF2F2', alignItems: 'center', justifyContent: 'center', marginRight: spacing.lg }}>
-                <MaterialIcons name="event" size={28} color="#DC2626" />
-              </View>
-              
-              <View style={{ flex: 1 }}>
-                <Text style={{ fontSize: 18, fontWeight: '800', color: colors.text }}>
-                  {t("General Visit")}
-                </Text>
-              </View>
+            {/* General Visit Card (Only if they have Farmer Edit permissions) */}
+            {canEditBaseFarmer && (
+              <Pressable
+                onPress={() => {
+                  navigation.navigate("GeneralVisit", { entity: localEntity });
+                }}
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  backgroundColor: colors.surface,
+                  padding: spacing.xl,
+                  borderRadius: radius.lg,
+                  borderWidth: 1,
+                  borderColor: '#DC2626',
+                  marginBottom: spacing.lg,
+                  ...shadows.soft,
+                }}
+              >
+                <View style={{ width: 48, height: 48, borderRadius: 12, backgroundColor: '#FEF2F2', alignItems: 'center', justifyContent: 'center', marginRight: spacing.lg }}>
+                  <MaterialIcons name="event" size={28} color="#DC2626" />
+                </View>
+                
+                <View style={{ flex: 1 }}>
+                  <Text style={{ fontSize: 18, fontWeight: '800', color: colors.text }}>
+                    {t("General Visit")}
+                  </Text>
+                </View>
 
-              <View style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: '#F1F5F9', alignItems: 'center', justifyContent: 'center' }}>
-                <MaterialIcons name="chevron-right" size={20} color={colors.textMuted} />
-              </View>
-            </Pressable>
+                <View style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: '#F1F5F9', alignItems: 'center', justifyContent: 'center' }}>
+                  <MaterialIcons name="chevron-right" size={20} color={colors.textMuted} />
+                </View>
+              </Pressable>
+            )}
 
-            {/* FSPP Enrollment Card */}
-            {!isDraft && (
+            {/* 3. FSPP Enrollment Card (Restricted by canViewFSPP) */}
+            {!isDraft && farmerPerm.can_view && (
               <Pressable
                 onPress={() => {
                   navigation.navigate("FSPPEnrollment", { entity: { ...localEntity, raw: localEntity.raw } });
@@ -189,7 +198,7 @@ export const FarmerHubScreen = ({ route, navigation }: any) => {
                   padding: spacing.xl,
                   borderRadius: radius.lg,
                   borderWidth: 1,
-                  borderColor: localEntity.raw?.fspp_details?.statusLabel ? "#166534" : "#2563EB", // 🚀 Dynamic colorful border based on completion status
+                  borderColor: localEntity.raw?.fspp_details?.statusLabel ? "#166534" : "#2563EB",
                   marginBottom: spacing.lg,
                   ...shadows.soft,
                 }}
@@ -213,22 +222,27 @@ export const FarmerHubScreen = ({ route, navigation }: any) => {
               </Pressable>
             )}
             
-            {/* 🚀 NEW: MASTER FARM CARD ENTRY BUTTON */}
-            {!isDraft && localEntity.raw?.fspp_details?.statusLabel && (
+            {/* 4. FARM CARD ENTRY BUTTON (Restricted by farmCardPerm) */}
+            {!isDraft && localEntity.raw?.fspp_details?.statusLabel && farmerPerm.can_view && (
               <Pressable
-                onPress={() => navigation.navigate("FarmCardsListScreen", { farmer: localEntity })}
+                onPress={() => {
+                  if (canAccessFarmCards) {
+                    navigation.navigate("FarmCardsListScreen", { farmer: localEntity });
+                  }
+                }}
+                disabled={!canAccessFarmCards}
                 style={{
                   flexDirection: 'row', alignItems: 'center', backgroundColor: colors.surface, padding: spacing.xl,
-                  borderRadius: radius.lg, borderWidth: 1, borderColor: colors.info, marginBottom: spacing.lg, ...shadows.soft,
+                  borderRadius: radius.lg, borderWidth: 1, borderColor: canAccessFarmCards ? colors.info : colors.border, marginBottom: spacing.lg, ...shadows.soft,
+                  opacity: canAccessFarmCards ? 1 : 0.7 // Fades the card slightly when locked
                 }}
               >
-                <View style={{ width: 48, height: 48, borderRadius: 12, backgroundColor: '#DBEAFE', alignItems: 'center', justifyContent: 'center', marginRight: spacing.lg }}>
-                  <MaterialIcons name="assignment-ind" size={28} color={colors.info} />
+                <View style={{ width: 48, height: 48, borderRadius: 12, backgroundColor: canAccessFarmCards ? '#DBEAFE' : '#F1F5F9', alignItems: 'center', justifyContent: 'center', marginRight: spacing.lg }}>
+                  <MaterialIcons name="assignment-ind" size={28} color={canAccessFarmCards ? colors.info : colors.textMuted} />
                 </View>
                 <View style={{ flex: 1 }}>
                   <Text style={{ fontSize: 18, fontWeight: '800', color: canAccessFarmCards ? colors.text : colors.textMuted }}>{t("Farm Cards")}</Text>
                   
-                  {/* Dynamic Subtext for Locked/Approved status */}
                   {!canAccessFarmCards ? (
                     <Text style={{ fontSize: 12, color: '#D97706', fontWeight: '800', marginTop: 4 }}>
                       {t(`Locked: Not Approved`)}
@@ -239,14 +253,18 @@ export const FarmerHubScreen = ({ route, navigation }: any) => {
                     </Text>
                   ) : null}
                 </View>
-                <View style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: '#F1F5F9', alignItems: 'center', justifyContent: 'center' }}>
-                  <MaterialIcons name="chevron-right" size={20} color={colors.textMuted} />
-                </View>
+                
+                {/* Only show the chevron arrow if it is clickable */}
+                {canAccessFarmCards && (
+                  <View style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: '#F1F5F9', alignItems: 'center', justifyContent: 'center' }}>
+                    <MaterialIcons name="chevron-right" size={20} color={colors.textMuted} />
+                  </View>
+                )}
               </Pressable>
             )}
 
-            {/* 🚀 NEW: FARM DIARY ENTRY BUTTON */}
-            {!isDraft && hasFarmCard && (
+            {/* 5. FARM DIARY ENTRY BUTTON (Restricted by canViewFarmDiary) */}
+            {!isDraft && hasFarmCard && farmerPerm.can_view && (
               <Pressable
                 onPress={() => navigation.navigate("FarmDiaryHubScreen", { farmer: localEntity })}
                 style={{
