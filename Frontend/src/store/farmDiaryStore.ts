@@ -302,12 +302,22 @@ export const useFarmDiaryStore = create<FarmDiaryState>((set, get) => ({
       // 2. Insert Plant Sample Sets
       const sessionId = session.id;
       for (const sample of samples) {
+        let samplePhotoUrl = sample.photo_path;
+        // Upload sample photo if it's a local file
+        if (samplePhotoUrl && samplePhotoUrl.startsWith('file://')) {
+          try {
+            samplePhotoUrl = await uploadFileToCloudinary(samplePhotoUrl, 'image');
+          } catch (e) {
+            console.error('Failed to upload sample photo:', e);
+          }
+        }
+
         const { data: sampleSet, error: sampleSetError } = await supabase
           .from('plant_sample_sets')
           .insert([{
             session_id: sessionId,
             sample_set_index: sample.index,
-            sample_photo_file_path: sample.photo_path
+            sample_photo_file_path: samplePhotoUrl
           }])
           .select('id')
           .single();
@@ -315,12 +325,25 @@ export const useFarmDiaryStore = create<FarmDiaryState>((set, get) => ({
         if (sampleSetError) throw sampleSetError;
 
         // 3. Insert Parameter Values for this sample
-        const valuesToInsert = sample.values.map((v: any) => ({
-          sample_set_id: sampleSet.id,
-          parameter_id: v.parameter_id,
-          selected_uom_id: v.uom_id || null,
-          logged_value_raw: v.value,
-        }));
+        // First handle any dynamic parameter image uploads
+        const uploadPromises = sample.values.map(async (v: any) => {
+          let finalValue = v.value;
+          if (finalValue && typeof finalValue === 'string' && finalValue.startsWith('file://')) {
+            try {
+              finalValue = await uploadFileToCloudinary(finalValue, 'image');
+            } catch (e) {
+              console.error('Failed to upload dynamic parameter photo:', e);
+            }
+          }
+          return {
+            sample_set_id: sampleSet.id,
+            parameter_id: v.parameter_id,
+            selected_uom_id: v.uom_id || null,
+            logged_value_raw: finalValue,
+          };
+        });
+
+        const valuesToInsert = await Promise.all(uploadPromises);
 
         if (valuesToInsert.length > 0) {
           const { error: valuesError } = await supabase
