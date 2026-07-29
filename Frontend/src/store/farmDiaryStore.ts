@@ -180,6 +180,7 @@ export const useFarmDiaryStore = create<FarmDiaryState>((set, get) => ({
 
       const payload = {
         ...visitData,
+        watering_method: visitData.watering_method || null,
         visit_photos: uploadedPhotos,
         farm_diary_id: diaryId,
         field_executive_id: fieldExecutiveId,
