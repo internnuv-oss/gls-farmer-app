@@ -1,5 +1,3 @@
-// Frontend/src/modules/dashboard/screens/FarmerHubScreen.tsx
-
 import React, { useState } from 'react';
 import { View, Text, Pressable, ScrollView, RefreshControl } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -23,7 +21,8 @@ export const FarmerHubScreen = ({ route, navigation }: any) => {
   const farmerOnboardPerm = getModulePerm('mobile_farmer_onboard');
 
   const canEditBaseFarmer = farmerPerm.can_edit || farmerOnboardPerm.can_edit;
-  
+
+  // 🚀 Store entity in local state for refreshing
   const [localEntity, setLocalEntity] = useState(route.params.entity);
   const [refreshing, setRefreshing] = useState(false);
   const [hasFarmCard, setHasFarmCard] = useState(false);
@@ -50,6 +49,7 @@ export const FarmerHubScreen = ({ route, navigation }: any) => {
   const onRefresh = async () => {
     setRefreshing(true);
     try {
+      // Assuming your table is named 'farmers'. Adjust if it's 'profiles'.
       const { data, error } = await supabase
         .from('farmers')
         .select('*')
@@ -57,6 +57,7 @@ export const FarmerHubScreen = ({ route, navigation }: any) => {
         .single();
         
       if (data && !error) {
+        // Merge the fresh database row into the `raw` property
         setLocalEntity((prev: any) => ({ ...prev, raw: data }));
       }
       await checkFarmCards();
@@ -67,6 +68,7 @@ export const FarmerHubScreen = ({ route, navigation }: any) => {
     }
   };
 
+  // 🚀 Update these to use localEntity instead of entity
   const isDraft = localEntity.isDraft;
   const village = localEntity.raw?.personal_details?.village || localEntity.city || localEntity.village || "Unknown Village";
   const state = localEntity.raw?.personal_details?.state || localEntity.state || "Unknown State";
@@ -81,7 +83,6 @@ export const FarmerHubScreen = ({ route, navigation }: any) => {
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.screen }}>
-      {/* Header section */}
       {/* Header section */}
       <View style={{ padding: spacing.xl, backgroundColor: colors.surface, borderBottomWidth: 1, borderBottomColor: colors.border }}>
         <Pressable onPress={() => navigation.goBack()} style={{ flexDirection: 'row', alignItems: 'center', marginBottom: spacing.lg }}>
@@ -105,9 +106,9 @@ export const FarmerHubScreen = ({ route, navigation }: any) => {
         }
       >
         
+        {/* Action Cards Container */}
         <View style={{ flex: 1 }}>
             
-            {/* The primary Action Card */}
             {/* The primary Action Card */}
             <Pressable
               onPress={() => {
@@ -131,21 +132,11 @@ export const FarmerHubScreen = ({ route, navigation }: any) => {
                 borderColor: isDraft ? colors.warning : colors.success,
                 marginBottom: spacing.lg,
                 ...shadows.soft,
-                flexDirection: 'row',
-                alignItems: 'center',
-                backgroundColor: colors.surface,
-                padding: spacing.xl,
-                borderRadius: radius.lg,
-                borderWidth: 1,
-                borderColor: isDraft ? colors.warning : colors.success,
-                marginBottom: spacing.lg,
-                ...shadows.soft,
               }}
             >
               <View style={{ width: 48, height: 48, borderRadius: 12, backgroundColor: isDraft ? '#FEF3C7' : '#DCFCE7', alignItems: 'center', justifyContent: 'center', marginRight: spacing.lg }}>
                 <MaterialIcons name={isDraft ? "edit-document" : "person"} size={28} color={isDraft ? '#D97706' : '#166534'} />
               </View>
-              
               
               <View style={{ flex: 1 }}>
                 <Text style={{ fontSize: 18, fontWeight: '800', color: colors.text }}>
@@ -157,7 +148,6 @@ export const FarmerHubScreen = ({ route, navigation }: any) => {
                   </Text>
                 )}
               </View>
-
 
               <View style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: '#F1F5F9', alignItems: 'center', justifyContent: 'center' }}>
                 <MaterialIcons name="chevron-right" size={20} color={colors.textMuted} />
@@ -214,34 +204,20 @@ export const FarmerHubScreen = ({ route, navigation }: any) => {
                   borderColor: localEntity.raw?.fspp_details?.statusLabel ? "#166534" : "#2563EB",
                   marginBottom: spacing.lg,
                   ...shadows.soft,
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  backgroundColor: colors.surface,
-                  padding: spacing.xl,
-                  borderRadius: radius.lg,
-                  borderWidth: 1,
-                  borderColor: localEntity.raw?.fspp_details?.statusLabel ? "#166534" : "#2563EB",
-                  marginBottom: spacing.lg,
-                  ...shadows.soft,
                 }}
               >
                 <View style={{ width: 48, height: 48, borderRadius: 12, backgroundColor: '#EFF6FF', alignItems: 'center', justifyContent: 'center', marginRight: spacing.lg }}>
                   <MaterialIcons name="assignment" size={28} color={localEntity.raw?.fspp_details?.statusLabel ? "#166534" : "#2563EB"} />
-                  <MaterialIcons name="assignment" size={28} color={localEntity.raw?.fspp_details?.statusLabel ? "#166534" : "#2563EB"} />
                 </View>
-                
                 
                 <View style={{ flex: 1 }}>
                   <Text style={{ fontSize: 18, fontWeight: '800', color: colors.text }}>
                     {localEntity.raw?.fspp_details?.statusLabel ? t("View FSPP Assessment") : t("FSPP Enrollment")}
-                    {localEntity.raw?.fspp_details?.statusLabel ? t("View FSPP Assessment") : t("FSPP Enrollment")}
                   </Text>
                   <Text style={{ fontSize: 12, color: colors.textMuted, fontWeight: '700', marginTop: 4 }}>
                     {localEntity.raw?.fspp_details?.statusLabel ? t("Completed") : t("Not yet enrolled")}
-                    {localEntity.raw?.fspp_details?.statusLabel ? t("Completed") : t("Not yet enrolled")}
                   </Text>
                 </View>
-
 
                 <View style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: '#F1F5F9', alignItems: 'center', justifyContent: 'center' }}>
                   <MaterialIcons name="chevron-right" size={20} color={colors.textMuted} />
@@ -261,7 +237,7 @@ export const FarmerHubScreen = ({ route, navigation }: any) => {
                 style={{
                   flexDirection: 'row', alignItems: 'center', backgroundColor: colors.surface, padding: spacing.xl,
                   borderRadius: radius.lg, borderWidth: 1, borderColor: canAccessFarmCards ? colors.info : colors.border, marginBottom: spacing.lg, ...shadows.soft,
-                  opacity: canAccessFarmCards ? 1 : 0.7 // Fades the card slightly when locked
+                  opacity: canAccessFarmCards ? 1 : 0.7
                 }}
               >
                 <View style={{ width: 48, height: 48, borderRadius: 12, backgroundColor: canAccessFarmCards ? '#DBEAFE' : '#F1F5F9', alignItems: 'center', justifyContent: 'center', marginRight: spacing.lg }}>
@@ -281,7 +257,6 @@ export const FarmerHubScreen = ({ route, navigation }: any) => {
                   ) : null}
                 </View>
                 
-                {/* Only show the chevron arrow if it is clickable */}
                 {canAccessFarmCards && (
                   <View style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: '#F1F5F9', alignItems: 'center', justifyContent: 'center' }}>
                     <MaterialIcons name="chevron-right" size={20} color={colors.textMuted} />
@@ -315,7 +290,6 @@ export const FarmerHubScreen = ({ route, navigation }: any) => {
             )}
 
           </View>
-
 
       </ScrollView>
     </SafeAreaView>
