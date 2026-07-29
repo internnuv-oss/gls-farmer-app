@@ -86,6 +86,7 @@ export const VisitDetailsScreen = ({ route, navigation }: any) => {
           <DataRow label={t("Soil Moisture")} value={baseVisit.soil_moisture_percentage ? `${baseVisit.soil_moisture_percentage}%` : null} />
           <DataRow label={t("Soil Health")} value={baseVisit.soil_health_status} />
           <DataRow label={t("Last Watering Date")} value={baseVisit.last_watering_date ? new Date(baseVisit.last_watering_date).toLocaleDateString() : null} />
+          <DataRow label={t("Watering Method")} value={baseVisit.watering_method} />
           {baseVisit.general_observations && (
             <View style={{ marginTop: spacing.sm }}>
               <Text style={{ fontSize: 14, color: colors.textMuted, fontWeight: '600' }}>{t("Observations")}</Text>

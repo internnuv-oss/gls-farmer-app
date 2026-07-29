@@ -82,6 +82,7 @@ export const FarmerHubScreen = ({ route, navigation }: any) => {
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.screen }}>
       {/* Header section */}
+      {/* Header section */}
       <View style={{ padding: spacing.xl, backgroundColor: colors.surface, borderBottomWidth: 1, borderBottomColor: colors.border }}>
         <Pressable onPress={() => navigation.goBack()} style={{ flexDirection: 'row', alignItems: 'center', marginBottom: spacing.lg }}>
           <MaterialIcons name="arrow-back" size={24} color={colors.primary} />
@@ -107,6 +108,7 @@ export const FarmerHubScreen = ({ route, navigation }: any) => {
         <View style={{ flex: 1 }}>
             
             {/* The primary Action Card */}
+            {/* The primary Action Card */}
             <Pressable
               onPress={() => {
                 if (isDraft) {
@@ -129,11 +131,21 @@ export const FarmerHubScreen = ({ route, navigation }: any) => {
                 borderColor: isDraft ? colors.warning : colors.success,
                 marginBottom: spacing.lg,
                 ...shadows.soft,
+                flexDirection: 'row',
+                alignItems: 'center',
+                backgroundColor: colors.surface,
+                padding: spacing.xl,
+                borderRadius: radius.lg,
+                borderWidth: 1,
+                borderColor: isDraft ? colors.warning : colors.success,
+                marginBottom: spacing.lg,
+                ...shadows.soft,
               }}
             >
               <View style={{ width: 48, height: 48, borderRadius: 12, backgroundColor: isDraft ? '#FEF3C7' : '#DCFCE7', alignItems: 'center', justifyContent: 'center', marginRight: spacing.lg }}>
                 <MaterialIcons name={isDraft ? "edit-document" : "person"} size={28} color={isDraft ? '#D97706' : '#166534'} />
               </View>
+              
               
               <View style={{ flex: 1 }}>
                 <Text style={{ fontSize: 18, fontWeight: '800', color: colors.text }}>
@@ -145,6 +157,7 @@ export const FarmerHubScreen = ({ route, navigation }: any) => {
                   </Text>
                 )}
               </View>
+
 
               <View style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: '#F1F5F9', alignItems: 'center', justifyContent: 'center' }}>
                 <MaterialIcons name="chevron-right" size={20} color={colors.textMuted} />
@@ -201,20 +214,34 @@ export const FarmerHubScreen = ({ route, navigation }: any) => {
                   borderColor: localEntity.raw?.fspp_details?.statusLabel ? "#166534" : "#2563EB",
                   marginBottom: spacing.lg,
                   ...shadows.soft,
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  backgroundColor: colors.surface,
+                  padding: spacing.xl,
+                  borderRadius: radius.lg,
+                  borderWidth: 1,
+                  borderColor: localEntity.raw?.fspp_details?.statusLabel ? "#166534" : "#2563EB",
+                  marginBottom: spacing.lg,
+                  ...shadows.soft,
                 }}
               >
                 <View style={{ width: 48, height: 48, borderRadius: 12, backgroundColor: '#EFF6FF', alignItems: 'center', justifyContent: 'center', marginRight: spacing.lg }}>
                   <MaterialIcons name="assignment" size={28} color={localEntity.raw?.fspp_details?.statusLabel ? "#166534" : "#2563EB"} />
+                  <MaterialIcons name="assignment" size={28} color={localEntity.raw?.fspp_details?.statusLabel ? "#166534" : "#2563EB"} />
                 </View>
+                
                 
                 <View style={{ flex: 1 }}>
                   <Text style={{ fontSize: 18, fontWeight: '800', color: colors.text }}>
                     {localEntity.raw?.fspp_details?.statusLabel ? t("View FSPP Assessment") : t("FSPP Enrollment")}
+                    {localEntity.raw?.fspp_details?.statusLabel ? t("View FSPP Assessment") : t("FSPP Enrollment")}
                   </Text>
                   <Text style={{ fontSize: 12, color: colors.textMuted, fontWeight: '700', marginTop: 4 }}>
                     {localEntity.raw?.fspp_details?.statusLabel ? t("Completed") : t("Not yet enrolled")}
+                    {localEntity.raw?.fspp_details?.statusLabel ? t("Completed") : t("Not yet enrolled")}
                   </Text>
                 </View>
+
 
                 <View style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: '#F1F5F9', alignItems: 'center', justifyContent: 'center' }}>
                   <MaterialIcons name="chevron-right" size={20} color={colors.textMuted} />
@@ -288,6 +315,7 @@ export const FarmerHubScreen = ({ route, navigation }: any) => {
             )}
 
           </View>
+
 
       </ScrollView>
     </SafeAreaView>

@@ -42,6 +42,7 @@ export const MandatoryBaseVisitScreen = ({ route, navigation }: any) => {
     soil_moisture_percentage: '',
     soil_health_status: 'Optimal',
     last_watering_date: null,
+    watering_method: '',
     fertilizers_given: false,
     fertilizers_applied: [],
     pesticides_given: false,
@@ -206,6 +207,13 @@ export const MandatoryBaseVisitScreen = ({ route, navigation }: any) => {
             value={formatForPicker(formData.last_watering_date)}
             onChange={v => setFormData({ ...formData, last_watering_date: parseDate(v) })}
             maximumDate={today}
+          />
+
+          <Input 
+            label={t("Watering Method")}
+            placeholder={t("e.g. Drip, Sprinkler, Flood")}
+            value={formData.watering_method}
+            onChangeText={t => setFormData({ ...formData, watering_method: t })}
           />
 
           {/* Fertilizers */}
