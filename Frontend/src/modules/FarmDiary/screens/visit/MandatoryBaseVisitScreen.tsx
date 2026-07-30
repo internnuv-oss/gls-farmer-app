@@ -100,13 +100,12 @@ export const MandatoryBaseVisitScreen = ({ route, navigation }: any) => {
   };
 
   const handleSave = async () => {
-    // 🚀 Strict validation for all mandatory fields
+    // 🚀 Strict validation for mandatory fields
     if (
       formData.soil_moisture_percentage.toString().trim() === '' ||
-      !formData.soil_health_status ||
-      !formData.last_watering_date
+      !formData.soil_health_status
     ) {
-      Alert.alert('Incomplete Form', 'Please fill all mandatory base visit parameters, including the date.');
+      Alert.alert('Incomplete Form', 'Please fill all mandatory base visit parameters (Soil Moisture and Soil Health).');
       return;
     }
 
@@ -203,14 +202,14 @@ export const MandatoryBaseVisitScreen = ({ route, navigation }: any) => {
           />
 
           <DatePickerField 
-            label={t("Last Watering Date")}
+            label={`${t("Last Watering Date")} (${t("Optional")})`}
             value={formatForPicker(formData.last_watering_date)}
             onChange={v => setFormData({ ...formData, last_watering_date: parseDate(v) })}
             maximumDate={today}
           />
 
           <Input 
-            label={t("Watering Method")}
+            label={`${t("Watering Method")} (${t("Optional")})`}
             placeholder={t("e.g. Drip, Sprinkler, Flood")}
             value={formData.watering_method}
             onChangeText={t => setFormData({ ...formData, watering_method: t })}
