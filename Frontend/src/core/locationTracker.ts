@@ -36,8 +36,8 @@ TaskManager.defineTask(SHIFT_LOCATION_TASK, async ({ data, error }) => {
           );
           const distInMeters = distInKm * 1000;
 
-          // If moved less than 15 meters, ignore
-          if (distInMeters < 15) continue; 
+          // If moved less than 10 meters, ignore
+          if (distInMeters < 10) continue; 
         }
 
         try {

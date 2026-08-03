@@ -1,3 +1,5 @@
+// Frontend/src/modules/dashboard/screens/DashboardScreen.tsx
+
 import React, { useRef, useState, useCallback, useMemo, useEffect } from "react";
 import * as crypto from 'expo-crypto';
 import {
@@ -54,20 +56,6 @@ export const DashboardScreen = ({ navigation, route }: any) => {
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const pagerRef = useRef<FlatList>(null);
-
-  // 🚀 BACKGROUND SYNC HEARTBEAT
-  useEffect(() => {
-    // Sync immediately when the user opens the dashboard
-    syncLocationsToSupabase();
-
-    // Set a timer to sync every 60 seconds while the app is alive
-    const syncInterval = setInterval(() => {
-      syncLocationsToSupabase();
-    }, 60000);
-
-    // Cleanup the timer when they leave the dashboard
-    return () => clearInterval(syncInterval);
-  }, []);
   
   const incrementActivity = useShiftStore((state) => state.incrementActivity);
 

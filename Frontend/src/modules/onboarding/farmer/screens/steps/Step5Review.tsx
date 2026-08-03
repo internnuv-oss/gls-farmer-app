@@ -83,6 +83,9 @@ export const Step5Review = ({ form, setStep, setJumpBackTo, dealers, t }: Props)
   const isFarmerSigMissing = !watch('farmerSignature');
   const isSESigMissing = !watch('seSignature');
 
+  const majorCrops = watch('majorCrops') || [];
+  const isOtherCropsMissing = majorCrops.some((c: string) => ["Other Cereals", "Other Pulses", "Other Oilseeds"].includes(c)) && !watch('otherCrops');
+
   return (
     <View>
       <Text style={{ fontSize: 20, fontWeight: '800', marginBottom: spacing.lg }}>{t("Final Review")}</Text>
@@ -123,7 +126,12 @@ export const Step5Review = ({ form, setStep, setJumpBackTo, dealers, t }: Props)
         <RenderField label={t("Rain-Fed Land")} value={watch('rainFedLand') || '0'} suffix={` ${t(watch('rainFedLandUnit') || 'Acres')}`} isRequired={false} t={t} />
         
         <View style={{ marginTop: 8 }}>
-          <RenderField label={t("Major Crops")} value={watch('majorCrops')} t={t} />
+        <RenderField 
+          label={t("Major Crops")} 
+          value={majorCrops.map((c: string) => ["Other Cereals", "Other Pulses", "Other Oilseeds"].includes(c) ? (watch('otherCrops') || c) : c)} 
+          isMissingOverride={isOtherCropsMissing} 
+          t={t} 
+        />
           
           <RenderField label={t("Soil Type")} value={soilType.map((s: string) => s === 'Others' ? watch('otherSoilType') : s)} isMissingOverride={isOtherSoilMissing} t={t} />
           <RenderField label={t("Water Source")} value={waterSource.map((w: string) => w === 'Others' ? watch('otherWaterSource') : w)} isMissingOverride={isOtherWaterMissing} t={t} />

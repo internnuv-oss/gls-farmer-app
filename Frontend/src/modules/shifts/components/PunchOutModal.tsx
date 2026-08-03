@@ -10,6 +10,7 @@ import { requestCameraPermission } from '../../../core/permissions';
 import { useAlertStore } from '../../../store/alertStore';
 import * as Location from 'expo-location';
 import DateTimePicker from '@react-native-community/datetimepicker';
+import { syncLocationsToSupabase } from '../../../core/locationUtils';
 
 // Helper to check if calendar day has changed
 const isDayChanged = (startTimeMs: number | null, currentTime: Date) => {
@@ -122,6 +123,7 @@ export const PunchOutModal = ({ visible, onClose, onConfirm }: any) => {
     setIsCapturing(true);
 
     try {
+      await syncLocationsToSupabase();
       await onConfirm(endKm, odoImage, {
         actualTime,
         editedTime,

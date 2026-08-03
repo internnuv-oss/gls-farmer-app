@@ -25,8 +25,7 @@ export const insertLocation = (shiftId: string, lat: number, lon: number, timest
 };
 
 export const getPendingLocations = () => {
-  // Pull in batches of 100 to prevent overloading the network request
-  return db.getAllSync('SELECT * FROM pending_locations ORDER BY timestamp ASC LIMIT 100');
+  return db.getAllSync('SELECT * FROM pending_locations ORDER BY timestamp ASC LIMIT 3000');
 };
 
 export const deleteLocations = (ids: number[]) => {
@@ -34,4 +33,14 @@ export const deleteLocations = (ids: number[]) => {
   const placeholders = ids.map(() => '?').join(',');
   const statement = db.prepareSync(`DELETE FROM pending_locations WHERE id IN (${placeholders})`);
   statement.executeSync(ids);
+};
+
+export const getPendingCount = () => {
+  try {
+    const result = db.getFirstSync<{ count: number }>('SELECT COUNT(*) as count FROM pending_locations');
+    return result?.count || 0;
+  } catch (e) {
+    console.error("Failed to get pending count:", e);
+    return 0;
+  }
 };

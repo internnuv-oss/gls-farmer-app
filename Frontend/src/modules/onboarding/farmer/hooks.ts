@@ -262,15 +262,17 @@ export function useFarmerOnboarding(navigation: any, route: any) {
   };
 
   const validationStatus = useMemo(() => {
-    const isStep1Valid = !!(values.fullName && values.fatherName && values.mobile?.length === 10 && values.state && values.city && values.taluka && values.village);
+    const isStep1Valid = !!(values.fullName && values.fatherName && values.mobile?.length === 10 && values.state && values.city && values.taluka && values.village) &&
+      (!values.pincode || values.pincode.length === 6); // 🚀 ADDED: Pincode length check
 
     const isStep2Valid = !!(values.totalLand && Array.isArray(values.majorCrops) && values.majorCrops.length > 0 && Array.isArray(values.soilType) && values.soilType.length > 0 && Array.isArray(values.waterSource) && values.waterSource.length > 0) &&
+      !(Array.isArray(values.majorCrops) && values.majorCrops.some((c: string) => ["Other Cereals", "Other Pulses", "Other Oilseeds"].includes(c)) && !values.otherCrops) && // 🚀 ADDED: Other Crops check
       !(Array.isArray(values.soilType) && values.soilType.includes('Others') && !values.otherSoilType) &&
       !(Array.isArray(values.waterSource) && values.waterSource.includes('Others') && !values.otherWaterSource) &&
       !(Array.isArray(values.farmEquipments) && values.farmEquipments.includes('Others') && !values.otherFarmEquipment);
 
-    // 🚀 CRITICAL FIX: Prepend Array.isArray checks
     const isStep3Valid = Array.isArray(values.pastCrops) && values.pastCrops.every(crop => {
+      if (crop.cropName && ["Other Cereals", "Other Pulses", "Other Oilseeds"].includes(crop.cropName) && !crop.otherCropName) return false; // 🚀 ADDED: Other Past Crop check
       if (Array.isArray(crop.inputUsed) && crop.inputUsed.includes('Others') && !crop.otherInputUsed) return false;
       return true;
     });
@@ -509,6 +511,16 @@ export function useFarmerOnboarding(navigation: any, route: any) {
         submitLockedRef.current = false;
         setIsSubmitting(false);
       }
+    },
+    (errors) => {
+      // 🚀 ADDED: Loudly alert the user instead of failing silently
+      console.error("Zod Validation Errors:", errors);
+      useAlertStore.getState().showAlert(
+        "Validation Error", 
+        "Some fields contain invalid data (e.g., Pincode is not 6 digits or 'Other' specification is missing). Please go back and correct the fields marked in red."
+      );
+      submitLockedRef.current = false;
+      setIsSubmitting(false);
     })();
   };
 

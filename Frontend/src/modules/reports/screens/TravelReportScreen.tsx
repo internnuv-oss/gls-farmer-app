@@ -9,6 +9,7 @@ import * as FileSystem from 'expo-file-system/legacy';
 import { supabase } from '../../../core/supabase';
 import { calculateDistance } from '../../../core/locationUtils';
 import * as Print from 'expo-print';
+import { ActivityIndicator } from 'react-native';
 
 import { colors, radius, spacing, shadows } from '../../../design-system/tokens';
 import { Button } from '../../../design-system/components';
@@ -133,9 +134,11 @@ export const TravelReportScreen = ({ navigation }: any) => {
     }, [dailyShift?.assigned_route_id, dailyShift]);
 
     useEffect(() => {
+        // 🚀 FIX 1: Instantly clear the previous route to prevent bleeding across dates
+        setDynamicRoute([]);
+        
         const fetchRouteForShift = async () => {
             if (!dailyShift?.id) {
-                setDynamicRoute([]);
                 return;
             }
     
@@ -145,7 +148,6 @@ export const TravelReportScreen = ({ navigation }: any) => {
                 let lastTimestamp = 0;
                 let hasMore = true;
     
-                // Paginate through Supabase to bypass the 1,000 row limit
                 while (hasMore) {
                     const { data } = await supabase
                         .from('shift_locations')
@@ -164,8 +166,6 @@ export const TravelReportScreen = ({ navigation }: any) => {
                     }
                 }
     
-                // 🚀 MAP OPTIMIZATION: Simple Decimation
-                // Only keep points that are at least ~50 meters apart visually to prevent UI freezing
                 const simplifiedPoints = [];
                 let lastAdded = null;
     
@@ -175,7 +175,7 @@ export const TravelReportScreen = ({ navigation }: any) => {
                         lastAdded = point;
                     } else {
                         const dist = calculateDistance(lastAdded.lat, lastAdded.lng, point.lat, point.lng);
-                        if (dist > 0.05) { // 0.05 km = 50 meters
+                        if (dist > 0.05) { 
                             simplifiedPoints.push({ lat: point.lat, lng: point.lng });
                             lastAdded = point;
                         }
@@ -571,6 +571,13 @@ export const TravelReportScreen = ({ navigation }: any) => {
         }
     };
 
+    // 🚀 FIX 2: Auto-adjust map bounds whenever the route data finishes loading
+    useEffect(() => {
+        if (reportData?.routeCoordinates && reportData.routeCoordinates.length > 1) {
+            fitMapToRoute();
+        }
+    }, [reportData?.routeCoordinates]);
+
     const year = currentMonth.getFullYear();
     const month = currentMonth.getMonth();
     const daysInMonth = new Date(year, month + 1, 0).getDate();
@@ -688,13 +695,20 @@ export const TravelReportScreen = ({ navigation }: any) => {
 
                                 {/* MAP */}
                                 <View style={{ height: 300, borderRadius: radius.lg, overflow: "hidden", borderWidth: 1, borderColor: colors.border, marginBottom: spacing.lg, ...shadows.medium }}>
-                                    {reportData.routeCoordinates.length > 0 ? (
+                                    {isLoadingRoute ? (
+                                        // 🚀 FIX 3: Show a loading state instead of a blank box while Supabase fetches
+                                        <View style={{ flex: 1, backgroundColor: "#E2E8F0", justifyContent: "center", alignItems: "center" }}>
+                                            <ActivityIndicator size="large" color={colors.primary} />
+                                            <Text style={{ color: "#64748B", fontWeight: "600", marginTop: 12 }}>{t("Drawing route map...")}</Text>
+                                        </View>
+                                    ) : reportData.routeCoordinates.length > 0 ? (
                                         <MapView
+                                            key={dailyShift?.id} // 🚀 FIX 4: The ultimate fix for state bleed. Destroys the old map instance and builds a fresh one for the new date.
                                             ref={mapRef}
                                             provider={PROVIDER_GOOGLE}
                                             style={{ flex: 1 }}
-                                            initialRegion={mapInitialRegion} // 🚀 FIXED: No more world map flashes
-                                            onMapReady={fitMapToRoute}       // 🚀 FIXED: Triggers exactly when engine mounts
+                                            initialRegion={mapInitialRegion} 
+                                            onMapReady={fitMapToRoute}       
                                             scrollEnabled={false}
                                             zoomEnabled={false}
                                         >

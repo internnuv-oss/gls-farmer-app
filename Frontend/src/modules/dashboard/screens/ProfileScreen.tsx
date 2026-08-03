@@ -1,4 +1,6 @@
-import React, { useState, useCallback } from 'react';
+// Frontend/src/modules/dashboard/screens/ProfileScreen.tsx
+
+import React, { useState, useCallback, useEffect } from 'react';
 import { View, Text, Pressable, ScrollView, RefreshControl, ActivityIndicator, Image, Modal, StyleSheet, Alert, Platform, Linking } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { MaterialIcons } from '@expo/vector-icons';
@@ -6,6 +8,7 @@ import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
 import * as IntentLauncher from 'expo-intent-launcher';
+import { getPendingCount } from '../../../core/database';
 
 import { useAuthStore } from '../../../store/authStore';
 import { useDraftStore } from '../../../store/draftStore';
@@ -23,6 +26,20 @@ export const ProfileScreen = () => {
   const [loading, setLoading] = useState(true);
   const [counts, setCounts] = useState({ dealers: 0, farmers: 0, distributors: 0, fpos: 0 });
   const [seData, setSeData] = useState<any>(null);
+
+  const [pendingSyncCount, setPendingSyncCount] = useState(0);
+
+  useEffect(() => {
+    // Fetch immediately on mount
+    setPendingSyncCount(getPendingCount());
+    
+    // Poll every 5 seconds to show live draining
+    const interval = setInterval(() => {
+      setPendingSyncCount(getPendingCount());
+    }, 5000);
+    
+    return () => clearInterval(interval);
+  }, []);
   
   const [viewerUrl, setViewerUrl] = useState<string | null>(null);
   const [downloadingDoc, setDownloadingDoc] = useState<string | null>(null);
@@ -309,8 +326,37 @@ export const ProfileScreen = () => {
 
       <Button label={t('Logout')} variant="danger" onPress={logout} icon="logout" iconPosition="right" />
 
+      {/* 🚀 LIVE TRACKING SYNC WIDGET */}
+      <View style={{ 
+          marginTop: spacing.xl, 
+          padding: spacing.md, 
+          backgroundColor: pendingSyncCount > 0 ? '#FEF3C7' : '#DCFCE7', 
+          borderRadius: radius.md, 
+          borderWidth: 1, 
+          borderColor: pendingSyncCount > 0 ? '#F59E0B' : '#16A34A', 
+          flexDirection: 'row', 
+          alignItems: 'center', 
+          justifyContent: 'center', 
+          gap: 8 
+      }}>
+          <MaterialIcons 
+              name={pendingSyncCount > 0 ? "cloud-sync" : "cloud-done"} 
+              size={20} 
+              color={pendingSyncCount > 0 ? "#D97706" : "#15803D"} 
+          />
+          <Text style={{ 
+              fontSize: 13, 
+              fontWeight: '700', 
+              color: pendingSyncCount > 0 ? "#D97706" : "#15803D" 
+          }}>
+              {pendingSyncCount > 0 
+                  ? `${pendingSyncCount} ${t('locations waiting to sync...')}` 
+                  : t('All tracking data synced to cloud')}
+          </Text>
+      </View>
+
       {/* 🚀 App Version Code */}
-      <View style={{ alignItems: 'center', marginTop: spacing.xl, marginBottom: spacing.xl }}>
+      <View style={{ alignItems: 'center', marginTop: spacing.md, marginBottom: spacing.xl }}>
         <Text style={{ color: colors.textMuted, fontSize: 13, fontWeight: '400' }}>
           Field Commander v1.0.4
         </Text>

@@ -10,10 +10,10 @@ import { AppNavigator } from "./src/navigation/AppNavigator";
 import "./src/core/i18n";
 import { AutoLogoutProvider } from "./src/core/AutoLogoutProvider";
 
-// 🚀 IMPORTANT: Registers the background task in the global scope
 import "./src/core/locationTracker"; 
-// 🚀 IMPORTANT: Imports database to trigger the table creation instantly
 import "./src/core/database"; 
+// 🚀 Import the new Sync Manager
+import { OfflineSyncManager } from "./src/core/OfflineSyncManager"; 
 
 export default function App() {
   return (
@@ -22,6 +22,10 @@ export default function App() {
         <StatusBar style="dark" />
         <AutoLogoutProvider>
           <AppNavigator />
+          
+          {/* 🚀 Mounts globally and handles its own visibility */}
+          <OfflineSyncManager />
+          
         </AutoLogoutProvider>
       </SafeAreaProvider>
     </GestureHandlerRootView>
