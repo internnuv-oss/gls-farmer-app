@@ -39,8 +39,7 @@
         "FOREGROUND_SERVICE",
         "FOREGROUND_SERVICE_LOCATION"
       ],
-      "package": "com.intern_skilltelligent.fieldcommander",
-      "versionCode": 13
+      "package": "com.intern_skilltelligent.fieldcommander"
     },
     "web": {
       "favicon": "./assets/icon.png"
