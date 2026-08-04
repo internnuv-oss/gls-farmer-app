@@ -241,8 +241,6 @@ export const TravelReportScreen = ({ navigation }: any) => {
         };
     }, [dailyShift, expenses, selectedDate]);
 
-    const [mapRegion, setMapRegion] = useState<any>(undefined);
-
     const getIconForType = (type: string) => {
         switch(type) {
             case 'punch-in': return { name: 'login', color: '#16A34A', bg: '#DCFCE7' };
@@ -544,28 +542,19 @@ export const TravelReportScreen = ({ navigation }: any) => {
         }
     };
 
-    // 🚀 FIX: Handle map bounding reliably when data arrives
+    // 🚀 THE FIX: A perfectly clean auto-zoom function
     useEffect(() => {
-        if (reportData?.routeCoordinates && reportData.routeCoordinates.length > 0) {
-            // Set the fallback region just in case fitToCoordinates fails
-            setMapRegion({
-                latitude: reportData.routeCoordinates[0].latitude,
-                longitude: reportData.routeCoordinates[0].longitude,
-                latitudeDelta: 0.05,
-                longitudeDelta: 0.05,
-            });
-
-            // Force the map to bound the polyline
-            if (mapRef.current && reportData.routeCoordinates.length > 1) {
-                setTimeout(() => {
-                    mapRef.current?.fitToCoordinates(reportData.routeCoordinates, {
-                        edgePadding: { top: 50, right: 50, bottom: 50, left: 50 },
-                        animated: true,
-                    });
-                }, 500); // 500ms ensures the map UI has completely finished layout
-            }
+        if (mapRef.current && reportData?.routeCoordinates && reportData.routeCoordinates.length > 1) {
+            // Give the map 500ms to visually render the polyline, then frame it perfectly
+            const timer = setTimeout(() => {
+                mapRef.current?.fitToCoordinates(reportData.routeCoordinates, {
+                    edgePadding: { top: 50, right: 50, bottom: 50, left: 50 },
+                    animated: true,
+                });
+            }, 500);
+            return () => clearTimeout(timer);
         }
-    }, [reportData?.routeCoordinates, isLoadingRoute]); // Re-run when loading finishes
+    }, [reportData?.routeCoordinates, isLoadingRoute]);
 
     const year = currentMonth.getFullYear();
     const month = currentMonth.getMonth();
@@ -691,13 +680,19 @@ export const TravelReportScreen = ({ navigation }: any) => {
                                         </View>
                                     ) : (reportData?.routeCoordinates && reportData.routeCoordinates.length > 0) ? (
                                         <MapView
-                                            key={`map-${dailyShift?.id}-${reportData.routeCoordinates.length}`} // Forces re-render if point count changes
+                                            key={`map-${dailyShift?.id}`} // 🚀 FIX: Only remount if the actual DATE/SHIFT changes
                                             ref={mapRef}
                                             provider={PROVIDER_GOOGLE}
                                             style={{ flex: 1 }}
-                                            region={mapRegion} // 🚀 Use controlled region, NOT initialRegion
                                             scrollEnabled={false}
                                             zoomEnabled={false}
+                                            // Provide a basic initial region just so it doesn't default to the ocean
+                                            initialRegion={{
+                                                latitude: reportData.routeCoordinates[0].latitude,
+                                                longitude: reportData.routeCoordinates[0].longitude,
+                                                latitudeDelta: 0.05,
+                                                longitudeDelta: 0.05,
+                                            }}
                                         >
                                             <Polyline 
                                                 coordinates={reportData.routeCoordinates} 
