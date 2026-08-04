@@ -1,15 +1,16 @@
 import React, { useState, useRef, useMemo, useEffect } from 'react';
-import { View, Text, ScrollView, Pressable, StyleSheet, RefreshControl } from 'react-native';
+import { View, Text, ScrollView, Pressable, StyleSheet, RefreshControl, ActivityIndicator } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
 import MapView, { Polyline, Marker, PROVIDER_GOOGLE } from 'react-native-maps';
 import ViewShot, { captureRef } from 'react-native-view-shot';
 import * as Sharing from 'expo-sharing';
 import * as FileSystem from 'expo-file-system/legacy';
+import * as Print from 'expo-print';
+
 import { supabase } from '../../../core/supabase';
 import { calculateDistance } from '../../../core/locationUtils';
-import * as Print from 'expo-print';
-import { ActivityIndicator } from 'react-native';
+import { getPendingLocations } from '../../../core/database'; // 🚀 IMPORT LOCAL DB
 
 import { colors, radius, spacing, shadows } from '../../../design-system/tokens';
 import { Button } from '../../../design-system/components';
@@ -42,30 +43,30 @@ export const TravelReportScreen = ({ navigation }: any) => {
 
     const [dynamicRoute, setDynamicRoute] = useState<any[]>([]);
     const [isLoadingRoute, setIsLoadingRoute] = useState(false);
-
-    // 🚀 NEW: State to hold the fetched route details
     const [assignedRoute, setAssignedRoute] = useState<{name: string, locations: string[]} | null>(null);
-
-    // 🚀 NEW: State and Handler for Pull-to-Refresh functionality
     const [refreshing, setRefreshing] = useState(false);
 
-    const onRefresh = async () => {
+    // 🚀 THE ULTIMATE FETCHER: Merges Cloud Data + Local SQLite Data
+    const fetchRouteData = async () => {
         if (!dailyShift?.id) return;
-        setRefreshing(true);
+
         setIsLoadingRoute(true);
         try {
             let allPoints: any[] = [];
             let lastTimestamp = 0;
             let hasMore = true;
 
+            // 1. Fetch Cloud Data
             while (hasMore) {
-                const { data } = await supabase
+                const { data, error } = await supabase
                     .from('shift_locations')
                     .select('lat, lng, timestamp')
                     .eq('shift_id', dailyShift.id)
                     .gt('timestamp', lastTimestamp)
                     .order('timestamp', { ascending: true })
                     .limit(1000);
+
+                if (error) throw error; // Catch silent network failures!
 
                 if (data && data.length > 0) {
                     allPoints = [...allPoints, ...data];
@@ -76,6 +77,26 @@ export const TravelReportScreen = ({ navigation }: any) => {
                 }
             }
 
+            // 2. Fetch Pending Offline Data (Fixes the "Sync Delay" bug)
+            try {
+                const pending = getPendingLocations() as any[];
+                const shiftPending = pending.filter(p => p.shift_id === dailyShift.id);
+                if (shiftPending.length > 0) {
+                    const localPoints = shiftPending.map(p => ({
+                        lat: p.latitude,
+                        lng: p.longitude,
+                        timestamp: p.timestamp
+                    }));
+                    allPoints = [...allPoints, ...localPoints];
+                }
+            } catch (sqliteErr) {
+                console.error("Failed to merge local SQLite points:", sqliteErr);
+            }
+
+            // Ensure chronological order after merging
+            allPoints.sort((a, b) => a.timestamp - b.timestamp);
+
+            // 3. Map Decimation
             const simplifiedPoints = [];
             let lastAdded = null;
 
@@ -85,7 +106,7 @@ export const TravelReportScreen = ({ navigation }: any) => {
                     lastAdded = point;
                 } else {
                     const dist = calculateDistance(lastAdded.lat, lastAdded.lng, point.lat, point.lng);
-                    if (dist > 0.05) {
+                    if (dist > 0.05) { 
                         simplifiedPoints.push({ lat: point.lat, lng: point.lng });
                         lastAdded = point;
                     }
@@ -94,11 +115,17 @@ export const TravelReportScreen = ({ navigation }: any) => {
 
             setDynamicRoute(simplifiedPoints);
         } catch (error) {
-            console.error("Refresh failed:", error);
+            console.error("Route Fetch Failed:", error);
         } finally {
             setIsLoadingRoute(false);
-            setRefreshing(false);
         }
+    };
+
+    const onRefresh = async () => {
+        if (!dailyShift?.id) return;
+        setRefreshing(true);
+        await fetchRouteData();
+        setRefreshing(false);
     };
 
     useEffect(() => {
@@ -107,12 +134,10 @@ export const TravelReportScreen = ({ navigation }: any) => {
                 setAssignedRoute(null);
                 return;
             }
-            // If they selected "Others" during punch-in, assigned_route_id is null
             if (!dailyShift.assigned_route_id) {
                 setAssignedRoute({ name: 'Others', locations: [] });
                 return;
             }
-            
             try {
                 const { data, error } = await supabase
                     .from('routes')
@@ -131,63 +156,9 @@ export const TravelReportScreen = ({ navigation }: any) => {
     }, [dailyShift?.assigned_route_id, dailyShift]);
 
     useEffect(() => {
-        // 🚀 FIX 1: Instantly clear the previous route to prevent bleeding across dates
+        // Clear route instantly on date change to prevent bleeding
         setDynamicRoute([]);
-        
-        const fetchRouteForShift = async () => {
-            if (!dailyShift?.id) {
-                return;
-            }
-    
-            setIsLoadingRoute(true);
-            try {
-                let allPoints: any[] = [];
-                let lastTimestamp = 0;
-                let hasMore = true;
-    
-                while (hasMore) {
-                    const { data } = await supabase
-                        .from('shift_locations')
-                        .select('lat, lng, timestamp')
-                        .eq('shift_id', dailyShift.id)
-                        .gt('timestamp', lastTimestamp)
-                        .order('timestamp', { ascending: true })
-                        .limit(1000);
-    
-                    if (data && data.length > 0) {
-                        allPoints = [...allPoints, ...data];
-                        lastTimestamp = data[data.length - 1].timestamp;
-                        if (data.length < 1000) hasMore = false;
-                    } else {
-                        hasMore = false;
-                    }
-                }
-    
-                const simplifiedPoints = [];
-                let lastAdded = null;
-    
-                for (const point of allPoints) {
-                    if (!lastAdded) {
-                        simplifiedPoints.push({ lat: point.lat, lng: point.lng });
-                        lastAdded = point;
-                    } else {
-                        const dist = calculateDistance(lastAdded.lat, lastAdded.lng, point.lat, point.lng);
-                        if (dist > 0.05) { 
-                            simplifiedPoints.push({ lat: point.lat, lng: point.lng });
-                            lastAdded = point;
-                        }
-                    }
-                }
-    
-                setDynamicRoute(simplifiedPoints);
-            } catch (error) {
-                console.error("Failed to fetch route:", error);
-            } finally {
-                setIsLoadingRoute(false);
-            }
-        };
-    
-        fetchRouteForShift();
+        fetchRouteData();
     }, [dailyShift?.id]);
 
     const reportData = useMemo(() => {
@@ -230,7 +201,7 @@ export const TravelReportScreen = ({ navigation }: any) => {
             startKm,
             endKm,
             manualDistance,
-            gpsDistance: parseFloat(gpsDistance).toFixed(2), // 🚀 Format to 2 decimal places
+            gpsDistance: parseFloat(gpsDistance).toFixed(2),
             TA,
             DA,
             activities,
@@ -239,7 +210,23 @@ export const TravelReportScreen = ({ navigation }: any) => {
             totalExpenses,
             grandTotal,
         };
-    }, [dailyShift, expenses, selectedDate, dynamicRoute]);
+    }, [dailyShift, expenses, selectedDate, dynamicRoute]); // 🚀 Ensured dynamicRoute is here
+
+    // 🚀 FIXED: Reliable map framing combination
+    const fitMapToRoute = () => {
+        if (mapRef.current && reportData?.routeCoordinates && reportData.routeCoordinates.length > 1) {
+            setTimeout(() => {
+                mapRef.current?.fitToCoordinates(reportData.routeCoordinates, {
+                    edgePadding: { top: 50, right: 50, bottom: 50, left: 50 },
+                    animated: true,
+                });
+            }, 500);
+        }
+    };
+
+    useEffect(() => {
+        fitMapToRoute();
+    }, [reportData?.routeCoordinates]);
 
     const getIconForType = (type: string) => {
         switch(type) {
@@ -254,10 +241,8 @@ export const TravelReportScreen = ({ navigation }: any) => {
         const styling = getIconForType(item.type);
         const isLast = index === dataLength - 1;
 
-        // 🚀 NEW: Dynamic Activity Description based on Route mapping
         let displayDescription = item.description;
         
-        // Append Assigned Route to the Punch-in event description
         if (item.type === 'punch-in' && assignedRoute) {
             const routeText = `${t('Route')}: ${assignedRoute.name}`;
             displayDescription = displayDescription ? `${routeText}\n${displayDescription}` : routeText;
@@ -265,21 +250,16 @@ export const TravelReportScreen = ({ navigation }: any) => {
 
         if (item.type === 'activity' && assignedRoute && displayDescription) {
             const isInRoute = (assignedRoute.locations || []).some((loc: any) => {
-                // Safely extract the string whether it's an array of strings or objects like {name: 'Village'}
                 const locName = typeof loc === 'string' ? loc : (loc?.name || loc?.village || '');
                 if (!locName || typeof locName !== 'string') return false;
-                
                 return displayDescription.toLowerCase().includes(locName.toLowerCase());
             });
             
-            // Prevent double-wrapping if the string somehow already contains the prefix
             const hasRoutePrefix = displayDescription.includes(`${assignedRoute.name} (`) || displayDescription.includes('Others (');
             if (!hasRoutePrefix) {
                 if (isInRoute && assignedRoute.name !== 'Others') {
-                    // Display: "RouteName (VillageName)"
                     displayDescription = `${assignedRoute.name} (${displayDescription})`;
                 } else {
-                    // Display: "Others (VillageName)"
                     displayDescription = `Others (${displayDescription})`;
                 }
             }
@@ -314,22 +294,18 @@ export const TravelReportScreen = ({ navigation }: any) => {
         setIsCapturing(true);
         
         try {
-            // 1. 🚀 CAPTURE NATIVE MAP AS BASE64 IMAGE (OPTIMIZED FOR SPEED)
             let mapImageHtml = '';
             if (mapRef.current && reportData?.routeCoordinates && reportData.routeCoordinates.length > 0) {
                 try {
                     const base64 = await mapRef.current.takeSnapshot({
-                        width: 700,  // 🚀 Optimized width for A4 PDF
+                        width: 700, 
                         height: 700,
-                        format: 'jpg', // 🚀 Changed from png to jpg (Massively faster to encode)
+                        format: 'jpg', 
                         quality: 1,
                         result: 'base64'
                     });
-                    
-                    // 🚀 Make sure to change the MIME type to image/jpeg here!
                     mapImageHtml = `<img src="data:image/jpeg;base64,${base64}" class="map-image" />`;
                 } catch (mapErr) {
-                    console.error("Failed to snapshot map:", mapErr);
                     mapImageHtml = `<div class="no-map">Map capture failed</div>`;
                 }
             } else {
@@ -340,7 +316,6 @@ export const TravelReportScreen = ({ navigation }: any) => {
                     </div>`;
             }
 
-            // 2. Map timeline events to HTML with exact styling
             const events = [...(dailyShift?.events || [])].sort((a: any, b: any) => a.time - b.time);
             
             const eventsHtml = events.map((item: any, index: number) => {
@@ -373,7 +348,7 @@ export const TravelReportScreen = ({ navigation }: any) => {
                 }
 
                 if (displayDescription) {
-                    displayDescription = displayDescription.replace(/\n/g, '<br/>'); // Preserve newlines
+                    displayDescription = displayDescription.replace(/\n/g, '<br/>'); 
                 }
                 
                 return `
@@ -393,48 +368,29 @@ export const TravelReportScreen = ({ navigation }: any) => {
                 `;
             }).join('');
 
-            // 3. Build the ultra-HD HTML Document
             const htmlContent = `
                 <!DOCTYPE html>
                 <html>
                 <head>
                     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no" />
-                    <!-- Import exact app fonts and Material Icons -->
                     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@500;600;700;800;900&display=swap" rel="stylesheet">
                     <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
                     <style>
-                        /* 🚀 PROPER PAGINATION MARGINS */
                         @page { margin: 40px 20px; }
-                        
-                        body { 
-                            font-family: 'Inter', sans-serif; 
-                            color: #0F172A; 
-                            background-color: #FFFFFF;
-                            -webkit-print-color-adjust: exact;
-                        }
-                        
-                        /* Header */
+                        body { font-family: 'Inter', sans-serif; color: #0F172A; background-color: #FFFFFF; -webkit-print-color-adjust: exact; }
                         .header { background-color: #EEF2FF; padding: 20px; border-radius: 12px; border-bottom: 2px solid #E2E8F0; margin-bottom: 24px; }
                         .header h1 { margin: 0 0 4px 0; color: #16A34A; font-size: 24px; font-weight: 900; }
                         .header p { margin: 4px 0; font-size: 14px; font-weight: 700; color: #334155; }
-                        
-                        /* Map */
                         .map-container { width: 100%; height: 700px; border-radius: 16px; border: 1px solid #E2E8F0; overflow: hidden; margin-bottom: 24px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); }
                         .map-image { width: 100%; height: 100%; object-fit: cover; }
                         .no-map { width: 100%; height: 100%; background-color: #E2E8F0; display: flex; flex-direction: column; align-items: center; justify-content: center; color: #64748B; font-weight: 600; }
-                        
-                        /* Metric Cards */
                         .grid { display: flex; gap: 16px; margin-bottom: 24px; }
                         .card { flex: 1; border: 1px solid #E2E8F0; padding: 16px; border-radius: 12px; background: #FFFFFF; }
                         .card-label { font-size: 11px; font-weight: 800; color: #64748B; text-transform: uppercase; margin-bottom: 8px; }
                         .card-value { font-size: 20px; font-weight: 900; color: #0F172A; }
                         .card-sub { font-size: 12px; font-weight: 600; color: #64748B; margin-top: 4px; }
-
-                        /* Section Blocks */
                         .section-box { border: 1px solid #E2E8F0; border-radius: 12px; padding: 20px; margin-bottom: 24px; page-break-inside: avoid; }
                         .section-title { font-size: 16px; font-weight: 800; border-bottom: 1px solid #E2E8F0; padding-bottom: 12px; margin-bottom: 20px; color: #0F172A; }
-                        
-                        /* Exact App Timeline Match */
                         .timeline-event { display: flex; margin-bottom: 0; page-break-inside: avoid; }
                         .time { width: 75px; text-align: right; padding-right: 16px; font-size: 13px; font-weight: 800; color: #0F172A; padding-top: 4px; }
                         .dot-container { display: flex; flex-direction: column; align-items: center; width: 26px; }
@@ -444,8 +400,6 @@ export const TravelReportScreen = ({ navigation }: any) => {
                         .last-content { padding-bottom: 0; }
                         .title { font-size: 16px; font-weight: 800; color: #0F172A; }
                         .desc { font-size: 14px; font-weight: 600; color: #64748B; margin-top: 4px; line-height: 1.5; }
-
-                        /* Summary Table */
                         .summary-row { display: flex; justify-content: space-between; padding: 8px 0; font-size: 14px; }
                         .row-label { font-weight: 700; color: #64748B; }
                         .row-value { font-weight: 900; color: #0F172A; }
@@ -459,11 +413,9 @@ export const TravelReportScreen = ({ navigation }: any) => {
                         <p>Phone: ${user?.mobile || 'N/A'}</p>
                         <p>${selectedDate.toLocaleDateString()}</p>
                     </div>
-
                     <div class="map-container">
                         ${mapImageHtml}
                     </div>
-
                     <div class="grid">
                         <div class="card">
                             <div class="card-label">Manual Distance</div>
@@ -476,12 +428,10 @@ export const TravelReportScreen = ({ navigation }: any) => {
                             <div class="card-sub">Background System</div>
                         </div>
                     </div>
-
                     <div class="section-box">
                         <div class="section-title">Activities</div>
                         ${events.length > 0 ? eventsHtml : '<div style="color: #64748B; font-weight: 600; text-align: center;">No activities logged on this date.</div>'}
                     </div>
-
                     <div class="section-box">
                         <div class="section-title">Summary</div>
                         <div class="summary-row">
@@ -506,7 +456,6 @@ export const TravelReportScreen = ({ navigation }: any) => {
                             <span class="row-value">₹${reportData?.totalExpenses}</span>
                         </div>
                         ` : ''}
-                        
                         <div class="total-row">
                             <span style="font-weight: 900;">Grand Total:</span>
                             <span class="total-val">₹${(reportData?.TA || 0) + ((reportData?.manualDistance || 0) > 60 ? 150 : 0) + (reportData?.totalExpenses || 0)}</span>
@@ -516,13 +465,10 @@ export const TravelReportScreen = ({ navigation }: any) => {
                 </html>
             `;
 
-            // 4. Generate PDF
             const { uri } = await Print.printToFileAsync({ html: htmlContent });
             
-            // 5. Share PDF
             const isAvailable = await Sharing.isAvailableAsync();
             if (isAvailable) {
-                // Rename file for cleaner sharing
                 const safeName = (user?.name || user?.firstName || 'Executive').replace(/[^a-zA-Z0-9]/g, '_');
                 const dateStr = selectedDate.toLocaleDateString('en-GB').replace(/\//g, '_');
                 const finalFileName = `${safeName}_${dateStr}_Report.pdf`;
@@ -541,20 +487,6 @@ export const TravelReportScreen = ({ navigation }: any) => {
             setIsCapturing(false);
         }
     };
-
-    // 🚀 THE FIX: A perfectly clean auto-zoom function
-    useEffect(() => {
-        if (mapRef.current && reportData?.routeCoordinates && reportData.routeCoordinates.length > 1) {
-            // Give the map 500ms to visually render the polyline, then frame it perfectly
-            const timer = setTimeout(() => {
-                mapRef.current?.fitToCoordinates(reportData.routeCoordinates, {
-                    edgePadding: { top: 50, right: 50, bottom: 50, left: 50 },
-                    animated: true,
-                });
-            }, 500);
-            return () => clearTimeout(timer);
-        }
-    }, [reportData?.routeCoordinates, isLoadingRoute]);
 
     const year = currentMonth.getFullYear();
     const month = currentMonth.getMonth();
@@ -589,15 +521,14 @@ export const TravelReportScreen = ({ navigation }: any) => {
                 )}
             </View>
 
-            {/* 🚀 Injected RefreshControl configuration */}
             <ScrollView 
                 contentContainerStyle={{ paddingBottom: 100 }}
                 refreshControl={
                     <RefreshControl 
                         refreshing={refreshing} 
                         onRefresh={onRefresh} 
-                        colors={[colors.primary]} // Android color indicator theme tint
-                        tintColor={colors.primary} // iOS color indicator spinner tint
+                        colors={[colors.primary]} 
+                        tintColor={colors.primary} 
                     />
                 }
             >
@@ -680,13 +611,13 @@ export const TravelReportScreen = ({ navigation }: any) => {
                                         </View>
                                     ) : (reportData?.routeCoordinates && reportData.routeCoordinates.length > 0) ? (
                                         <MapView
-                                            key={`map-${dailyShift?.id}`} // 🚀 FIX: Only remount if the actual DATE/SHIFT changes
+                                            key={`map-${dailyShift?.id}`} // 🚀 Re-mounts correctly
                                             ref={mapRef}
                                             provider={PROVIDER_GOOGLE}
                                             style={{ flex: 1 }}
                                             scrollEnabled={false}
                                             zoomEnabled={false}
-                                            // Provide a basic initial region just so it doesn't default to the ocean
+                                            onMapReady={fitMapToRoute} // 🚀 Ensure it natively reacts
                                             initialRegion={{
                                                 latitude: reportData.routeCoordinates[0].latitude,
                                                 longitude: reportData.routeCoordinates[0].longitude,
@@ -751,7 +682,6 @@ export const TravelReportScreen = ({ navigation }: any) => {
                                         {t("Summary")}
                                     </Text>
                                     
-
                                     <View style={styles.row}>
                                         <Text style={styles.rowLabel}>Profiles / Activities Logged:</Text>
                                         <Text style={styles.rowValue}>{reportData.activities}</Text>
