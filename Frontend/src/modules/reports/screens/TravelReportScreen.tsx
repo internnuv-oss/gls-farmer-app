@@ -93,9 +93,6 @@ export const TravelReportScreen = ({ navigation }: any) => {
             }
 
             setDynamicRoute(simplifiedPoints);
-            
-            // Re-trigger the map camera framing to re-align the newly refreshed polyline bounds
-            fitMapToRoute();
         } catch (error) {
             console.error("Refresh failed:", error);
         } finally {
@@ -244,18 +241,7 @@ export const TravelReportScreen = ({ navigation }: any) => {
         };
     }, [dailyShift, expenses, selectedDate]);
 
-    // 🚀 FIX: Prevent map flashing world coordinates. Seed the region natively.
-    const mapInitialRegion = useMemo(() => {
-        if (reportData?.routeCoordinates && reportData.routeCoordinates.length > 0) {
-            return {
-                latitude: reportData.routeCoordinates[0].latitude,
-                longitude: reportData.routeCoordinates[0].longitude,
-                latitudeDelta: 0.05,
-                longitudeDelta: 0.05,
-            };
-        }
-        return undefined;
-    }, [reportData]);
+    const [mapRegion, setMapRegion] = useState<any>(undefined);
 
     const getIconForType = (type: string) => {
         switch(type) {
@@ -558,25 +544,28 @@ export const TravelReportScreen = ({ navigation }: any) => {
         }
     };
 
-    // 🚀 FIX: Reliable callback attached to the Map's native ready state
-    const fitMapToRoute = () => {
-        if (mapRef.current && reportData?.routeCoordinates && reportData.routeCoordinates.length > 1) {
-            // Slight delay ensures the layout sizing resolves perfectly before animating zoom
-            setTimeout(() => {
-                mapRef.current?.fitToCoordinates(reportData.routeCoordinates, {
-                    edgePadding: { top: 50, right: 50, bottom: 50, left: 50 },
-                    animated: true,
-                });
-            }, 300);
-        }
-    };
-
-    // 🚀 FIX 2: Auto-adjust map bounds whenever the route data finishes loading
+    // 🚀 FIX: Handle map bounding reliably when data arrives
     useEffect(() => {
-        if (reportData?.routeCoordinates && reportData.routeCoordinates.length > 1) {
-            fitMapToRoute();
+        if (reportData?.routeCoordinates && reportData.routeCoordinates.length > 0) {
+            // Set the fallback region just in case fitToCoordinates fails
+            setMapRegion({
+                latitude: reportData.routeCoordinates[0].latitude,
+                longitude: reportData.routeCoordinates[0].longitude,
+                latitudeDelta: 0.05,
+                longitudeDelta: 0.05,
+            });
+
+            // Force the map to bound the polyline
+            if (mapRef.current && reportData.routeCoordinates.length > 1) {
+                setTimeout(() => {
+                    mapRef.current?.fitToCoordinates(reportData.routeCoordinates, {
+                        edgePadding: { top: 50, right: 50, bottom: 50, left: 50 },
+                        animated: true,
+                    });
+                }, 500); // 500ms ensures the map UI has completely finished layout
+            }
         }
-    }, [reportData?.routeCoordinates]);
+    }, [reportData?.routeCoordinates, isLoadingRoute]); // Re-run when loading finishes
 
     const year = currentMonth.getFullYear();
     const month = currentMonth.getMonth();
@@ -696,19 +685,17 @@ export const TravelReportScreen = ({ navigation }: any) => {
                                 {/* MAP */}
                                 <View style={{ height: 300, borderRadius: radius.lg, overflow: "hidden", borderWidth: 1, borderColor: colors.border, marginBottom: spacing.lg, ...shadows.medium }}>
                                     {isLoadingRoute ? (
-                                        // 🚀 FIX 3: Show a loading state instead of a blank box while Supabase fetches
                                         <View style={{ flex: 1, backgroundColor: "#E2E8F0", justifyContent: "center", alignItems: "center" }}>
                                             <ActivityIndicator size="large" color={colors.primary} />
                                             <Text style={{ color: "#64748B", fontWeight: "600", marginTop: 12 }}>{t("Drawing route map...")}</Text>
                                         </View>
-                                    ) : reportData.routeCoordinates.length > 0 ? (
+                                    ) : (reportData?.routeCoordinates && reportData.routeCoordinates.length > 0) ? (
                                         <MapView
-                                            key={dailyShift?.id} // 🚀 FIX 4: The ultimate fix for state bleed. Destroys the old map instance and builds a fresh one for the new date.
+                                            key={`map-${dailyShift?.id}-${reportData.routeCoordinates.length}`} // Forces re-render if point count changes
                                             ref={mapRef}
                                             provider={PROVIDER_GOOGLE}
                                             style={{ flex: 1 }}
-                                            initialRegion={mapInitialRegion} 
-                                            onMapReady={fitMapToRoute}       
+                                            region={mapRegion} // 🚀 Use controlled region, NOT initialRegion
                                             scrollEnabled={false}
                                             zoomEnabled={false}
                                         >
