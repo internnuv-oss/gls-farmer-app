@@ -358,7 +358,7 @@ export const ProfileScreen = () => {
       {/* 🚀 App Version Code */}
       <View style={{ alignItems: 'center', marginTop: spacing.md, marginBottom: spacing.xl }}>
         <Text style={{ color: colors.textMuted, fontSize: 13, fontWeight: '400' }}>
-          Field Commander v1.0.4
+          Field Commander v1.0.5
         </Text>
       </View>
 

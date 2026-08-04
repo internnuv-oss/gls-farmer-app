@@ -7,6 +7,7 @@ import { supabase } from '../core/supabase';
 import { useAuthStore } from './authStore';
 import { startBackgroundTracking, stopBackgroundTracking } from '../core/locationTracker';
 import { syncLocationsToSupabase } from '../core/locationUtils';
+import { clearLastSyncedLocation } from '../core/database';
 
 export interface TimelineEvent {
   id: string;
@@ -169,6 +170,8 @@ export const useShiftStore = create<ShiftState>()(
         await stopBackgroundTracking();
 
         await syncLocationsToSupabase();
+
+        clearLastSyncedLocation();
 
         const timeToUse = editedTime || actualTime || Date.now();
 

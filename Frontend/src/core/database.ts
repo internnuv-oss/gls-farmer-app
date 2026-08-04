@@ -1,10 +1,8 @@
 // src/core/database.ts
 import * as SQLite from 'expo-sqlite';
 
-// Initialize the local database file synchronously
 const db = SQLite.openDatabaseSync('fieldcommander.db');
 
-// 🚀 FIX: Runs instantly upon file import. No React lifecycle required!
 db.execSync(`
   CREATE TABLE IF NOT EXISTS pending_locations (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -15,7 +13,30 @@ db.execSync(`
     accuracy REAL,
     speed REAL
   );
+  
+  -- 🚀 NEW: A bulletproof table to store the active shift ID for the background task
+  CREATE TABLE IF NOT EXISTS app_config (
+    key TEXT PRIMARY KEY,
+    value TEXT
+  );
 `);
+
+export const setActiveShiftId = (id: string | null) => {
+  if (id) {
+    db.runSync(`INSERT OR REPLACE INTO app_config (key, value) VALUES ('active_shift_id', ?)`, [id]);
+  } else {
+    db.runSync(`DELETE FROM app_config WHERE key = 'active_shift_id'`);
+  }
+};
+
+export const getActiveShiftId = () => {
+  try {
+    const row = db.getFirstSync<{value: string}>(`SELECT value FROM app_config WHERE key = 'active_shift_id'`);
+    return row?.value || null;
+  } catch (e) {
+    return null;
+  }
+};
 
 export const insertLocation = (shiftId: string, lat: number, lon: number, timestamp: number, accuracy: number, speed: number) => {
   const statement = db.prepareSync(
@@ -40,7 +61,24 @@ export const getPendingCount = () => {
     const result = db.getFirstSync<{ count: number }>('SELECT COUNT(*) as count FROM pending_locations');
     return result?.count || 0;
   } catch (e) {
-    console.error("Failed to get pending count:", e);
     return 0;
   }
+};
+
+export const setLastSyncedLocation = (lat: number, lng: number) => {
+  const payload = JSON.stringify({ lat, lng });
+  db.runSync(`INSERT OR REPLACE INTO app_config (key, value) VALUES ('last_synced_loc', ?)`, [payload]);
+};
+
+export const getLastSyncedLocation = (): { lat: number, lng: number } | null => {
+  try {
+    const row = db.getFirstSync<{value: string}>(`SELECT value FROM app_config WHERE key = 'last_synced_loc'`);
+    return row?.value ? JSON.parse(row.value) : null;
+  } catch (e) {
+    return null;
+  }
+};
+
+export const clearLastSyncedLocation = () => {
+  db.runSync(`DELETE FROM app_config WHERE key = 'last_synced_loc'`);
 };

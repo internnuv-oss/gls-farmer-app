@@ -1,6 +1,6 @@
 // Frontend/src/core/locationUtils.ts
 
-import { getPendingLocations, deleteLocations } from './database';
+import { getPendingLocations, deleteLocations, getLastSyncedLocation, setLastSyncedLocation } from './database';
 import { supabase } from './supabase'; // ⚠️ Ensure this path matches your supabase client location
 
 export const SHIFT_LOCATION_TASK = 'SHIFT_LOCATION_TASK';
@@ -25,26 +25,44 @@ export const syncLocationsToSupabase = async () => {
   try {
     isSyncing = true;
     
-    // 1. Grab unsynced locations from local database
     const pending = getPendingLocations() as any[];
     if (pending.length === 0) {
       isSyncing = false;
       return; 
     }
 
-    // Sort chronologically to ensure accurate math
     pending.sort((a, b) => a.timestamp - b.timestamp);
 
-    // 2. 🚀 Calculate the total distance of this offline chunk
+    // 🚀 THE FIX: Smart Math Filter & Continuity Pointer
     let chunkDistance = 0;
-    for (let i = 1; i < pending.length; i++) {
-      chunkDistance += calculateDistance(
-        pending[i-1].latitude, pending[i-1].longitude,
-        pending[i].latitude, pending[i].longitude
+    
+    // Grab the last valid point from the PREVIOUS batch (so we don't lose the connecting distance)
+    let lastTrustedPoint = getLastSyncedLocation(); 
+    let latestValidPointForNextBatch = lastTrustedPoint;
+
+    for (const pt of pending) {
+      // 1. Math Filter: Completely ignore terrible GPS bounces for the calculation
+      if (pt.accuracy > 150) continue; 
+
+      if (!lastTrustedPoint) {
+        lastTrustedPoint = { lat: pt.latitude, lng: pt.longitude };
+        latestValidPointForNextBatch = lastTrustedPoint;
+        continue;
+      }
+
+      const dist = calculateDistance(
+        lastTrustedPoint.lat, lastTrustedPoint.lng, 
+        pt.latitude, pt.longitude
       );
+
+      // 2. Anti-Drift: Only count the distance if they moved more than 15 meters (~0.015 km)
+      if (dist > 0.015) {
+        chunkDistance += dist;
+        lastTrustedPoint = { lat: pt.latitude, lng: pt.longitude };
+        latestValidPointForNextBatch = lastTrustedPoint;
+      }
     }
 
-    // 3. Format for Supabase
     const payload = pending.map(loc => ({
       shift_id: loc.shift_id,
       lat: loc.latitude,      
@@ -54,23 +72,11 @@ export const syncLocationsToSupabase = async () => {
       speed: loc.speed
     }));
 
-    // Inside syncLocationsToSupabase, before the insert:
-    const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-    if (!session || sessionError) {
-      // Try to refresh the token manually
-      const { data: { session: refreshedSession } } = await supabase.auth.refreshSession();
-      if (!refreshedSession) {
-        console.error("Auth expired in background, aborting sync.");
-        isSyncing = false;
-        return;
-      }
-    }
-
-    // 4. Bulk insert coordinates
+    // Upload ALL points to Supabase (even the 1500m ones, so the cloud has raw data)
     const { error: insertError } = await supabase.from('shift_locations').insert(payload);
     if (insertError) throw insertError; 
 
-    // 5. 🚀 Update the total distance securely via RPC
+    // Update the distance using the heavily filtered, clean math
     if (chunkDistance > 0 && payload.length > 0) {
       const { error: rpcError } = await supabase.rpc('add_shift_distance', {
         p_shift_id: payload[0].shift_id,
@@ -79,11 +85,15 @@ export const syncLocationsToSupabase = async () => {
       if (rpcError) console.error("RPC Distance Update Failed:", rpcError);
     }
 
-    // 6. Delete ONLY upon successful upload
+    // Save the last trusted point so the next background sync batch connects to it!
+    if (latestValidPointForNextBatch) {
+      setLastSyncedLocation(latestValidPointForNextBatch.lat, latestValidPointForNextBatch.lng);
+    }
+
     const syncedIds = pending.map(loc => loc.id);
     deleteLocations(syncedIds);
     
-    console.log(`Successfully pushed ${syncedIds.length} coordinates and added ${chunkDistance.toFixed(2)} km!`);
+    console.log(`Pushed ${syncedIds.length} raw points, but only added ${chunkDistance.toFixed(2)} km of REAL travel!`);
 
   } catch (e) {
     console.error("Critical failure in location sync engine:", e);
