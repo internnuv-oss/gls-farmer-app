@@ -239,7 +239,7 @@ export const TravelReportScreen = ({ navigation }: any) => {
             totalExpenses,
             grandTotal,
         };
-    }, [dailyShift, expenses, selectedDate]);
+    }, [dailyShift, expenses, selectedDate, dynamicRoute]);
 
     const getIconForType = (type: string) => {
         switch(type) {
