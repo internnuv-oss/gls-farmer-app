@@ -65,12 +65,12 @@ export const getPendingCount = () => {
   }
 };
 
-export const setLastSyncedLocation = (lat: number, lng: number) => {
-  const payload = JSON.stringify({ lat, lng });
+export const setLastSyncedLocation = (lat: number, lng: number, timestamp: number) => {
+  const payload = JSON.stringify({ lat, lng, timestamp });
   db.runSync(`INSERT OR REPLACE INTO app_config (key, value) VALUES ('last_synced_loc', ?)`, [payload]);
 };
 
-export const getLastSyncedLocation = (): { lat: number, lng: number } | null => {
+export const getLastSyncedLocation = (): { lat: number, lng: number, timestamp: number } | null => {
   try {
     const row = db.getFirstSync<{value: string}>(`SELECT value FROM app_config WHERE key = 'last_synced_loc'`);
     return row?.value ? JSON.parse(row.value) : null;

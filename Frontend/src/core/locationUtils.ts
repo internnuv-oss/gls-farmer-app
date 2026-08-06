@@ -33,19 +33,18 @@ export const syncLocationsToSupabase = async () => {
 
     pending.sort((a, b) => a.timestamp - b.timestamp);
 
-    // 🚀 THE FIX: Smart Math Filter & Continuity Pointer
     let chunkDistance = 0;
     
-    // Grab the last valid point from the PREVIOUS batch (so we don't lose the connecting distance)
+    // Grab the last valid point from the PREVIOUS batch
     let lastTrustedPoint = getLastSyncedLocation(); 
     let latestValidPointForNextBatch = lastTrustedPoint;
 
     for (const pt of pending) {
-      // 1. Math Filter: Completely ignore terrible GPS bounces for the calculation
+      // 1. Hardware Filter: Accept up to 150m so cheap/weak phones aren't penalized
       if (pt.accuracy > 150) continue; 
 
       if (!lastTrustedPoint) {
-        lastTrustedPoint = { lat: pt.latitude, lng: pt.longitude };
+        lastTrustedPoint = { lat: pt.latitude, lng: pt.longitude, timestamp: pt.timestamp };
         latestValidPointForNextBatch = lastTrustedPoint;
         continue;
       }
@@ -55,11 +54,23 @@ export const syncLocationsToSupabase = async () => {
         pt.latitude, pt.longitude
       );
 
-      // 2. Anti-Drift: Only count the distance if they moved more than 15 meters (~0.015 km)
-      if (dist > 0.015) {
+      // Calculate physical speed required to make this jump
+      const timeDiffHours = (pt.timestamp - lastTrustedPoint.timestamp) / (1000 * 3600);
+      const speedKmh = timeDiffHours > 0 ? (dist / timeDiffHours) : 0;
+
+      // 2. The Spiderweb Filter: Ignore impossible jumps > 100 km/h (fake cell-tower spikes)
+      if (speedKmh > 100) {
+          continue; 
+      }
+
+      // 3. Anti-Drift Filter: Count distance only if they moved > 30 meters
+      if (dist > 0.030) {
         chunkDistance += dist;
-        lastTrustedPoint = { lat: pt.latitude, lng: pt.longitude };
+        lastTrustedPoint = { lat: pt.latitude, lng: pt.longitude, timestamp: pt.timestamp };
         latestValidPointForNextBatch = lastTrustedPoint;
+      } else {
+        // Stationary drift: don't add distance, but update timestamp for the next speed calculation
+        lastTrustedPoint.timestamp = pt.timestamp;
       }
     }
 
@@ -72,11 +83,11 @@ export const syncLocationsToSupabase = async () => {
       speed: loc.speed
     }));
 
-    // Upload ALL points to Supabase (even the 1500m ones, so the cloud has raw data)
+    // Upload ALL points to Supabase for the map rendering
     const { error: insertError } = await supabase.from('shift_locations').insert(payload);
     if (insertError) throw insertError; 
 
-    // Update the distance using the heavily filtered, clean math
+    // Update the distance using the Smart Plausibility Math
     if (chunkDistance > 0 && payload.length > 0) {
       const { error: rpcError } = await supabase.rpc('add_shift_distance', {
         p_shift_id: payload[0].shift_id,
@@ -85,9 +96,9 @@ export const syncLocationsToSupabase = async () => {
       if (rpcError) console.error("RPC Distance Update Failed:", rpcError);
     }
 
-    // Save the last trusted point so the next background sync batch connects to it!
+    // Pass timestamp as well to keep speed math accurate across batches
     if (latestValidPointForNextBatch) {
-      setLastSyncedLocation(latestValidPointForNextBatch.lat, latestValidPointForNextBatch.lng);
+      setLastSyncedLocation(latestValidPointForNextBatch.lat, latestValidPointForNextBatch.lng, latestValidPointForNextBatch.timestamp);
     }
 
     const syncedIds = pending.map(loc => loc.id);

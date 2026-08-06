@@ -11,6 +11,7 @@ import * as Print from 'expo-print';
 import { supabase } from '../../../core/supabase';
 import { calculateDistance } from '../../../core/locationUtils';
 import { getPendingLocations } from '../../../core/database'; // 🚀 IMPORT LOCAL DB
+import { getSnappedRoute } from '../../../core/roadsApi';
 
 import { colors, radius, spacing, shadows } from '../../../design-system/tokens';
 import { Button } from '../../../design-system/components';
@@ -113,7 +114,14 @@ export const TravelReportScreen = ({ navigation }: any) => {
                 }
             }
 
-            setDynamicRoute(simplifiedPoints);
+            // 🚀 THE GOOGLE UPGRADE: Send our jagged array to Google for smoothing
+            if (simplifiedPoints.length > 0) {
+                const curvedRoute = await getSnappedRoute(simplifiedPoints);
+                setDynamicRoute(curvedRoute);
+            } else {
+                setDynamicRoute([]);
+            }
+
         } catch (error) {
             console.error("Route Fetch Failed:", error);
         } finally {
@@ -190,9 +198,10 @@ export const TravelReportScreen = ({ navigation }: any) => {
         const totalExpenses = dailyExpenses.reduce((sum, item) => sum + Number(item.amount), 0);
         const grandTotal = DA + totalExpenses;
 
+        // Safely map both formats (Google's format OR our offline fallback format)
         const routeCoordinates = dynamicRoute.map((point: any) => ({ 
-            latitude: point.lat, 
-            longitude: point.lng 
+            latitude: point.latitude || point.lat, 
+            longitude: point.longitude || point.lng 
         }));
 
         return {
