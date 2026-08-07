@@ -1,53 +1,39 @@
 // src/modules/FarmCard/screens/steps/Step3SoilAndHistory.tsx
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { View, Text, Pressable } from 'react-native';
 import { Controller, UseFormReturn } from 'react-hook-form';
 import { MaterialIcons } from '@expo/vector-icons';
 import { Input, SelectField, DatePickerField, YearPickerField } from '../../../../design-system/components';
 import { spacing, colors, radius, shadows } from '../../../../design-system/tokens';
 import { FarmCardValues } from '../../schema';
-
-const WEST_INDIA_CROPS = [
-    "Bajra",
-    "Castor",
-    "Chana",
-    "Chilli",
-    "Coriander",
-    "Cotton",
-    "Cumin",
-    "Fennel",
-    "Fodder",
-    "Garlic",
-    "Groundnut",
-    "Guar",
-    "Irri. Wheat",
-    "Isabgul",
-    "Jowar",
-    "Maize",
-    "Math",
-    "Moong",
-    "Mustard",
-    "Onion",
-    "Paddy",
-    "Potato",
-    "Sawa",
-    "Sesamum",
-    "Soyabean",
-    "Sugarcane",
-    "Tobacco",
-    "Tomato",
-    "Tur",
-    "Udid",
-    "Unirri. Wheat",
-    "Vegetable",
-    "Wheat",
-  ].sort();
+import { supabase } from '../../../../core/supabase'; // 🚀 IMPORT SUPABASE
 
 interface Props { form: UseFormReturn<FarmCardValues>; t: any; }
 
 export const Step3SoilAndHistory = ({ form, t }: Props) => {
   const { control, watch, setValue, formState: { errors } } = form;
   const yieldHistory = watch('yieldHistory') || [];
+
+  // 🚀 STATE FOR DYNAMIC CROPS
+  const [cropOptions, setCropOptions] = useState<string[]>([]);
+
+  useEffect(() => {
+    const fetchCrops = async () => {
+      const { data, error } = await supabase
+        .from('master_crops')
+        .select('crop_name')
+        .eq('status', 'Active')
+        .order('crop_name', { ascending: true });
+
+      if (data && !error) {
+        // Extract names and use Set to automatically remove duplicates (like Banana)
+        const uniqueCrops = Array.from(new Set(data.map(d => d.crop_name)));
+        setCropOptions(uniqueCrops);
+      }
+    };
+
+    fetchCrops();
+  }, []);
 
   return (
     <View>
@@ -118,7 +104,8 @@ export const Step3SoilAndHistory = ({ form, t }: Props) => {
              </View>
           </View>
           
-          <Controller control={control} name={`yieldHistory.${index}.cropGrown`} render={({field}) => <SelectField label={t("Crop Grown")} placeholder={t("Select Crop")} value={field.value ?? ''} options={WEST_INDIA_CROPS} searchable onChange={field.onChange} />} />
+          {/* 🚀 USE DYNAMIC CROPS LIST HERE */}
+          <Controller control={control} name={`yieldHistory.${index}.cropGrown`} render={({field}) => <SelectField label={t("Crop Grown")} placeholder={t("Select Crop")} value={field.value ?? ''} options={cropOptions.length > 0 ? cropOptions : ['Loading...']} searchable onChange={field.onChange} />} />
           
           <View style={{ flexDirection: 'row', gap: 8 }}>
             <View style={{ flex: 2 }}><Controller control={control} name={`yieldHistory.${index}.area`} render={({field}) => <Input label={t("Area")} placeholder="e.g. 5" keyboardType="numeric" value={field.value} onChangeText={field.onChange} />} /></View>
