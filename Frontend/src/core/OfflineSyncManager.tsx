@@ -76,7 +76,12 @@ export const OfflineSyncManager = () => {
   if (!visible) return null;
 
   return (
-    <Modal visible={visible} transparent animationType="slide">
+    <Modal 
+      visible={visible} 
+      transparent 
+      animationType="slide"
+      onRequestClose={() => {}} // 🚀 PREVENTS ANDROID HARDWARE BACK BUTTON BYPASS
+    >
       <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.7)', justifyContent: 'center', padding: spacing.lg }}>
         <View style={{ backgroundColor: colors.surface, padding: spacing.xl, borderRadius: radius.lg, alignItems: 'center' }}>
           
@@ -116,14 +121,6 @@ export const OfflineSyncManager = () => {
             )}
           </View>
           
-          {!isSyncing && (
-             <Text 
-               onPress={() => setVisible(false)} 
-               style={{ marginTop: spacing.md, color: colors.textMuted, fontWeight: '700', fontSize: 13 }}
-             >
-               {t("Remind Me Later")}
-             </Text>
-          )}
         </View>
       </View>
     </Modal>

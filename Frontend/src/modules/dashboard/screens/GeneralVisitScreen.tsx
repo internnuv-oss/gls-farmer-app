@@ -1,3 +1,5 @@
+// Frontend/src/modules/dashboard/screens/GeneralVisitScreen.tsx
+
 import React, { useState, useRef } from 'react';
 import { View, Text, Pressable, ScrollView, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -138,7 +140,7 @@ export const GeneralVisitScreen = ({ route, navigation }: any) => {
       
       const raw = entity.raw || entity;
       const villageName = raw.personal_details?.village || raw.village || raw.city || "Unknown Village";
-      const eventDesc = `${entity.name}\n${routeName} (${villageName})`;
+      const eventDesc = `${entity.name}\n${routeName} (${villageName})\nComment: ${comment.trim()}`;
 
       // Use logActivityForDate — works whether shift is active OR already punched out
       // logShiftEvent silently does nothing when activeShiftId is null (after punch-out)

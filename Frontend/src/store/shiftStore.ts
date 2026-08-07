@@ -8,6 +8,7 @@ import { useAuthStore } from './authStore';
 import { startBackgroundTracking, stopBackgroundTracking } from '../core/locationTracker';
 import { syncLocationsToSupabase } from '../core/locationUtils';
 import { clearLastSyncedLocation } from '../core/database';
+import * as Location from 'expo-location';
 
 export interface TimelineEvent {
   id: string;
@@ -237,7 +238,27 @@ export const useShiftStore = create<ShiftState>()(
         const { activeShiftId, shiftHistory } = get();
         if (!activeShiftId) return;
 
-        const event: TimelineEvent = { id: Date.now().toString(), time: Date.now(), type, title, description };
+        // 🚀 THE FIX: Instantly grab the latest location when an activity is logged
+        let currentLocation = null;
+        try {
+          // Tries to get an instant cached location first, falls back to a quick live fetch
+          const loc = await Location.getLastKnownPositionAsync() || await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+          if (loc) {
+            currentLocation = { lat: loc.coords.latitude, lng: loc.coords.longitude };
+          }
+        } catch (e) {
+          console.warn("Could not fetch location for activity", e);
+        }
+
+        const event: TimelineEvent = { 
+          id: Date.now().toString(), 
+          time: Date.now(), 
+          type, 
+          title, 
+          description,
+          location: currentLocation // 🚀 Embed the captured location into the event
+        };
+        
         const currentShiftRecord = shiftHistory.find(h => h.id === activeShiftId);
         if (!currentShiftRecord) return;
 

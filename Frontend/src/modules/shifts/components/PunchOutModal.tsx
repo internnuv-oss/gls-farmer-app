@@ -11,6 +11,7 @@ import { useAlertStore } from '../../../store/alertStore';
 import * as Location from 'expo-location';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { syncLocationsToSupabase } from '../../../core/locationUtils';
+import { getPendingCount } from '../../../core/database';
 
 // Helper to check if calendar day has changed
 const isDayChanged = (startTimeMs: number | null, currentTime: Date) => {
@@ -27,6 +28,7 @@ export const PunchOutModal = ({ visible, onClose, onConfirm }: any) => {
   const [endKm, setEndKm] = useState('');
   const [error, setError] = useState('');
   const [isCapturing, setIsCapturing] = useState(false);
+  const [syncStatusText, setSyncStatusText] = useState('');
   const [pickerMode, setPickerMode] = useState<'date' | 'time'>('date');
 
   const [customTime, setCustomTime] = useState(new Date());
@@ -123,7 +125,14 @@ export const PunchOutModal = ({ visible, onClose, onConfirm }: any) => {
     setIsCapturing(true);
 
     try {
-      await syncLocationsToSupabase();
+      // 🚀 NEW: Check for unsynced points and update UI during the drain
+      const unsyncedCount = getPendingCount();
+      if (unsyncedCount > 0) {
+        setSyncStatusText(t(`Syncing offline points...`));
+        await syncLocationsToSupabase();
+      }
+      setSyncStatusText(t("Closing Shift..."));
+
       await onConfirm(endKm, odoImage, {
         actualTime,
         editedTime,
@@ -344,7 +353,8 @@ export const PunchOutModal = ({ visible, onClose, onConfirm }: any) => {
           )}
 
           <Button
-            label={locationStr.includes('Locating') || locationStr.includes('Fetching') ? t("Detecting Location...") : (isCapturing ? t("Closing Shift...") : t("Punch Out"))}
+            // 🚀 NEW: Button dynamically displays the sync status
+            label={locationStr.includes('Locating') || locationStr.includes('Fetching') ? t("Detecting Location...") : (isCapturing ? syncStatusText || t("Closing Shift...") : t("Punch Out"))}
             variant="danger"
             onPress={handleConfirm}
             disabled={

@@ -1,3 +1,5 @@
+// Frontend/src/modules/reports/screens/TravelReportScreen.tsx
+
 import React, { useState, useRef, useMemo, useEffect } from 'react';
 import { View, Text, ScrollView, Pressable, StyleSheet, RefreshControl, ActivityIndicator } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
@@ -274,6 +276,12 @@ export const TravelReportScreen = ({ navigation }: any) => {
             }
         }
 
+        // 🚀 NEW: Attach GPS coordinates to the description text
+        if (item.location?.lat && item.location?.lng) {
+            const gpsText = `📍 ${item.location.lat.toFixed(5)}, ${item.location.lng.toFixed(5)}`;
+            displayDescription = displayDescription ? `${displayDescription}\n${gpsText}` : gpsText;
+        }
+
         return (
             <View key={index} style={{ flexDirection: 'row', marginBottom: spacing.lg }}>
                 <View style={{ width: 75, alignItems: 'flex-end', paddingRight: spacing.md }}>
@@ -354,6 +362,12 @@ export const TravelReportScreen = ({ navigation }: any) => {
                             displayDescription = `Others (${displayDescription})`;
                         }
                     }
+                }
+
+                // 🚀 NEW: Attach GPS coordinates to the PDF description text
+                if (item.location?.lat && item.location?.lng) {
+                    const gpsText = `📍 ${item.location.lat.toFixed(5)}, ${item.location.lng.toFixed(5)}`;
+                    displayDescription = displayDescription ? `${displayDescription}\n${gpsText}` : gpsText;
                 }
 
                 if (displayDescription) {
@@ -626,7 +640,7 @@ export const TravelReportScreen = ({ navigation }: any) => {
                                             style={{ flex: 1 }}
                                             scrollEnabled={false}
                                             zoomEnabled={false}
-                                            onMapReady={fitMapToRoute} // 🚀 Ensure it natively reacts
+                                            onMapReady={fitMapToRoute}
                                             initialRegion={{
                                                 latitude: reportData.routeCoordinates[0].latitude,
                                                 longitude: reportData.routeCoordinates[0].longitude,
@@ -643,6 +657,31 @@ export const TravelReportScreen = ({ navigation }: any) => {
                                             />
                                             <Marker coordinate={reportData.routeCoordinates[0]} pinColor="green" title="Start" />
                                             <Marker coordinate={reportData.routeCoordinates[reportData.routeCoordinates.length - 1]} pinColor="red" title="End" />
+                                            
+                                            {/* 🚀 NEW: Render Activity Bubbles on the Map */}
+                                            {(() => {
+                                                const acts = [...(dailyShift?.events || [])]
+                                                    .sort((a: any, b: any) => a.time - b.time)
+                                                    .filter((e: any) => e.type === 'activity' && e.location?.lat && e.location?.lng);
+                                                
+                                                return acts.map((act, idx) => {
+                                                    if (!act.location) return null; // 🚀 TypeScript Null Guard
+                                                    
+                                                    return (
+                                                        <Marker 
+                                                            key={`act-${act.id}`} 
+                                                            coordinate={{ latitude: act.location.lat, longitude: act.location.lng }}
+                                                            title={`Activity ${idx + 1}`}
+                                                            description={t(act.title)}
+                                                            anchor={{ x: 0.5, y: 0.5 }}
+                                                        >
+                                                            <View style={{ width: 24, height: 24, borderRadius: 12, backgroundColor: colors.primary, borderWidth: 2, borderColor: '#FFF', justifyContent: 'center', alignItems: 'center', ...shadows.soft }}>
+                                                                <Text style={{ color: '#FFF', fontSize: 12, fontWeight: '900' }}>{idx + 1}</Text>
+                                                            </View>
+                                                        </Marker>
+                                                    );
+                                                });
+                                            })()}
                                         </MapView>
                                     ) : (
                                         <View style={{ flex: 1, backgroundColor: "#E2E8F0", justifyContent: "center", alignItems: "center" }}>

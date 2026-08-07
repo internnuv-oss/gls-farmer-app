@@ -58,13 +58,13 @@ export const syncLocationsToSupabase = async () => {
       const timeDiffHours = (pt.timestamp - lastTrustedPoint.timestamp) / (1000 * 3600);
       const speedKmh = timeDiffHours > 0 ? (dist / timeDiffHours) : 0;
 
-      // 2. The Spiderweb Filter: Ignore impossible jumps > 100 km/h (fake cell-tower spikes)
-      if (speedKmh > 100) {
-          continue; 
-      }
+      // 2. The Spiderweb Filter: Ignore impossible jumps (fake cell-tower spikes)
+      if (dist > 1.0 && speedKmh > 120) {
+        continue; 
+    }
 
-      // 3. Anti-Drift Filter: Count distance only if they moved > 30 meters
-      if (dist > 0.030) {
+      // 3. Anti-Drift Filter: Count distance only if they moved > 20 meters
+      if (dist > 0.020) {
         chunkDistance += dist;
         lastTrustedPoint = { lat: pt.latitude, lng: pt.longitude, timestamp: pt.timestamp };
         latestValidPointForNextBatch = lastTrustedPoint;
