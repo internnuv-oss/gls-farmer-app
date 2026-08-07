@@ -665,7 +665,7 @@ export const TravelReportScreen = ({ navigation }: any) => {
                                                     .filter((e: any) => e.type === 'activity' && e.location?.lat && e.location?.lng);
                                                 
                                                 return acts.map((act, idx) => {
-                                                    if (!act.location) return null; // 🚀 TypeScript Null Guard
+                                                    if (!act.location) return null;
                                                     
                                                     return (
                                                         <Marker 
@@ -675,8 +675,23 @@ export const TravelReportScreen = ({ navigation }: any) => {
                                                             description={t(act.title)}
                                                             anchor={{ x: 0.5, y: 0.5 }}
                                                         >
-                                                            <View style={{ width: 24, height: 24, borderRadius: 12, backgroundColor: colors.primary, borderWidth: 2, borderColor: '#FFF', justifyContent: 'center', alignItems: 'center', ...shadows.soft }}>
-                                                                <Text style={{ color: '#FFF', fontSize: 12, fontWeight: '900' }}>{idx + 1}</Text>
+                                                            {/* 🚀 SMALLER, GLASSY, POPPING UI */}
+                                                            <View style={{ 
+                                                                width: 20, 
+                                                                height: 20, 
+                                                                borderRadius: 10, 
+                                                                backgroundColor: 'rgba(234, 88, 12, 0.85)', // Glassy vibrant orange
+                                                                borderWidth: 1.5, 
+                                                                borderColor: '#FFFFFF', 
+                                                                justifyContent: 'center', 
+                                                                alignItems: 'center', 
+                                                                shadowColor: '#000',
+                                                                shadowOffset: { width: 0, height: 2 },
+                                                                shadowOpacity: 0.3,
+                                                                shadowRadius: 2,
+                                                                elevation: 3
+                                                            }}>
+                                                                <Text style={{ color: '#FFFFFF', fontSize: 10, fontWeight: '900' }}>{idx + 1}</Text>
                                                             </View>
                                                         </Marker>
                                                     );

@@ -298,12 +298,24 @@ export const useShiftStore = create<ShiftState>()(
 
         if (shiftError || !shiftData) return;
 
+        // 🚀 THE FIX: Instantly grab the latest location for General Visits
+        let currentLocation = null;
+        try {
+          const loc = await Location.getLastKnownPositionAsync() || await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+          if (loc) {
+            currentLocation = { lat: loc.coords.latitude, lng: loc.coords.longitude };
+          }
+        } catch (e) {
+          console.warn("Could not fetch location for general visit", e);
+        }
+
         const newEvent: TimelineEvent = {
           id: Date.now().toString(),
           time: Date.now(),
           type: 'activity',
           title,
-          description
+          description,
+          location: currentLocation // 🚀 Embed the captured location here
         };
 
         const updatedEvents = [...(shiftData.events || []), newEvent];
