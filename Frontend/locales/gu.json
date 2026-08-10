@@ -2068,5 +2068,15 @@
   "Watering Method": "પાણી આપવાની પદ્ધતિ",
   "You do not have permission to view reports or logs. Please contact your administrator.": "તમારી પાસે રિપોર્ટ્સ અથવા લોગ્સ જોવાની પરવાનગી નથી. કૃપા કરીને તમારા એડમિનિસ્ટ્રેટરનો સંપર્ક કરો.",
   "You have ${queueCount} un-synced location coordinates saved on your device. Please sync them to the cloud to ensure your travel distance is accurate.": "તમારા ઉપકરણ પર ${queueCount} અન-સિંક કરેલા સ્થાન નિર્દેશાંકો સાચવેલા છે. તમારી મુસાફરીનું અંતર સચોટ રહે તે સુનિશ્ચિત કરવા માટે કૃપા કરીને તેમને ક્લાઉડ પર સિંક કરો.",
-  "Your role currently has no dashboard modules assigned. Please contact the administrator.": "તમારી ભૂમિકામાં હાલમાં કોઈ ડેશબોર્ડ મોડ્યુલ સોંપેલ નથી. કૃપા કરીને એડમિનિસ્ટ્રેટરનો સંપર્ક કરો."
+  "Your role currently has no dashboard modules assigned. Please contact the administrator.": "તમારી ભૂમિકામાં હાલમાં કોઈ ડેશબોર્ડ મોડ્યુલ સોંપેલ નથી. કૃપા કરીને એડમિનિસ્ટ્રેટરનો સંપર્ક કરો.",
+  "Farm Diary": "ફાર્મ ડાયરી",
+  "Farm Diaries in": "ફાર્મ ડાયરીઓ",
+  "Farmers with Farm Cards": "ફાર્મ કાર્ડ ધરાવતા ખેડૂતો",
+  "No Farm Cards Found": "કોઈ ફાર્મ કાર્ડ મળ્યું નથી",
+  "No farmers with Farm Cards in this village yet.": "આ ગામમાં હજુ ફાર્મ કાર્ડ ધરાવતા કોઈ ખેડૂત નથી.",
+  "FARM DIARIES": "ફાર્મ ડાયરીઓ",
+  "Current Stage": "વર્તમાન તબક્કો",
+  "Next Stage": "આગલો તબક્કો",
+  "Not started": "શરૂ થયું નથી",
+  "No diary yet": "હજુ કોઈ ડાયરી નથી"
 }

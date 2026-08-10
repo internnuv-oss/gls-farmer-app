@@ -37,6 +37,7 @@ import { FarmCardDetailsScreen } from '../modules/FarmCard/screens/FarmCardDetai
 import { FarmCardsListScreen } from '../modules/FarmCard/screens/FarmCardsListScreen';
 import { TempDealersListScreen } from '../modules/dashboard/screens/TempDealersListScreen';
 import { FarmDiaryHubScreen } from '../modules/FarmDiary/screens/FarmDiaryHubScreen';
+import { VillageFarmDiariesScreen } from '../modules/FarmDiary/screens/VillageFarmDiariesScreen';
 import { FarmDiarySetupScreen } from '../modules/FarmDiary/screens/setup/FarmDiarySetupScreen';
 import { FarmDiaryDashboardScreen } from '../modules/FarmDiary/screens/visit/FarmDiaryDashboardScreen';
 import { FarmDiaryProfileScreen } from '../modules/FarmDiary/screens/visit/FarmDiaryProfileScreen';
@@ -64,6 +65,7 @@ const DashboardStackNavigator = () => (
     <DashboardStack.Screen name="FarmerHub" component={FarmerHubScreen} />
     <DashboardStack.Screen name="GeneralVisit" component={GeneralVisitScreen} />
     <DashboardStack.Screen name="TempDealersListScreen" component={TempDealersListScreen} />
+    <DashboardStack.Screen name="VillageFarmDiariesScreen" component={VillageFarmDiariesScreen} />
   </DashboardStack.Navigator>
 );
 

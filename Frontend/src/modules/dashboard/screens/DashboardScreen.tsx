@@ -921,7 +921,7 @@ export const DashboardScreen = ({ navigation, route }: any) => {
                           {t("Farmers in")} {selectedVillageName}
                         </Text>
                         
-                        <View style={{ flexDirection: 'row', gap: 8 }}>
+                        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, justifyContent: 'flex-end', maxWidth: '58%' }}>
                           <Pressable 
                             onPress={() => {
                               navigation.navigate("TempDealersListScreen", { 
@@ -952,6 +952,25 @@ export const DashboardScreen = ({ navigation, route }: any) => {
                             <MaterialIcons name="analytics" size={16} color={colors.primary} />
                             <Text style={{ marginLeft: 6, fontSize: 13, fontWeight: '700', color: colors.primary }}>{t("Analysis")}</Text>
                           </Pressable>
+
+                          {farmerPerm.can_view && (
+                            <Pressable
+                              onPress={() => {
+                                const filteredFarmers = item.data.filter((f: any) => {
+                                  const fVill = (f.raw?.village || f.raw?.personal_details?.village || '').trim().toLowerCase();
+                                  return fVill === (selectedVillageName || '').trim().toLowerCase();
+                                });
+                                navigation.navigate('VillageFarmDiariesScreen', {
+                                  villageName: selectedVillageName,
+                                  farmers: filteredFarmers,
+                                });
+                              }}
+                              style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: colors.surface, paddingHorizontal: 12, paddingVertical: 6, borderRadius: radius.pill, borderWidth: 1, borderColor: colors.border, ...shadows.soft }}
+                            >
+                              <MaterialIcons name="menu-book" size={16} color={colors.primary} />
+                              <Text style={{ marginLeft: 6, fontSize: 13, fontWeight: '700', color: colors.primary }}>{t('Farm Diary')}</Text>
+                            </Pressable>
+                          )}
                         </View>
                       </View>
                     </View>
