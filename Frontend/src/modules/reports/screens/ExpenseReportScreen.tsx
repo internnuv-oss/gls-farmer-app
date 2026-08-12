@@ -1,3 +1,5 @@
+// Frontend/src/modules/reports/screens/ExpenseReportScreen.tsx
+
 import React, { useState } from 'react';
 import { View, Text, SectionList, Pressable, ScrollView } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
@@ -105,14 +107,14 @@ export const ExpenseReportScreen = ({ navigation }: any) => {
 
   const getStatusColor = (status: string) => {
     switch(status) {
-      case 'Approved': return { bg: '#DCFCE7', text: '#166534' };
-      case 'Rejected': return { bg: '#FEE2E2', text: '#991B1B' };
-      case 'Queried': return { bg: '#FEF3C7', text: '#B45309' };
-      default: return { bg: '#F1F5F9', text: '#475569' };
+      case 'Approved': return { bg: '#DCFCE7', text: '#166534', border: '#86EFAC' };
+      case 'Rejected': return { bg: '#FEE2E2', text: '#991B1B', border: '#FCA5A5' };
+      case 'Queried': return { bg: '#FEF3C7', text: '#B45309', border: '#FCD34D' };
+      default: return { bg: '#F1F5F9', text: '#475569', border: '#CBD5E1' };
     }
   };
 
-  const renderExpense = ({ item }: { item: Expense }) => {
+  const renderExpense = ({ item }: { item: Expense & { admin_comments?: string } }) => {
     const sColors = getStatusColor(item.status);
     return (
       <View style={{ backgroundColor: colors.surface, padding: spacing.md, borderRadius: radius.md, marginBottom: spacing.sm, borderWidth: 1, borderColor: colors.border }}>
@@ -125,8 +127,24 @@ export const ExpenseReportScreen = ({ navigation }: any) => {
           </View>
           <Text style={{ fontSize: 18, fontWeight: '900', color: colors.text }}>₹{item.amount}</Text>
         </View>
-        <Text style={{ fontSize: 14, color: colors.textMuted, marginBottom: 8, fontWeight: '500' }}>{item.remarks}</Text>
-        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end' }}>
+        
+        {item.remarks ? (
+          <Text style={{ fontSize: 14, color: colors.textMuted, marginBottom: 8, fontWeight: '500' }}>{item.remarks}</Text>
+        ) : null}
+
+        {/* 🚀 ADDED: Admin Comments Display */}
+        {item.admin_comments ? (
+          <View style={{ backgroundColor: '#F8FAFC', padding: spacing.sm, borderRadius: radius.sm, borderWidth: 1, borderColor: '#E2E8F0', marginBottom: 12, borderLeftWidth: 3, borderLeftColor: sColors.border }}>
+            <Text style={{ fontSize: 11, fontWeight: '800', color: colors.textMuted, textTransform: 'uppercase', marginBottom: 2 }}>
+              {t("Admin Note")}
+            </Text>
+            <Text style={{ fontSize: 13, color: colors.text, fontWeight: '600' }}>
+              {item.admin_comments}
+            </Text>
+          </View>
+        ) : null}
+
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end', marginTop: item.admin_comments ? 0 : 4 }}>
           <Text style={{ fontSize: 12, color: colors.textMuted, fontWeight: '700' }}>{new Date(item.date).toLocaleDateString()}</Text>
           <View style={{ backgroundColor: sColors.bg, paddingHorizontal: 10, paddingVertical: 4, borderRadius: radius.pill }}>
             <Text style={{ color: sColors.text, fontSize: 11, fontWeight: '800', textTransform: 'uppercase' }}>{t(item.status)}</Text>

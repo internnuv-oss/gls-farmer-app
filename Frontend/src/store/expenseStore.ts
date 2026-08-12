@@ -1,3 +1,5 @@
+// Frontend/src/store/expenseStore.ts
+
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -13,6 +15,7 @@ export interface Expense {
   remarks: string;
   receipt_url: string;
   status: 'Pending' | 'Approved' | 'Rejected' | 'Queried';
+  admin_comments?: string; // 🚀 ADDED: TypeScript now recognizes the admin_comments column
 }
 
 interface ExpenseState {
