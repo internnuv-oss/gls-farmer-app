@@ -276,12 +276,6 @@ export const TravelReportScreen = ({ navigation }: any) => {
             }
         }
 
-        // 🚀 NEW: Attach GPS coordinates to the description text
-        if (item.location?.lat && item.location?.lng) {
-            const gpsText = `📍 ${item.location.lat.toFixed(5)}, ${item.location.lng.toFixed(5)}`;
-            displayDescription = displayDescription ? `${displayDescription}\n${gpsText}` : gpsText;
-        }
-
         return (
             <View key={index} style={{ flexDirection: 'row', marginBottom: spacing.lg }}>
                 <View style={{ width: 75, alignItems: 'flex-end', paddingRight: spacing.md }}>
@@ -302,6 +296,24 @@ export const TravelReportScreen = ({ navigation }: any) => {
                     {displayDescription ? (
                         <Text style={{ fontSize: 14, color: colors.textMuted, fontWeight: '600', marginTop: 4 }}>{t(displayDescription)}</Text>
                     ) : null}
+                    
+                    {/* 🚀 NEW: Glassy Blue GPS Tag */}
+                    {item.location?.lat && item.location?.lng && (
+                        <View style={{ 
+                            alignSelf: 'flex-start', 
+                            backgroundColor: 'rgba(59, 130, 246, 0.15)', 
+                            borderWidth: 1, 
+                            borderColor: 'rgba(59, 130, 246, 0.3)', 
+                            borderRadius: radius.sm, 
+                            paddingHorizontal: 8, 
+                            paddingVertical: 4, 
+                            marginTop: 6 
+                        }}>
+                            <Text style={{ fontSize: 11, fontWeight: '800', color: '#2563EB' }}>
+                                GPS: {item.location.lat.toFixed(5)}, {item.location.lng.toFixed(5)}
+                            </Text>
+                        </View>
+                    )}
                 </View>
             </View>
         );
@@ -364,10 +376,13 @@ export const TravelReportScreen = ({ navigation }: any) => {
                     }
                 }
 
-                // 🚀 NEW: Attach GPS coordinates to the PDF description text
+                let gpsHtml = '';
                 if (item.location?.lat && item.location?.lng) {
-                    const gpsText = `📍 ${item.location.lat.toFixed(5)}, ${item.location.lng.toFixed(5)}`;
-                    displayDescription = displayDescription ? `${displayDescription}\n${gpsText}` : gpsText;
+                    gpsHtml = `
+                        <div style="display: inline-block; background-color: rgba(59, 130, 246, 0.12); border: 1px solid rgba(59, 130, 246, 0.3); border-radius: 4px; padding: 3px 8px; margin-top: 6px; font-size: 10px; font-weight: 800; color: #2563EB;">
+                            GPS: ${item.location.lat.toFixed(5)}, ${item.location.lng.toFixed(5)}
+                        </div>
+                    `;
                 }
 
                 if (displayDescription) {
@@ -386,6 +401,7 @@ export const TravelReportScreen = ({ navigation }: any) => {
                         <div class="content ${isLast ? 'last-content' : ''}">
                             <div class="title">${t(item.title)}</div>
                             ${displayDescription ? `<div class="desc">${t(displayDescription)}</div>` : ''}
+                            ${gpsHtml}
                         </div>
                     </div>
                 `;
