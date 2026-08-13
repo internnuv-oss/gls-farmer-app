@@ -196,7 +196,7 @@ export const BoundaryCaptureModal = ({ visible, onClose, onSave, parentBoundary 
            )}
         </View>
 
-        <ViewShot ref={viewShotRef} options={{ format: "png", quality: 1 }} style={{ flex: 1 }}>
+        <ViewShot ref={viewShotRef} options={{ format: "jpg", quality: 0.7 }} style={{ flex: 1 }}>
           {region ? (
             <MapView
               ref={mapRef} 

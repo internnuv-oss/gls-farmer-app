@@ -8,6 +8,8 @@ import { useFarmDiaryStore } from '../../../../store/farmDiaryStore';
 import { supabase } from '../../../../core/supabase';
 import { Button, Input, SelectField, TextArea, DatePickerField } from '../../../../design-system/components';
 import * as ImagePicker from 'expo-image-picker';
+import { compressImage } from '../../../../core/imageCompressor';
+
 export const MandatoryBaseVisitScreen = ({ route, navigation }: any) => {
   const { t } = useTranslation();
   const { diary } = route.params;
@@ -74,7 +76,8 @@ export const MandatoryBaseVisitScreen = ({ route, navigation }: any) => {
               quality: 0.7,
             });
             if (!result.canceled && result.assets && result.assets.length > 0) {
-              setVisitPhotos(prev => [...prev, result.assets[0].uri]);
+              const compressedUri = await compressImage(result.assets[0].uri, 1080, 0.7);
+              setVisitPhotos(prev => [...prev, compressedUri]);
             }
           }
         },
@@ -91,7 +94,8 @@ export const MandatoryBaseVisitScreen = ({ route, navigation }: any) => {
               quality: 0.7,
             });
             if (!result.canceled && result.assets && result.assets.length > 0) {
-              setVisitPhotos(prev => [...prev, result.assets[0].uri]);
+              const compressedUri = await compressImage(result.assets[0].uri, 1080, 0.7);
+              setVisitPhotos(prev => [...prev, compressedUri]);
             }
           }
         }

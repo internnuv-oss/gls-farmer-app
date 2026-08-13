@@ -7,6 +7,7 @@ import { useTranslation } from 'react-i18next';
 import { colors, radius, spacing } from '../../../../design-system/tokens';
 import { useFarmDiaryStore } from '../../../../store/farmDiaryStore';
 import { supabase } from '../../../../core/supabase';
+import { compressImage } from '../../../../core/imageCompressor';
 
 export const CropObservationScreen = ({ route, navigation }: any) => {
   const { t } = useTranslation();
@@ -137,39 +138,42 @@ export const CropObservationScreen = ({ route, navigation }: any) => {
       Alert.alert('Permission needed', 'Camera permission is required to take photos.');
       return;
     }
-
     const result = await ImagePicker.launchCameraAsync({
       mediaTypes: ['images'],
       allowsEditing: false,
       quality: 0.8,
     });
-
+  
     if (!result.canceled && result.assets && result.assets.length > 0) {
+      // Compress and downscale photo before saving to state
+      const compressedUri = await compressImage(result.assets[0].uri, 1080, 0.7);
+  
       setSamplesData((prev: any) => ({
         ...prev,
         [activeTab]: {
           ...prev[activeTab],
-          photo_path: result.assets[0].uri
+          photo_path: compressedUri
         }
       }));
     }
   };
-
+  
   const handleParamPhotoCapture = async (paramId: string) => {
     const { status } = await ImagePicker.requestCameraPermissionsAsync();
     if (status !== 'granted') {
       Alert.alert('Permission needed', 'Camera permission is required to take photos.');
       return;
     }
-
     const result = await ImagePicker.launchCameraAsync({
       mediaTypes: ['images'],
       allowsEditing: false,
       quality: 0.8,
     });
-
+  
     if (!result.canceled && result.assets && result.assets.length > 0) {
-      handleValueChange(paramId, result.assets[0].uri, undefined);
+      // Compress parameter photo
+      const compressedUri = await compressImage(result.assets[0].uri, 1080, 0.7);
+      handleValueChange(paramId, compressedUri, undefined);
     }
   };
 
