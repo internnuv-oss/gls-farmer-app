@@ -142,12 +142,11 @@ export const CropObservationScreen = ({ route, navigation }: any) => {
     const result = await ImagePicker.launchCameraAsync({
       mediaTypes: ['images'],
       allowsEditing: false,
-      quality: 0.8,
+      quality: 0.6,
     });
   
     if (!result.canceled && result.assets && result.assets.length > 0) {
-      // Compress and downscale photo before saving to state
-      const compressedUri = await compressImage(result.assets[0].uri, 1080, 0.7);
+      const compressedUri = await compressImage(result.assets[0].uri, 1024, 0.6);
   
       setSamplesData((prev: any) => ({
         ...prev,
@@ -168,12 +167,11 @@ export const CropObservationScreen = ({ route, navigation }: any) => {
     const result = await ImagePicker.launchCameraAsync({
       mediaTypes: ['images'],
       allowsEditing: false,
-      quality: 0.8,
+      quality: 0.6,
     });
   
     if (!result.canceled && result.assets && result.assets.length > 0) {
-      // Compress parameter photo
-      const compressedUri = await compressImage(result.assets[0].uri, 1080, 0.7);
+      const compressedUri = await compressImage(result.assets[0].uri, 1024, 0.6);
       handleValueChange(paramId, compressedUri, undefined);
     }
   };

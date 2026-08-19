@@ -3,6 +3,7 @@ import { supabase } from '../core/supabase';
 import { useAuthStore } from './authStore';
 import { useAlertStore } from './alertStore';
 import { uploadFileToCloudinary } from '../modules/onboarding/services/cloudinaryService';
+import { compressImage } from '../core/imageCompressor';
 import { useShiftStore } from './shiftStore';
 
 const getActiveRouteName = async (): Promise<string> => {
@@ -306,7 +307,8 @@ export const useFarmDiaryStore = create<FarmDiaryState>((set, get) => ({
         // Upload sample photo if it's a local file
         if (samplePhotoUrl && samplePhotoUrl.startsWith('file://')) {
           try {
-            samplePhotoUrl = await uploadFileToCloudinary(samplePhotoUrl, 'image');
+            const compressedUri = await compressImage(samplePhotoUrl, 1024, 0.6);
+            samplePhotoUrl = await uploadFileToCloudinary(compressedUri, 'image');
           } catch (e) {
             console.error('Failed to upload sample photo:', e);
           }
@@ -330,7 +332,8 @@ export const useFarmDiaryStore = create<FarmDiaryState>((set, get) => ({
           let finalValue = v.value;
           if (finalValue && typeof finalValue === 'string' && finalValue.startsWith('file://')) {
             try {
-              finalValue = await uploadFileToCloudinary(finalValue, 'image');
+              const compressedUri = await compressImage(finalValue, 1024, 0.6);
+              finalValue = await uploadFileToCloudinary(compressedUri, 'image');
             } catch (e) {
               console.error('Failed to upload dynamic parameter photo:', e);
             }
