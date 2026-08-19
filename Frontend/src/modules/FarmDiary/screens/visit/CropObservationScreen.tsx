@@ -37,6 +37,7 @@ export const CropObservationScreen = ({ route, navigation }: any) => {
   }, [baseVisitId]);
   
   const [parameters, setParameters] = useState<any[]>([]);
+  
   const [samplesData, setSamplesData] = useState<any>({
     1: { photo_path: null, values: {} },
     2: { photo_path: null, values: {} },
@@ -264,7 +265,9 @@ export const CropObservationScreen = ({ route, navigation }: any) => {
         <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
            <View style={{ flex: 1 }}>
               <Text style={{ fontSize: 14, fontWeight: '700', color: colors.text }}>Crop:</Text>
-              <Text style={{ fontSize: 22, fontWeight: '900', color: colors.text }}>{diary.farm_name || 'Groundnut'}</Text>
+              <Text style={{ fontSize: 22, fontWeight: '900', color: colors.text }}>
+  {diary.farm_name ? t(diary.farm_name.trim()) : t('Groundnut')}
+</Text>
               {activeStage?.das ? (
                 <View style={{ backgroundColor: '#DCFCE7', paddingHorizontal: spacing.sm, paddingVertical: 2, borderRadius: radius.sm, alignSelf: 'flex-start', marginTop: spacing.xs }}>
                    <Text style={{ color: '#166534', fontSize: 10, fontWeight: '700' }}>{activeStage.das} Days After Sowing (DAS)</Text>
@@ -279,8 +282,8 @@ export const CropObservationScreen = ({ route, navigation }: any) => {
                 style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 2, paddingVertical: 8, paddingHorizontal: 12, backgroundColor: '#F1F5F9', borderRadius: radius.md, width: '100%' }}
               >
                 <Text style={{ fontSize: 18, fontWeight: '800', color: colors.text, flex: 1 }} numberOfLines={2}>
-                  {activeStage?.stage_name || 'Select Stage'}
-                </Text>
+  {activeStage?.stage_name ? t(activeStage.stage_name.trim()) : t('Select Stage')}
+</Text>
                 <MaterialIcons name="arrow-drop-down" size={24} color={colors.text} />
               </Pressable>
               <Text style={{ color: colors.textMuted, fontSize: 10, fontWeight: '600', marginTop: spacing.xs }}>Batch ID: GL-GN-2023-04</Text>
@@ -340,143 +343,156 @@ export const CropObservationScreen = ({ route, navigation }: any) => {
                return (
                  <View key={param.id} style={{ marginBottom: spacing.xl }}>
                    <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: spacing.sm }}>
-                     <MaterialIcons name="crop-free" size={20} color="#065F46" />
-                     <Text style={{ fontSize: 16, fontWeight: '800', color: colors.text, marginLeft: spacing.xs }}>
-                       {param.parameter_label.toLowerCase()}
-                     </Text>
-                   </View>
+  <MaterialIcons name="crop-free" size={20} color="#065F46" />
+  <Text style={{ fontSize: 16, fontWeight: '800', color: colors.text, marginLeft: spacing.xs }}>
+    {t(param.parameter_label.trim())}
+  </Text>
+</View>
                    
                    {(() => {
                      switch (param.ui_input_type) {
-                       case 'Dropdown Choice':
-                       case 'chips':
-                       case 'categorical':
-                         return (
-                           <View>
-                              <Pressable 
-                                onPress={() => setDropdownConfig({ paramId: param.id, options: options })}
-                                style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', borderWidth: 1, borderColor: '#CBD5E1', borderRadius: radius.md, backgroundColor: '#FFFFFF', padding: spacing.md, marginBottom: spacing.md }}
-                              >
-                                 <Text style={{ fontSize: 14, color: val ? colors.text : '#94A3B8' }}>{val || 'Select Option'}</Text>
-                                 <MaterialIcons name="keyboard-arrow-down" size={20} color={colors.text} />
-                              </Pressable>
-                              {param.parameter_label.toLowerCase().includes('color') && options && (
-                                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.md, justifyContent: 'space-between' }}>
-                                  {options.map((opt: string, idx: number) => {
-                                    const isSelected = val === opt;
-                                    const chipColor = getColorForOption(opt);
-                                    return (
-                                      <Pressable
-                                        key={idx}
-                                        onPress={() => handleValueChange(param.id, opt, undefined)}
-                                        style={{
-                                          width: '47%', padding: spacing.md, borderRadius: radius.md,
-                                          borderWidth: isSelected ? 2 : 1, 
-                                          borderColor: isSelected ? '#166534' : '#E2E8F0',
-                                          backgroundColor: isSelected ? '#ECFDF5' : '#FFFFFF',
-                                          alignItems: 'center'
-                                        }}
-                                      >
-                                        <View style={{ width: '100%', height: 24, backgroundColor: chipColor, borderRadius: 4, marginBottom: spacing.xs }} />
-                                        <Text style={{ fontSize: 12, fontWeight: '700', color: colors.text }}>{opt}</Text>
-                                      </Pressable>
-                                    );
-                                  })}
-                                </View>
-                              )}
-                           </View>
-                         );
-                       case 'Boolean':
-                         return (
-                           <View style={{ flexDirection: 'row', gap: spacing.md }}>
-                             {['Yes', 'No'].map((opt) => {
-                               const isSelected = (val === 'true' && opt === 'Yes') || (val === 'false' && opt === 'No');
-                               return (
-                                 <Pressable
-                                   key={opt}
-                                   onPress={() => handleValueChange(param.id, opt === 'Yes' ? 'true' : 'false', undefined)}
-                                   style={{
-                                     flex: 1, padding: spacing.md, borderRadius: radius.md,
-                                     borderWidth: isSelected ? 2 : 1, 
-                                     borderColor: isSelected ? '#166534' : '#E2E8F0',
-                                     backgroundColor: isSelected ? '#ECFDF5' : '#FFFFFF',
-                                     alignItems: 'center'
-                                   }}
-                                 >
-                                   <Text style={{ fontSize: 14, fontWeight: isSelected ? '800' : '600', color: isSelected ? '#166534' : colors.text }}>{opt}</Text>
-                                 </Pressable>
-                               );
-                             })}
-                           </View>
-                         );
-                       case 'Textarea':
-                         return (
-                           <View style={{ borderWidth: 1, borderColor: '#CBD5E1', borderRadius: radius.md, backgroundColor: '#FFFFFF', overflow: 'hidden' }}>
-                             <TextInput
-                               style={{ padding: spacing.md, fontSize: 16, color: colors.text, height: 100 }}
-                               placeholder={`Enter ${param.parameter_label.toLowerCase()}`}
-                               placeholderTextColor="#94A3B8"
-                               value={val}
-                               onChangeText={t => handleValueChange(param.id, t, undefined)}
-                               multiline={true}
-                               numberOfLines={4}
-                               textAlignVertical="top"
-                             />
-                           </View>
-                         );
-                       case 'Upload Image':
-                         return (
-                           <Pressable 
-                             onPress={() => handleParamPhotoCapture(param.id)}
-                             style={{ 
-                               borderWidth: 2, borderStyle: 'dashed', borderColor: '#CBD5E1', 
-                               backgroundColor: '#FFFFFF', borderRadius: 12, padding: spacing.md,
-                               alignItems: 'center', justifyContent: 'center', height: 120
-                             }}
-                           >
-                             {val ? (
-                               <Image source={{ uri: val }} style={{ width: '100%', height: '100%', borderRadius: 8 }} resizeMode="cover" />
-                             ) : (
-                               <>
-                                 <Feather name="camera" size={32} color="#64748B" />
-                                 <Text style={{ fontSize: 14, fontWeight: '600', color: '#64748B', marginTop: spacing.sm }}>Tap to capture image</Text>
-                               </>
-                             )}
-                           </Pressable>
-                         );
-                       case 'Numeric':
-                       default:
-                         return (
-                           <View>
-                             <View style={{ flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: '#CBD5E1', borderRadius: radius.md, backgroundColor: '#FFFFFF', overflow: 'hidden' }}>
-                               <TextInput
-                                 style={{ flex: 1, padding: spacing.md, fontSize: 16, color: colors.text }}
-                                 placeholder={`Enter ${param.parameter_label.toLowerCase()}`}
-                                 placeholderTextColor="#94A3B8"
-                                 keyboardType="numeric"
-                                 value={val}
-                                 onChangeText={t => handleValueChange(param.id, t, currentUomId)}
-                               />
-                               {uomSymbol ? (
-                                 <Pressable 
-                                   onPress={() => param.permitted_uoms?.length > 1 ? setShowUomPicker(param.id) : null}
-                                   style={{ backgroundColor: '#E2E8F0', paddingHorizontal: spacing.lg, paddingVertical: spacing.md, flexDirection: 'row', alignItems: 'center', borderLeftWidth: 1, borderLeftColor: '#CBD5E1' }}
-                                 >
-                                   <Text style={{ fontSize: 16, fontWeight: '700', color: colors.text }}>{uomSymbol}</Text>
-                                   {param.permitted_uoms?.length > 1 && (
-                                     <MaterialIcons name="arrow-drop-down" size={18} color={colors.text} />
-                                   )}
-                                 </Pressable>
-                               ) : null}
-                             </View>
-                             {param.ui_input_type === 'Numeric' && (
-                               <Text style={{ fontSize: 12, fontStyle: 'italic', color: '#64748B', marginTop: spacing.xs }}>
-                                 Average for this crop stage: 32-40 {uomSymbol}
-                               </Text>
-                             )}
-                           </View>
-                         );
-                     }
+  case 'Dropdown Choice':
+  case 'chips':
+  case 'categorical':
+    return (
+      <View>
+        <Pressable 
+          onPress={() => setDropdownConfig({ paramId: param.id, options: options || [] })}
+          style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', borderWidth: 1, borderColor: '#CBD5E1', borderRadius: radius.md, backgroundColor: '#FFFFFF', padding: spacing.md, marginBottom: spacing.md }}
+        >
+          <Text style={{ fontSize: 14, color: val ? colors.text : '#94A3B8' }}>
+            {val ? t(val.trim()) : t('Select Option')}
+          </Text>
+          <MaterialIcons name="keyboard-arrow-down" size={20} color={colors.text} />
+        </Pressable>
+        {Boolean(param.parameter_label?.toLowerCase().includes('color') && options && options.length > 0) ? (
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.md, justifyContent: 'space-between' }}>
+            {options.map((opt: string, idx: number) => {
+              const isSelected = val === opt;
+              const chipColor = getColorForOption(opt);
+              return (
+                <Pressable
+                  key={idx}
+                  onPress={() => handleValueChange(param.id, opt, undefined)}
+                  style={{
+                    width: '47%', padding: spacing.md, borderRadius: radius.md,
+                    borderWidth: isSelected ? 2 : 1, 
+                    borderColor: isSelected ? '#166534' : '#E2E8F0',
+                    backgroundColor: isSelected ? '#ECFDF5' : '#FFFFFF',
+                    alignItems: 'center'
+                  }}
+                >
+                  <View style={{ width: '100%', height: 24, backgroundColor: chipColor, borderRadius: 4, marginBottom: spacing.xs }} />
+                  <Text style={{ fontSize: 12, fontWeight: '700', color: colors.text }}>
+                    {t((opt || '').trim())}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
+        ) : null}
+      </View>
+    );
+
+  case 'Boolean':
+    return (
+      <View style={{ flexDirection: 'row', gap: spacing.md }}>
+        {['Yes', 'No'].map((opt) => {
+          const isSelected = (val === 'true' && opt === 'Yes') || (val === 'false' && opt === 'No');
+          return (
+            <Pressable
+              key={opt}
+              onPress={() => handleValueChange(param.id, opt === 'Yes' ? 'true' : 'false', undefined)}
+              style={{
+                flex: 1, padding: spacing.md, borderRadius: radius.md,
+                borderWidth: isSelected ? 2 : 1, 
+                borderColor: isSelected ? '#166534' : '#E2E8F0',
+                backgroundColor: isSelected ? '#ECFDF5' : '#FFFFFF',
+                alignItems: 'center'
+              }}
+            >
+              <Text style={{ fontSize: 14, fontWeight: isSelected ? '800' : '600', color: isSelected ? '#166534' : colors.text }}>
+                {t(opt)}
+              </Text>
+            </Pressable>
+          );
+        })}
+      </View>
+    );
+
+  case 'Textarea':
+    return (
+      <View style={{ borderWidth: 1, borderColor: '#CBD5E1', borderRadius: radius.md, backgroundColor: '#FFFFFF', overflow: 'hidden' }}>
+        <TextInput
+          style={{ padding: spacing.md, fontSize: 16, color: colors.text, height: 100 }}
+          placeholder={`${t("Enter")} ${t((param.parameter_label || '').trim())}`}
+          placeholderTextColor="#94A3B8"
+          value={val}
+          onChangeText={textVal => handleValueChange(param.id, textVal, undefined)}
+          multiline={true}
+          numberOfLines={4}
+          textAlignVertical="top"
+        />
+      </View>
+    );
+
+  case 'Upload Image':
+    return (
+      <Pressable 
+        onPress={() => handleParamPhotoCapture(param.id)}
+        style={{ 
+          borderWidth: 2, borderStyle: 'dashed', borderColor: '#CBD5E1', 
+          backgroundColor: '#FFFFFF', borderRadius: 12, padding: spacing.md,
+          alignItems: 'center', justifyContent: 'center', height: 120
+        }}
+      >
+        {val ? (
+          <Image source={{ uri: val }} style={{ width: '100%', height: '100%', borderRadius: 8 }} resizeMode="cover" />
+        ) : (
+          <>
+            <Feather name="camera" size={32} color="#64748B" />
+            <Text style={{ fontSize: 14, fontWeight: '600', color: '#64748B', marginTop: spacing.sm }}>
+              {t("Tap to capture image")}
+            </Text>
+          </>
+        )}
+      </Pressable>
+    );
+
+  case 'Numeric':
+  default:
+    return (
+      <View>
+        <View style={{ flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: '#CBD5E1', borderRadius: radius.md, backgroundColor: '#FFFFFF', overflow: 'hidden' }}>
+          <TextInput
+            style={{ flex: 1, padding: spacing.md, fontSize: 16, color: colors.text }}
+            placeholder={`${t("Enter")} ${t((param.parameter_label || '').trim())}`}
+            placeholderTextColor="#94A3B8"
+            keyboardType="numeric"
+            value={val}
+            onChangeText={numVal => handleValueChange(param.id, numVal, currentUomId)}
+          />
+          {Boolean(uomSymbol) ? (
+            <Pressable 
+              onPress={() => (param.permitted_uoms?.length > 1 ? setShowUomPicker(param.id) : null)}
+              style={{ backgroundColor: '#E2E8F0', paddingHorizontal: spacing.lg, paddingVertical: spacing.md, flexDirection: 'row', alignItems: 'center', borderLeftWidth: 1, borderLeftColor: '#CBD5E1' }}
+            >
+              <Text style={{ fontSize: 16, fontWeight: '700', color: colors.text }}>{uomSymbol}</Text>
+              {Boolean(param.permitted_uoms && param.permitted_uoms.length > 1) ? (
+                <MaterialIcons name="arrow-drop-down" size={18} color={colors.text} />
+              ) : null}
+            </Pressable>
+          ) : null}
+        </View>
+        {param.ui_input_type === 'Numeric' ? (
+          <Text style={{ fontSize: 12, fontStyle: 'italic', color: '#64748B', marginTop: spacing.xs }}>
+            {t("Average for this crop stage:")} 32-40 {uomSymbol}
+          </Text>
+        ) : null}
+      </View>
+    );
+}
+                     
                    })()}
                  </View>
                );
@@ -564,8 +580,8 @@ export const CropObservationScreen = ({ route, navigation }: any) => {
                      style={{ paddingVertical: spacing.md, borderBottomWidth: 1, borderBottomColor: '#F1F5F9' }}
                    >
                      <Text style={{ fontSize: 16, fontWeight: selectedStageId === stg.id ? '700' : '400', color: selectedStageId === stg.id ? colors.primary : colors.text }}>
-                       {stg.stage_name}
-                     </Text>
+  {t(stg.stage_name?.trim())}
+</Text>
                    </Pressable>
                  ))}
                  {stages.length === 0 && (
@@ -624,8 +640,7 @@ export const CropObservationScreen = ({ route, navigation }: any) => {
                      }}
                      style={{ paddingVertical: spacing.md, borderBottomWidth: 1, borderBottomColor: '#F1F5F9' }}
                    >
-                     <Text style={{ fontSize: 16, color: colors.text }}>{opt}</Text>
-                   </Pressable>
+<Text style={{ fontSize: 16, color: colors.text }}>{t(opt.trim())}</Text>                   </Pressable>
                  ))}
                  {(!dropdownConfig?.options || dropdownConfig.options.length === 0) && (
                    <Text style={{ color: colors.textMuted, fontStyle: 'italic', paddingVertical: spacing.md }}>No options available.</Text>

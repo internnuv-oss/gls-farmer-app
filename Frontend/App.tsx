@@ -11,23 +11,27 @@ import { AppNavigator } from "./src/navigation/AppNavigator";
 import "./src/core/i18n";
 import { AutoLogoutProvider } from "./src/core/AutoLogoutProvider";
 import { syncLocationsToSupabase } from "./src/core/locationUtils";
-import { startBackgroundTracking } from "./src/core/locationTracker"; // 🚀 Import this
-import { useShiftStore } from "./src/store/shiftStore"; // 🚀 Import shift store
+import { startBackgroundTracking } from "./src/core/locationTracker"; 
+import { useShiftStore } from "./src/store/shiftStore"; 
 
 import "./src/core/locationTracker"; 
 import "./src/core/database"; 
-// 🚀 Import the new Sync Manager
 import { OfflineSyncManager } from "./src/core/OfflineSyncManager"; 
+
+// 🚀 1. ADD THIS IMPORT
+import { loadDynamicTranslations } from "./src/core/i18nSync";
 
 export default function App() {
 
   useEffect(() => {
+    // 🚀 2. CALL THIS FUNCTION WHEN THE APP STARTS
+    loadDynamicTranslations();
+
     const subscription = AppState.addEventListener('change', nextAppState => {
       if (nextAppState === 'active') {
         syncLocationsToSupabase();
         
         const state = useShiftStore.getState();
-        // 🚀 Ensure we use state.activeShiftId matching your Zustand store
         if (state.isActive && state.activeShiftId) {
            startBackgroundTracking(state.activeShiftId);
         }
@@ -43,7 +47,6 @@ export default function App() {
         <AutoLogoutProvider>
           <AppNavigator />
           
-          {/* 🚀 Mounts globally and handles its own visibility */}
           <OfflineSyncManager />
           
         </AutoLogoutProvider>

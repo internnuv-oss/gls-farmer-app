@@ -44,3 +44,9 @@ yarn-error.*
 Keystore
 *.keystore
 *.jks
+
+# =========================
+# Supabase Specific
+# =========================
+supabase/.temp/
+supabase/.branches/
