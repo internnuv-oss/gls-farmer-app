@@ -207,6 +207,16 @@ export const CropObservationScreen = ({ route, navigation }: any) => {
       return;
     }
 
+    // Every plant row saved to the server requires a photograph
+    const plantsMissingPhoto = validPlants.filter(i => !samplesData[i].photo_path);
+    if (plantsMissingPhoto.length > 0) {
+      Alert.alert(
+        'Photograph Required',
+        `Capture the plant set photograph for Plant ${plantsMissingPhoto.join(', ')} before submitting, or clear the details entered for it.`
+      );
+      return;
+    }
+
     const sessionData = {
       base_visit_id: baseVisitId,
       farm_diary_id: diary.id,

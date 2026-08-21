@@ -290,6 +290,7 @@ export const useFarmDiaryStore = create<FarmDiaryState>((set, get) => ({
 
   saveCropObservation: async (sessionData, samples) => {
     set({ isLoading: true });
+    let createdSessionId: string | null = null;
     try {
       // 1. Insert Session
       const { data: session, error: sessionError } = await supabase
@@ -302,16 +303,17 @@ export const useFarmDiaryStore = create<FarmDiaryState>((set, get) => ({
 
       // 2. Insert Plant Sample Sets
       const sessionId = session.id;
+      createdSessionId = sessionId;
       for (const sample of samples) {
         let samplePhotoUrl = sample.photo_path;
-        // Upload sample photo if it's a local file
+        // The photo path column is mandatory, so a failed upload must abort the save
         if (samplePhotoUrl && samplePhotoUrl.startsWith('file://')) {
-          try {
-            const compressedUri = await compressImage(samplePhotoUrl, 1024, 0.6);
-            samplePhotoUrl = await uploadFileToCloudinary(compressedUri, 'image');
-          } catch (e) {
-            console.error('Failed to upload sample photo:', e);
-          }
+          const compressedUri = await compressImage(samplePhotoUrl, 1024, 0.6);
+          samplePhotoUrl = await uploadFileToCloudinary(compressedUri, 'image');
+        }
+
+        if (!samplePhotoUrl) {
+          throw new Error(`Plant ${sample.index} photo could not be uploaded. Please retry on a better network.`);
         }
 
         const { data: sampleSet, error: sampleSetError } = await supabase
@@ -331,12 +333,8 @@ export const useFarmDiaryStore = create<FarmDiaryState>((set, get) => ({
         const uploadPromises = sample.values.map(async (v: any) => {
           let finalValue = v.value;
           if (finalValue && typeof finalValue === 'string' && finalValue.startsWith('file://')) {
-            try {
-              const compressedUri = await compressImage(finalValue, 1024, 0.6);
-              finalValue = await uploadFileToCloudinary(compressedUri, 'image');
-            } catch (e) {
-              console.error('Failed to upload dynamic parameter photo:', e);
-            }
+            const compressedUri = await compressImage(finalValue, 1024, 0.6);
+            finalValue = await uploadFileToCloudinary(compressedUri, 'image');
           }
           return {
             sample_set_id: sampleSet.id,
@@ -379,7 +377,14 @@ export const useFarmDiaryStore = create<FarmDiaryState>((set, get) => ({
       return true;
     } catch (error: any) {
       console.error('Save Crop Obs Error:', error);
-      useAlertStore.getState().showAlert('Error', 'Failed to save crop observation.');
+
+      // Roll back the half-written session so it does not linger as an empty record
+      if (createdSessionId) {
+        await supabase.from('crop_observation_sessions').delete().eq('id', createdSessionId);
+      }
+
+      const reason = error?.message || error?.details || 'Unknown error';
+      useAlertStore.getState().showAlert('Error', `Failed to save crop observation.\n\n${reason}`);
       return false;
     } finally {
       set({ isLoading: false });

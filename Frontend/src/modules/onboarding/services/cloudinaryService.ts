@@ -29,7 +29,13 @@ export async function uploadFileToCloudinary(uri: string, type: "image" | "raw" 
   } as never);
 
   const response = await fetch(endpoint, { method: "POST", body: formData });
-  const data = await response.json();
-  
+  const data = await response.json().catch(() => null);
+
+  if (!response.ok || !data?.secure_url) {
+    throw new Error(
+      data?.error?.message || `Upload failed (${response.status}). Check your network and retry.`
+    );
+  }
+
   return data.secure_url as string;
 }
