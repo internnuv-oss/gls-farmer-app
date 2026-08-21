@@ -19,6 +19,59 @@ const getActiveRouteName = async (): Promise<string> => {
   return routeName;
 };
 
+const classifyCropObservationError = (error: any): string => {
+  const message = String(error?.message || '');
+  const details = String(error?.details || '');
+  const code = String(error?.code || '');
+  const raw = `${message} ${details} ${code} ${error?.hint || ''}`.toLowerCase();
+
+  if (
+    message.includes('photo could not be uploaded') ||
+    message.includes('Upload failed') ||
+    raw.includes('cloudinary') ||
+    raw.includes('upload failed')
+  ) {
+    return 'Photo upload failed — retry';
+  }
+
+  if (
+    raw.includes('network request failed') ||
+    raw.includes('failed to fetch') ||
+    raw.includes('network error') ||
+    raw.includes('timeout') ||
+    raw.includes('timed out') ||
+    error?.name === 'AbortError'
+  ) {
+    return 'Check connection and retry';
+  }
+
+  if (
+    raw.includes('jwt') ||
+    raw.includes('unauthorized') ||
+    raw.includes('not authenticated') ||
+    raw.includes('invalid claim') ||
+    raw.includes('auth session missing') ||
+    raw.includes('session expired') ||
+    code === 'PGRST301'
+  ) {
+    return 'Session expired — log in again';
+  }
+
+  if (code === '23505' || raw.includes('duplicate') || raw.includes('unique constraint')) {
+    return 'Already saved for this visit';
+  }
+
+  if (
+    raw.includes('row-level security') ||
+    raw.includes('permission denied') ||
+    code === '42501'
+  ) {
+    return "You don't have permission to save this observation.";
+  }
+
+  return 'Something went wrong. Please try again.';
+};
+
 export interface FarmDiary {
   id: string;
   farmer_id: string;
@@ -41,7 +94,7 @@ export interface FarmDiaryState {
   updateDiary: (diaryId: string, diaryData: any) => Promise<boolean>;
   startBaseVisit: (diaryId: string, visitData: any) => Promise<string | null>;
   fetchDynamicParameters: (cropId: string, stageId: string) => Promise<any>;
-  saveCropObservation: (sessionData: any, samples: any[]) => Promise<boolean>;
+  saveCropObservation: (sessionData: any, samples: any[], onSuccess?: () => void) => Promise<boolean>;
   fetchHistoryLedger: (diaryId: string) => Promise<any[]>;
   getNextVisitNumber: (diaryId: string) => Promise<number>;
 }
@@ -288,7 +341,7 @@ export const useFarmDiaryStore = create<FarmDiaryState>((set, get) => ({
     }
   },
 
-  saveCropObservation: async (sessionData, samples) => {
+  saveCropObservation: async (sessionData, samples, onSuccess) => {
     set({ isLoading: true });
     let createdSessionId: string | null = null;
     try {
@@ -355,25 +408,31 @@ export const useFarmDiaryStore = create<FarmDiaryState>((set, get) => ({
         }
       }
 
-      // 🚀 NEW: Log Crop Observation Activity for Travel Report
-      const routeName = await getActiveRouteName();
-      const diary = get().diaries.find(d => d.id === sessionData.farm_diary_id);
-      const farmName = diary?.farm_name || 'Unknown Farm';
-      
-      let stageName = "Observation";
-      if (sessionData.selected_stage_id) {
-         const { data: sData } = await supabase.from('master_crop_stages').select('stage_name').eq('id', sessionData.selected_stage_id).single();
-         if (sData?.stage_name) stageName = sData.stage_name;
-      }
-      
-      await useShiftStore.getState().incrementActivity();
-      await useShiftStore.getState().logShiftEvent(
-        'activity',
-        `Farm Diary Crop Observation`,
-        `Farm: ${farmName}\nStage: ${stageName}\nRoute: ${routeName}`
-      );
-
       useAlertStore.getState().showAlert('Success', 'Crop observation saved successfully.');
+      onSuccess?.();
+
+      // Travel-report logging must not fail/rollback a successful observation save
+      try {
+        const routeName = await getActiveRouteName();
+        const diary = get().diaries.find(d => d.id === sessionData.farm_diary_id);
+        const farmName = diary?.farm_name || 'Unknown Farm';
+
+        let stageName = "Observation";
+        if (sessionData.selected_stage_id) {
+          const { data: sData } = await supabase.from('master_crop_stages').select('stage_name').eq('id', sessionData.selected_stage_id).single();
+          if (sData?.stage_name) stageName = sData.stage_name;
+        }
+
+        await useShiftStore.getState().incrementActivity();
+        await useShiftStore.getState().logShiftEvent(
+          'activity',
+          `Farm Diary Crop Observation`,
+          `Farm: ${farmName}\nStage: ${stageName}\nRoute: ${routeName}`
+        );
+      } catch (logError) {
+        console.error('Crop observation shift logging failed:', logError);
+      }
+
       return true;
     } catch (error: any) {
       console.error('Save Crop Obs Error:', error);
@@ -383,8 +442,16 @@ export const useFarmDiaryStore = create<FarmDiaryState>((set, get) => ({
         await supabase.from('crop_observation_sessions').delete().eq('id', createdSessionId);
       }
 
-      const reason = error?.message || error?.details || 'Unknown error';
-      useAlertStore.getState().showAlert('Error', `Failed to save crop observation.\n\n${reason}`);
+      const userMessage = classifyCropObservationError(error);
+      useAlertStore.getState().showAlert('Error', `Failed to save crop observation.\n\n${userMessage}`, [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Retry',
+          onPress: () => {
+            void get().saveCropObservation(sessionData, samples, onSuccess);
+          },
+        },
+      ]);
       return false;
     } finally {
       set({ isLoading: false });

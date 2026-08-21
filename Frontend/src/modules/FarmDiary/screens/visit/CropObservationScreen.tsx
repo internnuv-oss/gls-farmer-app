@@ -235,10 +235,9 @@ export const CropObservationScreen = ({ route, navigation }: any) => {
       }))
     }));
 
-    const success = await saveCropObservation(sessionData, formattedSamples);
-    if (success) {
-      navigation.navigate("FarmDiaryDashboardScreen", { diary }); 
-    }
+    await saveCropObservation(sessionData, formattedSamples, () => {
+      navigation.navigate("FarmDiaryDashboardScreen", { diary });
+    });
   };
 
   const activeCrop = crops.find(c => c.id === selectedCropId);
