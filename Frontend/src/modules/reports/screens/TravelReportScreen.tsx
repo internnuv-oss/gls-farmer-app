@@ -178,18 +178,39 @@ export const TravelReportScreen = ({ navigation }: any) => {
         const punchInEvent = dailyShift.events.find((e: any) => e.type === "punch-in");
         const punchOutEvent = dailyShift.events.find((e: any) => e.type === "punch-out");
 
-        const rawStart = shiftData.startKm || shiftData.start_km || "0";
-        const rawEnd = shiftData.endKm || shiftData.end_km || rawStart;
+        // Match backend: strip non-numeric, prefer odometer when end > start, else GPS total_distance
+        const sanitizeKm = (raw: any) => {
+            const cleaned = String(raw ?? '').replace(/[^0-9.]/g, '');
+            if (!cleaned) return null;
+            const n = parseFloat(cleaned);
+            return Number.isFinite(n) ? n : null;
+        };
 
-        const startKm = parseFloat(rawStart);
-        const endKm = parseFloat(rawEnd);
-        const manualDistance = Math.max(0, endKm - startKm);
+        const startKmParsed = sanitizeKm(shiftData.startKm ?? shiftData.start_km);
+        const endKmParsed = sanitizeKm(shiftData.endKm ?? shiftData.end_km);
+        const gpsDistanceNum = Number(shiftData.totalDistance ?? shiftData.total_distance ?? 0) || 0;
 
-        const gpsDistance = shiftData.totalDistance || shiftData.total_distance || 0;
+        let calculatedDistance = gpsDistanceNum;
+        if (startKmParsed !== null && endKmParsed !== null && endKmParsed > startKmParsed) {
+            calculatedDistance = endKmParsed - startKmParsed;
+        }
+
+        const manualDistance = startKmParsed !== null && endKmParsed !== null
+            ? Math.max(0, endKmParsed - startKmParsed)
+            : 0;
+
+        const vehicleType =
+            shiftData.vehicle_type ||
+            shiftData.vehicleType ||
+            punchInEvent?.vehicleType ||
+            null;
+        // Match backend: four-wheeler → ₹8/km, else (two-wheeler / null) → ₹4/km
+        const ratePerKm = vehicleType === 'four-wheeler' ? 8 : 4;
+
         const activities = shiftData.activitiesLogged || shiftData.activities_logged || 0;
 
-        const TA = manualDistance * 4;
-        const DA = manualDistance > 60 ? TA + 150 : TA;
+        const TA = calculatedDistance * ratePerKm;
+        const daAmount = calculatedDistance > 60 ? 150 : 0;
 
         const dailyExpenses = expenses.filter(e => 
             isSameDay(new Date(e.date), selectedDate) && 
@@ -198,7 +219,7 @@ export const TravelReportScreen = ({ navigation }: any) => {
         );
         
         const totalExpenses = dailyExpenses.reduce((sum, item) => sum + Number(item.amount), 0);
-        const grandTotal = DA + totalExpenses;
+        const grandTotal = TA + daAmount + totalExpenses;
 
         // Safely map both formats (Google's format OR our offline fallback format)
         const routeCoordinates = dynamicRoute.map((point: any) => ({ 
@@ -209,19 +230,22 @@ export const TravelReportScreen = ({ navigation }: any) => {
         return {
             punchInTime: punchInEvent ? new Date(punchInEvent.time) : null,
             punchOutTime: punchOutEvent ? new Date(punchOutEvent.time) : null,
-            startKm,
-            endKm,
+            startKm: startKmParsed ?? 0,
+            endKm: endKmParsed ?? startKmParsed ?? 0,
             manualDistance,
-            gpsDistance: parseFloat(gpsDistance).toFixed(2),
+            calculatedDistance,
+            ratePerKm,
+            vehicleType,
+            gpsDistance: gpsDistanceNum.toFixed(2),
             TA,
-            DA,
+            DA: daAmount,
             activities,
             routeCoordinates,
             dailyExpenses,
             totalExpenses,
             grandTotal,
         };
-    }, [dailyShift, expenses, selectedDate, dynamicRoute]); // 🚀 Ensured dynamicRoute is here
+    }, [dailyShift, expenses, selectedDate, dynamicRoute]);
 
     // 🚀 FIXED: Reliable map framing combination
     const fitMapToRoute = () => {
@@ -482,12 +506,12 @@ export const TravelReportScreen = ({ navigation }: any) => {
                             <span class="row-value">${reportData?.activities || 0}</span>
                         </div>
                         <div class="summary-row">
-                            <span class="row-label">Travel Allowance (TA @ ₹4/km):</span>
+                            <span class="row-label">Travel Allowance (TA @ ₹${reportData?.ratePerKm || 4}/km):</span>
                             <span class="row-value">₹${reportData?.TA || 0}</span>
                         </div>
                         <div class="summary-row">
                             <span class="row-label">Daily Allowance (DA):</span>
-                            <span class="row-value">₹${(reportData?.manualDistance || 0) > 60 ? 150 : 0}</span>
+                            <span class="row-value">₹${reportData?.DA || 0}</span>
                         </div>
                         ${(reportData?.totalExpenses || 0) > 0 ? `
                         <div class="summary-row">
@@ -497,7 +521,7 @@ export const TravelReportScreen = ({ navigation }: any) => {
                         ` : ''}
                         <div class="total-row">
                             <span style="font-weight: 900;">Grand Total:</span>
-                            <span class="total-val">₹${(reportData?.TA || 0) + ((reportData?.manualDistance || 0) > 60 ? 150 : 0) + (reportData?.totalExpenses || 0)}</span>
+                            <span class="total-val">₹${reportData?.grandTotal || 0}</span>
                         </div>
                     </div>
                 </body>
@@ -767,13 +791,13 @@ export const TravelReportScreen = ({ navigation }: any) => {
                                     </View>
 
                                     <View style={styles.row}>
-                                        <Text style={styles.rowLabel}>Travel Allowance (TA @ ₹4/km):</Text>
+                                        <Text style={styles.rowLabel}>Travel Allowance (TA @ ₹{reportData.ratePerKm}/km):</Text>
                                         <Text style={styles.rowValue}>₹{reportData.TA || 0}</Text>
                                     </View>
 
                                     <View style={styles.row}>
                                         <Text style={styles.rowLabel}>Daily Allowance (DA):</Text>
-                                        <Text style={styles.rowValue}>₹{reportData.manualDistance > 60 ? 150 : 0}</Text>
+                                        <Text style={styles.rowValue}>₹{reportData.DA || 0}</Text>
                                     </View>
 
                                     {reportData.dailyExpenses && reportData.dailyExpenses.length > 0 && (
@@ -786,7 +810,7 @@ export const TravelReportScreen = ({ navigation }: any) => {
                                     <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginTop: spacing.lg, paddingTop: spacing.md, borderTopWidth: 1.5, borderTopColor: colors.primarySoft }}>
                                         <Text style={{ fontSize: 18, fontWeight: "900", color: colors.primary }}>{t("Grand Total")}:</Text>
                                         <Text style={{ fontSize: 24, fontWeight: "900", color: colors.primary }}>
-                                            ₹{(reportData.TA || 0) + (reportData.manualDistance > 60 ? 150 : 0) + (reportData.totalExpenses || 0)}
+                                            ₹{reportData.grandTotal || 0}
                                         </Text>
                                     </View>
                                 </View>

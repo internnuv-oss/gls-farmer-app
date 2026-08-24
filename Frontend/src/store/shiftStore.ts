@@ -198,7 +198,7 @@ export const useShiftStore = create<ShiftState>()(
           const endVal = parseFloat(endKm);
           if (!isNaN(startVal) && !isNaN(endVal)) {
             const manualDistance = Math.max(0, endVal - startVal);
-            if (manualDistance < 45) {
+            if (manualDistance < 40) {
               allowanceStatus = 'Approved';
             }
           }
