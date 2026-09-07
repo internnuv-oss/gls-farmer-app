@@ -1,0 +1,255 @@
+---
+alwaysApply: false
+---
+
+# APP (Mobile) Frontend Test Scenario Generator
+
+You are a Test Engineer analyzing the Field Commander **mobile app** (`Frontend/`).
+
+Detected architecture (this repo):
+**Screen → Hooks / Zustand stores → Services → Supabase / Cloudinary / local SQLite / AsyncStorage**
+
+Stack cues to chase in code:
+- **UI**: React Native + Expo screens under `Frontend/src/modules/**/screens/`
+- **Navigation**: React Navigation (`AppNavigator.tsx` stacks/tabs + `navigation.navigate(...)`)
+- **Forms**: `react-hook-form` + `zod` schemas (`schema.ts`) + `@hookform/resolvers`
+- **State**: Zustand stores (`draftStore`, `authStore`, `shiftStore`, `expenseStore`, …)
+- **API**: `@supabase/supabase-js` client (`Frontend/src/core/supabase.ts`), service modules, Cloudinary uploads
+- **Permissions**: `usePermissions` / `getModulePerm('mobile_*')`
+- **Offline / drafts / sync**: `draftStore`, `OfflineSyncManager`, `database.ts`, location queue — **only if present in the module’s code path**
+
+**Job:** Generate a **Test Case Scenario Specification** covering **ONLY** validation and business logic **ACTUALLY implemented** in the provided mobile app code.
+
+---
+
+## HOW TO USE THIS RULE (every module)
+
+In Agent mode, provide:
+
+1. This rule file: `@docs/scenarios/session/app_scenarios_rule.mdc`
+2. **Module ID** (prefer IDs that match `docs/business-rules/<module-id>.md` when one exists)
+3. **Output path**: `scenarios/app/<module-id>.md` (overwrite if exists — one file per module)
+4. Primary source files (Screen + related hooks/schema/services/stores)
+5. Optional docs for cross-check only (do **NOT** invent TCs from docs)
+
+**Example prompt:**
+
+```
+Follow @docs/scenarios/session/app_scenarios_rule.mdc
+
+## Target
+- Module ID: dealer
+- Output path: scenarios/app/dealer.md
+- Overwrite if exists
+
+## Sources (code only — primary)
+@Frontend/src/modules/onboarding/dealer/screens/DealerOnboardingScreen.tsx
+@Frontend/src/modules/onboarding/dealer/hooks.ts
+@Frontend/src/modules/onboarding/dealer/schema.ts
+@Frontend/src/modules/onboarding/services/onboardingService.ts
+(and any other files this module imports for create/edit/list/permission/validation)
+
+## Optional cross-check only (do NOT invent TCs from docs)
+@docs/business-rules/dealer.md
+```
+
+---
+
+## CRITICAL RULES
+
+1. **DO NOT** create hypothetical scenarios
+2. **DO NOT** assume validations not in code
+3. **DO NOT** infer business rules not implemented in screens/hooks/services
+4. If validation is missing in the app — **do NOT** invent it
+5. Only test the exact **UI → handler/hook → API/local persist** flow visible in code
+6. If related screen/hook/schema/service code is missing, say so and only cover provided code
+7. Optional docs / admin permission key lists are for naming/cross-check hints only — never invent TCs from them
+8. Do **not** invent HTTP/API status codes — record what the **APP UI** does (alert title/message, toast, navigation, disabled button, success screen)
+
+---
+
+## EXTRACT FROM CODE
+
+### From Screens / Step components
+- Form fields and default values
+- Explicit validation (zod schema, RHF errors, manual `if` checks, disabled submit conditions)
+- Conditional rendering / branches (draft vs submitted, step gates, locked fields, FAB actions)
+- Permission / `getModulePerm('mobile_*')` / role / `can_view` / `can_edit` checks
+- Success and error handling (`useAlertStore`, Feedback screens, navigation after success)
+- Filters, search, pagination, PDF share/print **if coded**
+- Device permission flows (camera, media, location) **if coded in this module**
+
+### From Hooks / Stores
+- Step navigation / jump-back logic
+- Draft save / resume / auto-save / remove
+- Shift / attendance gates that block or unlock actions
+- Submit / update / fetch-by-mobile / lock-after-submitted branches
+- Offline fallback paths actually implemented
+
+### From API / service usage
+- `supabase.from` / `rpc` / `auth` / storage calls
+- Cloudinary or other upload helpers
+- Local SQLite / AsyncStorage reads/writes used by the flow
+- Request payload shape built in the hook/service
+- Query filters (`.eq`, `.in`, status filters, etc.)
+- What UI does on success vs error (do **not** invent backend status codes)
+
+### Related imports to chase
+- Module `hooks.ts`, `schema.ts`, `services/*`
+- Shared onboarding services (`onboardingService`, `cloudinaryService`)
+- Stores (`draftStore`, `authStore`, `shiftStore`, …)
+- `usePermissions` / dashboard list screens that surface this entity
+- Navigation entry points from `AppNavigator.tsx` / Dashboard / FarmerHub / ReportsHub
+
+---
+
+## FILE RULES
+
+- **One scenario file per module**
+- Filename: `<module-id>.md` inside `scenarios/app/`
+- Cover **ALL** user-facing operations in that module that exist in code:
+  list, view, create, update, draft save/resume, submit, delete draft, punch-in/out, export/share, settings links, etc.
+- **Overwrite** if the file already exists
+- Prefer **Module IDs** that match `docs/business-rules/` filenames when applicable (e.g. `dealer`, `distributor`, `farmer-part-1`, `attendance`)
+- Mobile-only areas without a matching business-rule file still get a clear kebab-case module-id (document it in prompts)
+
+---
+
+## MODULE ID ALIGNMENT (for Web / App / Backend diffing)
+
+When a business-rule file exists, use that stem as Module ID:
+
+| Module ID | App evidence (primary) | Permission key hint (naming only) |
+|-----------|------------------------|-----------------------------------|
+| `auth` | `modules/auth/*` | — |
+| `dashboard` | `modules/dashboard/screens/DashboardScreen.tsx` + list/filter UI | `mobile_*` gates on tabs/FAB |
+| `dealer` | `modules/onboarding/dealer/*` + dealer list/profile entry | `mobile_dealer` |
+| `distributor` | `modules/onboarding/distributor/*` | `mobile_distributor` |
+| `fpo` | `modules/onboarding/fpo/*` | `mobile_fpo` |
+| `farmer-part-1` | farmer onboarding + FarmerHub + GeneralVisit + FSPP enrollment | `mobile_farmer`, `mobile_farmer_onboard` |
+| `farmer-part-2` | `FarmCard/*` + `FarmDiary/*` | (hub gates only; no invent) |
+| `attendance` | `modules/shifts/*` + TravelReport + location sync touchpoints | `mobile_travel_activity` |
+| `expenses` | `modules/reports/*` expense screens | `mobile_travel_activity` |
+| `retail` | `modules/retail/*` | `mobile_retail` |
+| `user-profile` | `ProfileScreen` + `modules/onboarding/se/*` + language prefs | — |
+
+Do **not** invent TCs from permission keys alone — only from coded gates.
+
+---
+
+## OUTPUT STRUCTURE
+
+Use this template for **EACH** major operation found in code:
+
+```md
+# Test Scenario: [Module] — [Operation Name]
+
+## Operation Overview
+- **Module ID**: <module-id>
+- **UI Entry**: [tab / screen / FAB / hub button / navigation route name]
+- **Primary files**: [paths]
+- **Handler / function**: [hook or function name]
+- **API / data ops**: [e.g. supabase.from('dealers').upsert(...), draftStore.addDraft, Cloudinary upload]
+- **Layer**: APP
+
+## Code Analysis
+
+### Validations Found in Code
+1. **[Field]** - [rule] (Source: file, approx location)
+   - Implementation: `snippet`
+
+### Business Logic Found in Code
+1. **[Rule]** (Source: ...)
+   - Implementation: `snippet`
+
+### Error / Edge Paths Handled in UI
+1. **[Case]** — UI shows: `[exact alert/title/message if any]`
+
+### Permissions / Visibility
+1. **[Gate]** — who can see/do this (from code only)
+
+## Test Cases
+Use IDs: APP-TC-001, APP-TC-002, ... (continue numbering across the whole module file)
+
+### Success Scenarios
+#### APP-TC-001: ...
+- **Code Path**: Screen → Hook/Store → Service/API
+- **Based On**: [file + logic]
+- **Preconditions**: [only if checked in code]
+- **User steps**: [UI actions]
+- **Input**: field values / payload built by UI
+- **Expected UI behavior**: ...
+- **Expected API / local call** (if any): method/table/filters/body / store action as built in code
+
+### Validation Failure Scenarios
+#### APP-TC-00N: ...
+- **Validation Rule**: exact from code
+- **Input**: invalid value per code
+- **Expected UI behavior**: message / block next/submit / etc.
+
+### Business Logic Failure / Branch Scenarios
+#### APP-TC-00N: ...
+- **Condition**: exact if/else from code
+- **Expected UI behavior**: ...
+```
+
+At the **end of the module file**, add:
+
+```md
+## Backend/Web Mapping Hints
+- APP-TC-001 → list_<entity>
+- APP-TC-00N → create_<entity>_draft
+- APP-TC-00N → submit_<entity>
+(Only shared operation keys that match operations you found — do not invent.
+ Prefer stable keys comparable to WEB/BACKEND, e.g. list_dealers, create_dealer_draft, submit_dealer, punch_in, add_expense.)
+```
+
+---
+
+## STRICT EXCLUSIONS
+
+- No backend-only rules not reflected in this app UI/hook/service path
+- No inventing HTTP status codes or API error bodies the app never surfaces
+- No auth middleware / Supabase RLS internals unless coded in these files
+- No network/DB-down generic cases unless UI handles them explicitly
+- No “best practice” validations
+- Do **not** copy WEB/BACKEND TC IDs; use `APP-TC-*`
+- Do **not** invent create/delete/approve/sync flows if the UI has no such buttons/handlers
+- Do **not** invent offline/draft/GPS behavior for a module that does not implement it
+- Known admin permission key names (`mobile_dealer`, etc.) are **hints only** — never a source of TCs by themselves
+
+---
+
+## PROCESS (follow in order)
+
+1. **Inventory** fields, validations (esp. zod), branches, navigation entries, API/local calls, permission gates from code
+2. **Map** one TC per validation / branch / success path / explicit error UI path
+3. **Verify** every TC traces to code; remove assumptions
+4. **Write** `scenarios/app/<module-id>.md` (overwrite if exists)
+5. **Append** Backend/Web Mapping Hints with shared operation keys
+
+---
+
+## IF CODE IS INCOMPLETE
+
+- State clearly what cannot be covered because code was not provided
+- Only generate TCs for code that **is** provided
+- Request the missing Screen / Hook / Schema / Service file names needed for full coverage
+
+---
+
+## EXAMPLES
+
+❌ **WRONG**: Invent GST required validation when zod/schema never checks GST  
+❌ **WRONG**: Add “approve dealer” TC when there is no approve button/handler in the app  
+❌ **WRONG**: Assert HTTP 409 when the UI only shows an alert from a caught error message  
+❌ **WRONG**: Add offline sync TCs for a screen that never touches the sync queue  
+
+✅ **RIGHT**: Zod message / RHF error from `dealerOnboardingSchema`  
+✅ **RIGHT**: Draft save calls `useDraftStore.addDraft` / `updateDraft` with type `'DEALER'`  
+✅ **RIGHT**: `getModulePerm('mobile_dealer').can_edit === false` hides Add Dealer FAB action  
+✅ **RIGHT**: Submit success sets `showSuccess` / navigates as coded  
+
+---
+
+**This rule produces scenario files that are 100% traceable to implemented mobile app code.**
