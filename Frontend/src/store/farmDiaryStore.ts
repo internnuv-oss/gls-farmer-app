@@ -19,6 +19,46 @@ const getActiveRouteName = async (): Promise<string> => {
   return routeName;
 };
 
+const isRemoteMediaUrl = (uri: string) => /^https?:\/\//i.test(uri.trim());
+
+const isLocalMediaUri = (uri: string) => {
+  const trimmed = uri.trim();
+  if (!trimmed || isRemoteMediaUrl(trimmed)) return false;
+  return (
+    trimmed.startsWith('file://') ||
+    trimmed.startsWith('content://') ||
+    trimmed.startsWith('ph://') ||
+    trimmed.startsWith('assets-library://') ||
+    trimmed.startsWith('/')
+  );
+};
+
+const ensureCloudinaryImageUrl = async (uri: string, label: string): Promise<string> => {
+  const trimmed = (uri || '').trim();
+  if (!trimmed) {
+    throw new Error(`${label} photo could not be uploaded. Please retry on a better network.`);
+  }
+  if (isRemoteMediaUrl(trimmed)) return trimmed;
+
+  const compressedUri = await compressImage(trimmed, 1024, 0.6);
+  return uploadFileToCloudinary(compressedUri, 'image');
+};
+
+const rollbackCropObservationSession = async (sessionId: string) => {
+  const { data: sampleSets } = await supabase
+    .from('plant_sample_sets')
+    .select('id')
+    .eq('session_id', sessionId);
+
+  const sampleSetIds = (sampleSets || []).map((row) => row.id);
+  if (sampleSetIds.length > 0) {
+    await supabase.from('sample_parameter_values').delete().in('sample_set_id', sampleSetIds);
+    await supabase.from('plant_sample_sets').delete().eq('session_id', sessionId);
+  }
+
+  await supabase.from('crop_observation_sessions').delete().eq('id', sessionId);
+};
+
 const classifyCropObservationError = (error: any): string => {
   const message = String(error?.message || '');
   const details = String(error?.details || '');
@@ -69,7 +109,15 @@ const classifyCropObservationError = (error: any): string => {
     return "You don't have permission to save this observation.";
   }
 
-  return 'Something went wrong. Please try again.';
+  if (code === '23502' || raw.includes('not-null constraint') || raw.includes('null value in column')) {
+    return 'A required field was missing. Please fill all values and retry.';
+  }
+
+  if (code === '23503' || raw.includes('foreign key constraint') || raw.includes('violates foreign key')) {
+    return 'Invalid crop, stage, or parameter data. Go back, refresh, and try again.';
+  }
+
+  return message || details || 'Something went wrong. Please try again.';
 };
 
 export interface FarmDiary {
@@ -358,16 +406,10 @@ export const useFarmDiaryStore = create<FarmDiaryState>((set, get) => ({
       const sessionId = session.id;
       createdSessionId = sessionId;
       for (const sample of samples) {
-        let samplePhotoUrl = sample.photo_path;
-        // The photo path column is mandatory, so a failed upload must abort the save
-        if (samplePhotoUrl && samplePhotoUrl.startsWith('file://')) {
-          const compressedUri = await compressImage(samplePhotoUrl, 1024, 0.6);
-          samplePhotoUrl = await uploadFileToCloudinary(compressedUri, 'image');
-        }
-
-        if (!samplePhotoUrl) {
-          throw new Error(`Plant ${sample.index} photo could not be uploaded. Please retry on a better network.`);
-        }
+        const samplePhotoUrl = await ensureCloudinaryImageUrl(
+          sample.photo_path,
+          `Plant ${sample.index}`
+        );
 
         const { data: sampleSet, error: sampleSetError } = await supabase
           .from('plant_sample_sets')
@@ -382,20 +424,20 @@ export const useFarmDiaryStore = create<FarmDiaryState>((set, get) => ({
         if (sampleSetError) throw sampleSetError;
 
         // 3. Insert Parameter Values for this sample
-        // First handle any dynamic parameter image uploads
-        const uploadPromises = sample.values.map(async (v: any) => {
-          let finalValue = v.value;
-          if (finalValue && typeof finalValue === 'string' && finalValue.startsWith('file://')) {
-            const compressedUri = await compressImage(finalValue, 1024, 0.6);
-            finalValue = await uploadFileToCloudinary(compressedUri, 'image');
-          }
-          return {
-            sample_set_id: sampleSet.id,
-            parameter_id: v.parameter_id,
-            selected_uom_id: v.uom_id || null,
-            logged_value_raw: finalValue,
-          };
-        });
+        const uploadPromises = sample.values
+          .filter((v: any) => v.value != null && String(v.value).trim() !== '')
+          .map(async (v: any) => {
+            let finalValue = String(v.value).trim();
+            if (isLocalMediaUri(finalValue)) {
+              finalValue = await ensureCloudinaryImageUrl(finalValue, 'Parameter');
+            }
+            return {
+              sample_set_id: sampleSet.id,
+              parameter_id: v.parameter_id,
+              selected_uom_id: v.uom_id || null,
+              logged_value_raw: finalValue,
+            };
+          });
 
         const valuesToInsert = await Promise.all(uploadPromises);
 
@@ -437,9 +479,13 @@ export const useFarmDiaryStore = create<FarmDiaryState>((set, get) => ({
     } catch (error: any) {
       console.error('Save Crop Obs Error:', error);
 
-      // Roll back the half-written session so it does not linger as an empty record
+      // Roll back the half-written session and any child rows
       if (createdSessionId) {
-        await supabase.from('crop_observation_sessions').delete().eq('id', createdSessionId);
+        try {
+          await rollbackCropObservationSession(createdSessionId);
+        } catch (rollbackError) {
+          console.error('Crop observation rollback failed:', rollbackError);
+        }
       }
 
       const userMessage = classifyCropObservationError(error);

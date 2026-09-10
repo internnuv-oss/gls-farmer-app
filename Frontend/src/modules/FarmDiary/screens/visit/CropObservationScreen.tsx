@@ -222,17 +222,20 @@ export const CropObservationScreen = ({ route, navigation }: any) => {
       farm_diary_id: diary.id,
       selected_crop_id: selectedCropId,
       selected_stage_id: selectedStageId,
+      days_after_sowing_das: activeStage?.das ?? null,
       overall_plant_health_score: 5,
     };
 
     const formattedSamples = validPlants.map(i => ({
       index: i,
       photo_path: samplesData[i].photo_path,
-      values: Object.keys(samplesData[i].values).map(paramId => ({
-        parameter_id: paramId,
-        value: samplesData[i].values[paramId].value,
-        uom_id: samplesData[i].values[paramId].uom_id,
-      }))
+      values: Object.entries(samplesData[i].values)
+        .filter(([, entry]) => entry?.value != null && String(entry.value).trim() !== '')
+        .map(([paramId, entry]) => ({
+          parameter_id: paramId,
+          value: entry.value,
+          uom_id: entry.uom_id,
+        })),
     }));
 
     await saveCropObservation(sessionData, formattedSamples, () => {
